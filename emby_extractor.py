@@ -1,7 +1,6 @@
-﻿"""Utility zum Entpacken und Bereinigen von heruntergeladenen Archiven.
+﻿"""Utility for extracting and cleaning downloaded archives.
 
-Passe die Pfade und die Aufbewahrungsdauer in CONFIG an deine Umgebung an
-und starte das Script.
+Update the paths, demo mode, and retention period in CONFIG before running.
 """
 
 from __future__ import annotations
@@ -11,14 +10,27 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterator
 
 CONFIG = {
-    "download_root": r"\\hs\Download\dcpp",
-    "extracted_root": r"\\hs\Multimedia\Neu\_extracting",
-    "finished_root": r"\\hs\Multimedia\Neu\_finished",
+    "download_root": r"C:\\CHANGE_ME\\Download",
+    "extracted_root": r"C:\\CHANGE_ME\\Extracted",
+    "finished_root": r"C:\\CHANGE_ME\\Finished",
     "finished_retention_days": 14,
+    "enable_delete": False,
+    "demo_mode": False,
 }
+
+
+def _build_supported_suffixes() -> tuple[str, ...]:
+    suffixes: set[str] = set()
+    for _name, suffix_list, _description in shutil.get_unpack_formats():
+        for suffix in suffix_list:
+            suffixes.add(suffix.lower())
+    return tuple(sorted(suffixes, key=len, reverse=True))
+
+
+SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
 
 
 @dataclass(frozen=True)
@@ -43,24 +55,16 @@ class Paths:
 
         for key, path in path_values.items():
             if "CHANGE_ME" in str(path):
-                raise ValueError(f"Bitte aktualisiere den Pfad fuer '{key}' in CONFIG.")
+                raise ValueError(f"Please update the path for '{key}' in CONFIG.")
         return cls(**path_values)
 
     def ensure_ready(self) -> None:
         if not self.download_root.exists():
-            raise FileNotFoundError(f"Download-Verzeichnis '{self.download_root}' existiert nicht.")
+            raise FileNotFoundError(f"Download directory '{self.download_root}' does not exist.")
         if not self.download_root.is_dir():
-            raise NotADirectoryError(f"Download-Pfad '{self.download_root}' ist kein Verzeichnis.")
+            raise NotADirectoryError(f"Download path '{self.download_root}' is not a directory.")
         for target in (self.extracted_root, self.finished_root):
             target.mkdir(parents=True, exist_ok=True)
-
-
-def get_supported_extensions() -> set[str]:
-    extensions: set[str] = set()
-    for _name, suffixes, _description in shutil.get_unpack_formats():
-        for suffix in suffixes:
-            extensions.add(suffix.lower())
-    return extensions
 
 
 def read_retention_days(raw: dict[str, object]) -> int:
@@ -78,13 +82,59 @@ def read_retention_days(raw: dict[str, object]) -> int:
     return days
 
 
-def find_archives(directory: Path, supported_suffixes: set[str]) -> Iterable[Path]:
-    for entry in sorted(directory.iterdir()):
+def read_bool(raw: dict[str, object], key: str, *, default: bool = False) -> bool:
+    if key not in raw:
+        return default
+
+    value = raw[key]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+
+    raise ValueError(f"Cannot interpret '{key}' as boolean (value: {value!r})")
+
+
+@dataclass(frozen=True)
+class Settings:
+    paths: Paths
+    retention_days: int
+    enable_delete: bool
+    demo_mode: bool
+
+    @classmethod
+    def from_raw(cls, raw: dict[str, object]) -> "Settings":
+        paths = Paths.from_raw(raw)
+        retention_days = read_retention_days(raw)
+        enable_delete = read_bool(raw, "enable_delete", default=False)
+        demo_mode = read_bool(raw, "demo_mode", default=False)
+        return cls(paths=paths, retention_days=retention_days, enable_delete=enable_delete, demo_mode=demo_mode)
+
+
+def _iter_download_subdirs(download_root: Path) -> Iterator[Path]:
+    for entry in sorted(download_root.iterdir(), key=lambda path: path.name.lower()):
+        if entry.is_dir():
+            yield entry
+
+
+def _split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
+    supported: list[Path] = []
+    unsupported: list[Path] = []
+    for entry in sorted(directory.iterdir(), key=lambda path: path.name.lower()):
         if not entry.is_file():
             continue
         lower_name = entry.name.lower()
-        if any(lower_name.endswith(suffix) for suffix in supported_suffixes):
-            yield entry
+        if any(lower_name.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+            supported.append(entry)
+        else:
+            unsupported.append(entry)
+    return supported, unsupported
 
 
 def ensure_unique_destination(destination: Path) -> Path:
@@ -92,7 +142,7 @@ def ensure_unique_destination(destination: Path) -> Path:
         return destination
 
     suffix = "".join(destination.suffixes)
-    base_name = destination.name[:-len(suffix)] if suffix else destination.name
+    base_name = destination.name[: -len(suffix)] if suffix else destination.name
     counter = 1
     while True:
         candidate = destination.with_name(f"{base_name}_{counter}{suffix}")
@@ -101,76 +151,87 @@ def ensure_unique_destination(destination: Path) -> Path:
         counter += 1
 
 
-def extract_archive(archive: Path, target_dir: Path) -> None:
-    logging.info("Entpacke %s nach %s", archive, target_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
+def extract_archive(archive: Path, target_dir: Path, *, demo_mode: bool) -> None:
+    if demo_mode:
+        logging.info("Demo mode: would extract %s to %s", archive, target_dir)
+        return
+
+    logging.info("Extracting %s to %s", archive, target_dir)
     shutil.unpack_archive(str(archive), str(target_dir))
 
 
-def move_to_finished(archive: Path, finished_root: Path, relative_parent: Path) -> None:
+def move_to_finished(archive: Path, finished_root: Path, relative_parent: Path, *, demo_mode: bool) -> None:
     destination_dir = finished_root / relative_parent
-    destination_dir.mkdir(parents=True, exist_ok=True)
     destination = ensure_unique_destination(destination_dir / archive.name)
-    logging.info("Verschiebe %s nach %s", archive, destination)
+
+    if demo_mode:
+        logging.info("Demo mode: would move %s to %s", archive, destination)
+        return
+
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    logging.info("Moving %s to %s", archive, destination)
     shutil.move(str(archive), str(destination))
 
 
-def process_downloads(paths: Paths) -> tuple[int, list[Path], list[Path]]:
-    supported_suffixes = get_supported_extensions()
-    if not supported_suffixes:
-        raise RuntimeError("Keine unterstuetzten Archivformate im Python-Standard vorhanden.")
+def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path], list[Path]]:
+    if not SUPPORTED_ARCHIVE_SUFFIXES:
+        raise RuntimeError("No supported archive formats available in the Python standard library.")
+
     processed = 0
     failed: list[Path] = []
     unsupported: list[Path] = []
 
-    for subdir in sorted(paths.download_root.iterdir()):
-        if not subdir.is_dir():
-            continue
-
-        archives = list(find_archives(subdir, supported_suffixes))
+    for subdir in _iter_download_subdirs(paths.download_root):
+        archives, unsupported_entries = _split_directory_entries(subdir)
+        unsupported.extend(unsupported_entries)
         if not archives:
-            logging.debug("Kein unterstuetztes Archiv in %s gefunden", subdir)
+            logging.debug("No supported archives found in %s", subdir)
             continue
 
         relative_parent = subdir.relative_to(paths.download_root)
         target_dir = paths.extracted_root / relative_parent
 
+        if not demo_mode:
+            target_dir.mkdir(parents=True, exist_ok=True)
+
         for archive in archives:
             try:
-                extract_archive(archive, target_dir)
+                extract_archive(archive, target_dir, demo_mode=demo_mode)
             except shutil.ReadError as exc:
-                logging.error("Entpacken fehlgeschlagen fuer %s: %s", archive, exc)
+                logging.error("Extract failed for %s: %s", archive, exc)
                 failed.append(archive)
                 continue
             except Exception:
-                logging.exception("Unerwarteter Fehler beim Entpacken von %s", archive)
+                logging.exception("Unexpected error while extracting %s", archive)
                 failed.append(archive)
                 continue
 
             try:
-                move_to_finished(archive, paths.finished_root, relative_parent)
+                move_to_finished(archive, paths.finished_root, relative_parent, demo_mode=demo_mode)
             except Exception:
-                logging.exception("Konnte %s nicht in den Finished-Pfad verschieben", archive)
+                logging.exception("Failed to move %s to the finished directory", archive)
                 failed.append(archive)
                 continue
 
             processed += 1
 
-        for entry in subdir.iterdir():
-            if entry.is_file() and entry not in archives:
-                lower_name = entry.name.lower()
-                if not any(lower_name.endswith(suffix) for suffix in supported_suffixes):
-                    unsupported.append(entry)
-
     return processed, failed, unsupported
 
 
-def cleanup_finished(finished_root: Path, retention_days: int) -> tuple[list[Path], list[Path]]:
+def cleanup_finished(
+    finished_root: Path,
+    retention_days: int,
+    *,
+    enable_delete: bool,
+    demo_mode: bool,
+) -> tuple[list[Path], list[Path], list[Path]]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     deleted: list[Path] = []
     failed: list[Path] = []
+    skipped: list[Path] = []
+    candidate_directories: set[Path] = set()
 
-    for file_path in sorted(finished_root.rglob("*")):
+    for file_path in finished_root.rglob("*"):
         if not file_path.is_file():
             continue
 
@@ -178,70 +239,99 @@ def cleanup_finished(finished_root: Path, retention_days: int) -> tuple[list[Pat
         if file_mtime > cutoff:
             continue
 
+        if demo_mode:
+            logging.info("Demo mode: would delete %s", file_path)
+            skipped.append(file_path)
+            continue
+
+        if not enable_delete:
+            logging.info("Delete switch disabled: skipping deletion of %s", file_path)
+            skipped.append(file_path)
+            continue
+
         try:
             file_path.unlink()
         except Exception:
-            logging.exception("Konnte %s nicht loeschen", file_path)
+            logging.exception("Could not delete %s", file_path)
             failed.append(file_path)
             continue
 
         deleted.append(file_path)
+        candidate_directories.add(file_path.parent)
 
-    # Entferne leere Verzeichnisse, die durch das Aufraeumen entstanden sind
-    for directory in sorted({path.parent for path in deleted}, key=lambda p: len(p.parts), reverse=True):
-        if directory == finished_root:
-            continue
-        try:
-            directory.rmdir()
-        except OSError:
-            continue
+    if enable_delete and not demo_mode:
+        for directory in sorted(candidate_directories, key=lambda path: len(path.parts), reverse=True):
+            if directory == finished_root:
+                continue
+            try:
+                directory.rmdir()
+            except OSError:
+                continue
 
-    return deleted, failed
+    return deleted, failed, skipped
 
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     try:
-        paths = Paths.from_raw(CONFIG)
-        retention_days = read_retention_days(CONFIG)
+        settings = Settings.from_raw(CONFIG)
     except Exception as exc:
-        logging.error("Konfigurationsfehler: %s", exc)
+        logging.error("Configuration error: %s", exc)
         return 1
 
     try:
-        paths.ensure_ready()
+        settings.paths.ensure_ready()
     except Exception as exc:
-        logging.error("Pfadpruefung fehlgeschlagen: %s", exc)
+        logging.error("Path validation failed: %s", exc)
         return 1
+
+    if settings.demo_mode:
+        logging.warning("Demo mode enabled: no files will be extracted, moved, or deleted.")
+    elif not settings.enable_delete:
+        logging.info("Delete switch disabled: finished cleanup will not remove files.")
 
     try:
-        processed, failed, unsupported = process_downloads(paths)
+        processed, failed, unsupported = process_downloads(settings.paths, demo_mode=settings.demo_mode)
     except Exception as exc:
-        logging.error("Fehler bei der Verarbeitung: %s", exc)
+        logging.error("Processing error: %s", exc)
         return 1
 
-    deleted, cleanup_failed = cleanup_finished(paths.finished_root, retention_days)
+    deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
+        settings.paths.finished_root,
+        settings.retention_days,
+        enable_delete=settings.enable_delete,
+        demo_mode=settings.demo_mode,
+    )
 
-    logging.info("Verarbeitete Archive: %s", processed)
+    logging.info("Processed archives: %s", processed)
+    if settings.demo_mode:
+        logging.info("Demo mode: all actions were simulated only.")
+
     if failed:
-        logging.error("Fehlgeschlagene Archive (%s):", len(failed))
+        logging.error("Failed archives (%s):", len(failed))
         for item in failed:
             logging.error("  %s", item)
     if unsupported:
-        logging.warning("Nicht unterstuetzte Dateien (%s):", len(unsupported))
+        logging.warning("Unsupported files (%s):", len(unsupported))
         for item in unsupported:
             logging.warning("  %s", item)
     if deleted:
-        logging.info("Geloeschte Finished-Dateien (%s):", len(deleted))
+        logging.info("Deleted finished files (%s):", len(deleted))
         for item in deleted:
             logging.info("  %s", item)
+    if skipped_cleanup:
+        logging.info("Skipped finished files (%s):", len(skipped_cleanup))
+        for item in skipped_cleanup:
+            logging.info("  %s", item)
     if cleanup_failed:
-        logging.error("Fehler beim Aufraeumen des Finished-Pfades (%s):", len(cleanup_failed))
+        logging.error("Failed to clean finished directory (%s):", len(cleanup_failed))
         for item in cleanup_failed:
             logging.error("  %s", item)
 
-    return 0 if not failed and not cleanup_failed else 2
+    if failed or cleanup_failed:
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
