@@ -6,6 +6,7 @@ Update the paths, demo mode, and retention period in CONFIG before running.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -13,12 +14,12 @@ from pathlib import Path
 from typing import Iterator
 
 CONFIG = {
-    "download_root": r"C:\\CHANGE_ME\\Download",
-    "extracted_root": r"C:\\CHANGE_ME\\Extracted",
-    "finished_root": r"C:\\CHANGE_ME\\Finished",
+    "download_root": r"\\hs\Download\dcpp",
+    "extracted_root": r"\\hs\Multimedia\Neu\_extracted",
+    "finished_root": r"\\hs\Multimedia\Neu\_finished",
     "finished_retention_days": 14,
     "enable_delete": False,
-    "demo_mode": False,
+    "demo_mode": True,
 }
 
 
@@ -31,6 +32,9 @@ def _build_supported_suffixes() -> tuple[str, ...]:
 
 
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
+_PART_VOLUME_RE = re.compile(r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE)
+_R_VOLUME_RE = re.compile(r"^(?P<base>.+?)\.r(?P<index>\d+)$", re.IGNORECASE)
+_SPLIT_EXT_RE = re.compile(r"^(?P<base>.+?)(?P<ext>(?:\.[^.]+)+)\.(?P<index>\d+)$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -137,6 +141,56 @@ def _split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
     return supported, unsupported
 
 
+def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
+    lower_name = archive.name.lower()
+
+    part_match = _PART_VOLUME_RE.match(lower_name)
+    if part_match:
+        base = f"{part_match.group('base')}{part_match.group('ext')}"
+        part_index = int(part_match.group('index'))
+        return base, part_index if part_index >= 0 else 0
+
+    r_match = _R_VOLUME_RE.match(lower_name)
+    if r_match:
+        base = f"{r_match.group('base')}.rar"
+        part_index = int(r_match.group('index'))
+        return base, part_index if part_index >= 0 else 0
+
+    split_match = _SPLIT_EXT_RE.match(lower_name)
+    if split_match:
+        base = f"{split_match.group('base')}{split_match.group('ext')}"
+        part_index = int(split_match.group('index'))
+        return base, part_index if part_index >= 0 else 0
+
+    return lower_name, -1
+
+
+def _select_primary_archives(archives: list[Path]) -> list[Path]:
+    if not archives:
+        return []
+
+    group_min: dict[str, tuple[int, Path]] = {}
+    cache: dict[Path, tuple[str, int]] = {}
+
+    for archive in archives:
+        key, order = _compute_archive_group_key(archive)
+        cache[archive] = (key, order)
+        current = group_min.get(key)
+        if current is None:
+            group_min[key] = (order, archive)
+            continue
+        current_order, current_path = current
+        if order < current_order or (order == current_order and archive.name < current_path.name):
+            group_min[key] = (order, archive)
+
+    primary: list[Path] = []
+    for archive in archives:
+        key, _ = cache[archive]
+        if group_min[key][1] == archive:
+            primary.append(archive)
+    return primary
+
+
 def ensure_unique_destination(destination: Path) -> Path:
     if not destination.exists():
         return destination
@@ -188,13 +242,14 @@ def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path]
             logging.debug("No supported archives found in %s", subdir)
             continue
 
+        primary_archives = _select_primary_archives(archives)
         relative_parent = subdir.relative_to(paths.download_root)
         target_dir = paths.extracted_root / relative_parent
 
         if not demo_mode:
             target_dir.mkdir(parents=True, exist_ok=True)
 
-        for archive in archives:
+        for archive in primary_archives:
             try:
                 extract_archive(archive, target_dir, demo_mode=demo_mode)
             except shutil.ReadError as exc:
