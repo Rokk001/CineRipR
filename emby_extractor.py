@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 import re
 import shutil
+import tarfile
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -37,7 +39,7 @@ _R_VOLUME_RE = re.compile(r"^(?P<base>.+?)\.r(?P<index>\d+)$", re.IGNORECASE)
 _SPLIT_EXT_RE = re.compile(r"^(?P<base>.+?)(?P<ext>(?:\.[^.]+)+)\.(?P<index>\d+)$", re.IGNORECASE)
 
 
-@dataclass(frozen=True)
+@dataclass
 class Paths:
     download_root: Path
     extracted_root: Path
@@ -105,7 +107,7 @@ def read_bool(raw: dict[str, object], key: str, *, default: bool = False) -> boo
     raise ValueError(f"Cannot interpret '{key}' as boolean (value: {value!r})")
 
 
-@dataclass(frozen=True)
+@dataclass
 class Settings:
     paths: Paths
     retention_days: int
@@ -119,6 +121,18 @@ class Settings:
         enable_delete = read_bool(raw, "enable_delete", default=False)
         demo_mode = read_bool(raw, "demo_mode", default=False)
         return cls(paths=paths, retention_days=retention_days, enable_delete=enable_delete, demo_mode=demo_mode)
+
+
+@dataclass
+class ArchiveGroup:
+    key: str
+    primary: Path
+    members: tuple[Path, ...]
+    order_map: dict[Path, int]
+
+    @property
+    def part_count(self) -> int:
+        return len(self.members)
 
 
 def _format_progress(current: int, total: int, *, width: int = 20) -> str:
@@ -156,9 +170,8 @@ def _is_supported_archive(entry: Path) -> bool:
         if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
             return True
 
-    r_match = _R_VOLUME_RE.match(name)
-    if r_match:
-        return True  # handled as .rar group later
+    if _R_VOLUME_RE.match(name):
+        return True  # treated as part of a .rar set
 
     split_match = _SPLIT_EXT_RE.match(name)
     if split_match:
@@ -221,30 +234,75 @@ def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
     return lower_name, -1
 
 
-def _select_primary_archives(archives: list[Path]) -> list[Path]:
-    if not archives:
-        return []
-
-    group_min: dict[str, tuple[int, Path]] = {}
-    cache: dict[Path, tuple[str, int]] = {}
-
+def _build_archive_groups(archives: list[Path]) -> list[ArchiveGroup]:
+    grouped: dict[str, list[tuple[int, Path]]] = {}
     for archive in archives:
         key, order = _compute_archive_group_key(archive)
-        cache[archive] = (key, order)
-        current = group_min.get(key)
-        if current is None:
-            group_min[key] = (order, archive)
-            continue
-        current_order, current_path = current
-        if order < current_order or (order == current_order and archive.name < current_path.name):
-            group_min[key] = (order, archive)
+        grouped.setdefault(key, []).append((order, archive))
 
-    primary: list[Path] = []
-    for archive in archives:
-        key, _ = cache[archive]
-        if group_min[key][1] == archive:
-            primary.append(archive)
-    return primary
+    groups: list[ArchiveGroup] = []
+    for key, items in grouped.items():
+        items.sort(key=lambda item: (item[0], item[1].name.lower()))
+        ordered_paths = tuple(path for _order, path in items)
+        order_map = {path: order for order, path in items}
+        primary = ordered_paths[0]
+        groups.append(ArchiveGroup(key=key, primary=primary, members=ordered_paths, order_map=order_map))
+
+    groups.sort(key=lambda group: group.primary.name.lower())
+    return groups
+
+
+def _validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
+    orders = group.order_map
+    positives = sorted(order for order in orders.values() if order >= 0)
+    if positives:
+        start = 0 if 0 in positives else 1 if 1 in positives else positives[0]
+        expected = list(range(start, start + len(positives)))
+        if positives != expected:
+            missing = sorted(set(expected) - set(positives))
+            if missing:
+                return False, "missing volume index(es): " + ", ".join(str(value) for value in missing)
+        if group.key.endswith(".rar") and not any(order < 0 for order in orders.values()):
+            return False, "missing base .rar volume"
+
+    if not group.primary.exists():
+        return False, "primary archive file is missing"
+
+    return True, None
+
+
+def _detect_archive_format(archive: Path) -> str | None:
+    lower = archive.name.lower()
+    for format_name, suffixes, _description in shutil.get_unpack_formats():
+        for suffix in suffixes:
+            if lower.endswith(suffix.lower()):
+                return format_name
+    return None
+
+
+def _can_extract_archive(archive: Path) -> tuple[bool, str | None]:
+    format_name = _detect_archive_format(archive)
+    if format_name == "zip":
+        try:
+            with zipfile.ZipFile(archive) as zf:
+                damaged = zf.testzip()
+                if damaged is not None:
+                    return False, f"corrupt member: {damaged}"
+        except Exception as exc:  # noqa: BLE001 - want details in log
+            return False, str(exc)
+        return True, None
+
+    if format_name in {"tar", "gztar", "bztar", "xztar"}:
+        try:
+            with tarfile.open(archive) as tf:
+                for _member in tf:
+                    pass
+        except Exception as exc:  # noqa: BLE001
+            return False, str(exc)
+        return True, None
+
+    # Unknown format: rely on extraction attempt
+    return True, None
 
 
 def ensure_unique_destination(destination: Path) -> Path:
@@ -265,12 +323,14 @@ def extract_archive(archive: Path, target_dir: Path) -> None:
     shutil.unpack_archive(str(archive), str(target_dir))
 
 
-def move_to_finished(archive: Path, finished_root: Path, relative_parent: Path) -> Path:
+def move_archive_group(files: tuple[Path, ...], finished_root: Path, relative_parent: Path) -> list[Path]:
     destination_dir = finished_root / relative_parent
     destination_dir.mkdir(parents=True, exist_ok=True)
-    destination = ensure_unique_destination(destination_dir / archive.name)
-    moved_to = Path(shutil.move(str(archive), str(destination)))
-    return moved_to
+    moved: list[Path] = []
+    for src in files:
+        destination = ensure_unique_destination(destination_dir / src.name)
+        moved.append(Path(shutil.move(str(src), str(destination))))
+    return moved
 
 
 def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path], list[Path]]:
@@ -288,47 +348,84 @@ def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path]
             logging.debug("No supported archives found in %s", subdir)
             continue
 
-        primary_archives = _select_primary_archives(archives)
+        groups = _build_archive_groups(archives)
         relative_parent = subdir.relative_to(paths.download_root)
         target_dir = paths.extracted_root / relative_parent
 
         if not demo_mode:
             target_dir.mkdir(parents=True, exist_ok=True)
 
-        total_archives = len(primary_archives)
-        for index, archive in enumerate(primary_archives, 1):
-            progress = _format_progress(index, total_archives)
+        total_groups = len(groups)
+        for index, group in enumerate(groups, 1):
+            progress = _format_progress(index, total_groups)
+
+            complete, reason = _validate_archive_group(group)
+            if not complete:
+                logging.warning("%s Skipping %s: %s", progress, group.primary, reason)
+                failed.append(group.primary)
+                continue
 
             if demo_mode:
-                logging.info("%s Demo: would extract %s to %s", progress, archive, target_dir)
+                logging.info(
+                    "%s Demo: would extract %s (%s file(s)) to %s",
+                    progress,
+                    group.primary,
+                    group.part_count,
+                    target_dir,
+                )
             else:
-                logging.info("%s Extracting %s to %s", progress, archive, target_dir)
+                can_extract, reason = _can_extract_archive(group.primary)
+                if not can_extract:
+                    logging.error(
+                        "%s Pre-extraction check failed for %s: %s",
+                        progress,
+                        group.primary,
+                        reason,
+                    )
+                    failed.append(group.primary)
+                    continue
+
+                logging.info(
+                    "%s Extracting %s (%s file(s)) to %s",
+                    progress,
+                    group.primary,
+                    group.part_count,
+                    target_dir,
+                )
                 try:
-                    extract_archive(archive, target_dir)
+                    extract_archive(group.primary, target_dir)
                 except shutil.ReadError as exc:
-                    logging.error("Extract failed for %s: %s", archive, exc)
-                    failed.append(archive)
+                    logging.error("Extract failed for %s: %s", group.primary, exc)
+                    failed.append(group.primary)
                     continue
                 except Exception:
-                    logging.exception("Unexpected error while extracting %s", archive)
-                    failed.append(archive)
+                    logging.exception("Unexpected error while extracting %s", group.primary)
+                    failed.append(group.primary)
                     continue
 
             destination_dir = paths.finished_root / relative_parent
-            destination = ensure_unique_destination(destination_dir / archive.name)
-
             if demo_mode:
-                logging.info("%s Demo: would move %s to %s", progress, archive, destination)
+                logging.info(
+                    "%s Demo: would move %s file(s) for archive %s to %s",
+                    progress,
+                    group.part_count,
+                    group.primary,
+                    destination_dir,
+                )
             else:
-                logging.info("%s Moving %s to %s", progress, archive, destination)
+                logging.info(
+                    "%s Moving %s file(s) for archive %s to %s",
+                    progress,
+                    group.part_count,
+                    group.primary,
+                    destination_dir,
+                )
                 try:
-                    moved_to = move_to_finished(archive, paths.finished_root, relative_parent)
+                    move_archive_group(group.members, paths.finished_root, relative_parent)
                 except Exception:
-                    logging.exception("Failed to move %s to the finished directory", archive)
-                    failed.append(archive)
+                    logging.exception("Failed to move archive %s to the finished directory", group.primary)
+                    failed.append(group.primary)
                     continue
-                else:
-                    destination = moved_to
 
             processed += 1
 
