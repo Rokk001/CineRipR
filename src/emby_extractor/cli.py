@@ -1,4 +1,4 @@
-﻿"""Command line interface for the emby extractor."""
+"""Command line interface for the emby extractor."""
 
 from __future__ import annotations
 
@@ -43,6 +43,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="demo_mode",
         action=argparse.BooleanOptionalAction,
         help="Enable demo mode (only log actions without modifying files)",
+    )
+    parser.add_argument(
+        "--seven-zip",
+        type=Path,
+        help="Path or executable name for 7-Zip used to extract RAR archives",
     )
     parser.add_argument(
         "--log-level",
@@ -96,11 +101,16 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     if args.demo_mode is not None:
         demo_mode = args.demo_mode
 
+    seven_zip_path = settings.seven_zip_path
+    if args.seven_zip is not None:
+        seven_zip_path = args.seven_zip
+
     return Settings(
         paths=paths,
         retention_days=retention_days,
         enable_delete=enable_delete,
         demo_mode=demo_mode,
+        seven_zip_path=seven_zip_path,
     )
 
 
@@ -138,7 +148,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
     try:
-        result: ProcessResult = process_downloads(settings.paths, demo_mode=settings.demo_mode)
+        result: ProcessResult = process_downloads(
+            settings.paths,
+            demo_mode=settings.demo_mode,
+            seven_zip_path=settings.seven_zip_path,
+        )
     except Exception as exc:
         _LOGGER.error("Processing error: %s", exc)
         return 1

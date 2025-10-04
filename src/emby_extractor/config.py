@@ -45,6 +45,7 @@ class Settings:
     retention_days: int = 14
     enable_delete: bool = False
     demo_mode: bool = False
+    seven_zip_path: Path | None = None
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any], *, base_path: Path | None = None) -> "Settings":
@@ -70,7 +71,9 @@ class Settings:
             extracted_root = resolve_path(raw_paths["extracted_root"], field="extracted_root")
             finished_root = resolve_path(raw_paths["finished_root"], field="finished_root")
         except KeyError as exc:
-            raise ConfigurationError("paths section must define download_root, extracted_root and finished_root") from exc
+            raise ConfigurationError(
+                "paths section must define download_root, extracted_root and finished_root"
+            ) from exc
 
         paths = Paths(
             download_root=download_root,
@@ -83,11 +86,27 @@ class Settings:
         enable_delete = _read_bool(options, "enable_delete", default=False)
         demo_mode = _read_bool(options, "demo_mode", default=False)
 
+        seven_zip_path: Path | None = None
+        tools_data = data.get("tools")
+        if isinstance(tools_data, dict) and "seven_zip" in tools_data:
+            raw_value = tools_data["seven_zip"]
+            if isinstance(raw_value, (str, Path)):
+                raw_text = str(raw_value).strip()
+                if raw_text:
+                    candidate = Path(raw_text)
+                    if candidate.is_absolute() or any(sep in raw_text for sep in ("/", "\\", ":")):
+                        if not candidate.is_absolute():
+                            candidate = (base_path / candidate).resolve()
+                        seven_zip_path = candidate
+                    else:
+                        seven_zip_path = candidate
+
         return cls(
             paths=paths,
             retention_days=retention_days,
             enable_delete=enable_delete,
             demo_mode=demo_mode,
+            seven_zip_path=seven_zip_path,
         )
 
 
@@ -120,7 +139,7 @@ def _read_bool(data: dict[str, Any], key: str, *, default: bool = False) -> bool
 
 
 def load_settings(config_file: Path | None) -> Settings:
-    """Load configuration from a TOML file, falling back to defaults when absent."""
+    """Load configuration from a TOML file."""
 
     if config_file is None:
         raise ConfigurationError("No configuration file supplied")

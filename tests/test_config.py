@@ -26,6 +26,9 @@ finished_root = "./finished"
 finished_retention_days = 7
 enable_delete = true
 demo_mode = true
+
+[tools]
+seven_zip = "tools/7z.exe"
 """
     )
 
@@ -35,6 +38,7 @@ demo_mode = true
     assert settings.enable_delete is True
     assert settings.demo_mode is True
     assert settings.paths.download_root == (config_path.parent / "downloads").resolve()
+    assert settings.seven_zip_path == (config_path.parent / "tools" / "7z.exe").resolve()
 
 
 def test_invalid_config_raises(tmp_path: Path) -> None:

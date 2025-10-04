@@ -9,7 +9,8 @@ Utility for extracting multi-part archives downloaded for Emby (or any media ser
 - CLI overrides for every runtime setting and structured logging with progress indicators.
 
 ## Requirements
-- Python 3.11 or newer. (Python 3.12 recommended; bundled `tomllib` is used for configuration parsing.)
+- Python 3.11 or newer (Python 3.12 recommended).
+- [7-Zip](https://www.7-zip.org/) (or compatible) available on `PATH` or configured explicitly for extracting RAR archives.
 
 ## Installation
 ```bash
@@ -20,7 +21,7 @@ This installs the package with the console entry point named `emby-extractor`.
 For local development without installation, add the `src/` directory to `PYTHONPATH` or use `pip install -e .`.
 
 ## Configuration
-Create an `emby_extractor.toml` file (a starter version is included in the repository). Adjust the paths and retention settings to match your environment:
+Create an `emby_extractor.toml` file (a starter version is included in the repository). Adjust the paths, retention settings, and optional tool overrides to match your environment:
 
 ```toml
 # emby_extractor.toml
@@ -33,6 +34,9 @@ finished_root = "C:/Media/Finished"
 finished_retention_days = 14
 enable_delete = false
 demo_mode = false
+
+[tools]
+seven_zip = "C:/Program Files/7-Zip/7z.exe"
 ```
 
 The CLI allows you to override any of these values at runtime.
@@ -47,6 +51,7 @@ Common flags:
 - `--enable-delete/--no-enable-delete` — control cleanup deletions.
 - `--retention-days N` — override retention period.
 - `--download-root`, `--extracted-root`, `--finished-root` — override individual paths.
+- `--seven-zip PATH` — point to a custom 7-Zip executable for RAR extraction.
 
 Use `emby-extractor --help` to list all available options.
 

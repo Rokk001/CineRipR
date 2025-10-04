@@ -1,10 +1,11 @@
-﻿"""Archive discovery, validation and extraction helpers."""
+"""Archive discovery, validation and extraction helpers."""
 
 from __future__ import annotations
 
 import logging
 import re
 import shutil
+import subprocess
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -54,13 +55,15 @@ class ProcessResult:
 
 def _is_supported_archive(entry: Path) -> bool:
     name = entry.name.lower()
+    if name.endswith(".rar"):
+        return True
     if any(name.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
         return True
 
     part_match = _PART_VOLUME_RE.match(name)
     if part_match:
         candidate = f"{part_match.group('base')}{part_match.group('ext')}"
-        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES) or candidate.endswith(".rar"):
             return True
 
     if _R_VOLUME_RE.match(name):
@@ -69,7 +72,7 @@ def _is_supported_archive(entry: Path) -> bool:
     split_match = _SPLIT_EXT_RE.match(name)
     if split_match:
         candidate = f"{split_match.group('base')}{split_match.group('ext')}"
-        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES) or candidate.endswith(".rar"):
             return True
 
     return False
@@ -96,6 +99,9 @@ def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
 
 def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
     lower_name = archive.name.lower()
+
+    if lower_name.endswith(".rar"):
+        return lower_name, -1
 
     part_match = _PART_VOLUME_RE.match(lower_name)
     if part_match:
@@ -157,6 +163,8 @@ def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
 
 def _detect_archive_format(archive: Path) -> str | None:
     lower = archive.name.lower()
+    if lower.endswith(".rar"):
+        return "rar"
     for format_name, suffixes, _description in shutil.get_unpack_formats():
         for suffix in suffixes:
             if lower.endswith(suffix.lower()):
@@ -164,8 +172,33 @@ def _detect_archive_format(archive: Path) -> str | None:
     return None
 
 
-def can_extract_archive(archive: Path) -> tuple[bool, str | None]:
+def _resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
+    if seven_zip_path is not None:
+        if seven_zip_path.is_absolute():
+            return str(seven_zip_path)
+        resolved = shutil.which(str(seven_zip_path))
+        if resolved:
+            return resolved
+        candidate = (Path.cwd() / seven_zip_path).resolve()
+        if candidate.exists():
+            return str(candidate)
+        return str(seven_zip_path)
+
+    for candidate in ("7z", "7za", "7zr"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return None
+
+
+def can_extract_archive(archive: Path, *, seven_zip_path: Path | None) -> tuple[bool, str | None]:
     format_name = _detect_archive_format(archive)
+    if format_name == "rar":
+        command = _resolve_seven_zip_command(seven_zip_path)
+        if command is None:
+            return False, "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
+        return True, None
+
     if format_name == "zip":
         try:
             with zipfile.ZipFile(archive) as zf:
@@ -202,8 +235,31 @@ def ensure_unique_destination(destination: Path) -> Path:
         counter += 1
 
 
-def extract_archive(archive: Path, target_dir: Path) -> None:
-    shutil.unpack_archive(str(archive), str(target_dir))
+def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> None:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [command, "x", str(archive), f"-o{target_dir}", "-y"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        raise RuntimeError(
+            f"7-Zip extraction failed (exit code {result.returncode})" + (f": {stderr}" if stderr else "")
+        )
+
+
+def extract_archive(archive: Path, target_dir: Path, *, seven_zip_path: Path | None) -> None:
+    format_name = _detect_archive_format(archive)
+    if format_name == "rar":
+        command = _resolve_seven_zip_command(seven_zip_path)
+        if command is None:
+            raise RuntimeError("7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.")
+        _extract_with_seven_zip(command, archive, target_dir)
+    else:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.unpack_archive(str(archive), str(target_dir))
 
 
 def move_archive_group(files: Sequence[Path], finished_root: Path, relative_parent: Path) -> list[Path]:
@@ -216,8 +272,13 @@ def move_archive_group(files: Sequence[Path], finished_root: Path, relative_pare
     return moved
 
 
-def process_downloads(paths: Paths, *, demo_mode: bool) -> ProcessResult:
-    if not SUPPORTED_ARCHIVE_SUFFIXES:
+def process_downloads(
+    paths: Paths,
+    *,
+    demo_mode: bool,
+    seven_zip_path: Path | None,
+) -> ProcessResult:
+    if not SUPPORTED_ARCHIVE_SUFFIXES and seven_zip_path is None:
         raise RuntimeError("No supported archive formats available in the Python standard library.")
 
     processed = 0
@@ -257,7 +318,7 @@ def process_downloads(paths: Paths, *, demo_mode: bool) -> ProcessResult:
                     target_dir,
                 )
             else:
-                can_extract, reason = can_extract_archive(group.primary)
+                can_extract, reason = can_extract_archive(group.primary, seven_zip_path=seven_zip_path)
                 if not can_extract:
                     _logger.error(
                         "%s Pre-extraction check failed for %s: %s",
@@ -276,8 +337,8 @@ def process_downloads(paths: Paths, *, demo_mode: bool) -> ProcessResult:
                     target_dir,
                 )
                 try:
-                    extract_archive(group.primary, target_dir)
-                except shutil.ReadError as exc:
+                    extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
+                except (shutil.ReadError, RuntimeError) as exc:
                     _logger.error("Extract failed for %s: %s", group.primary, exc)
                     failed.append(group.primary)
                     continue
