@@ -1,4 +1,4 @@
-"""Archive discovery, validation and extraction helpers."""
+﻿"""Archive discovery, validation and extraction helpers."""
 
 from __future__ import annotations
 
@@ -237,6 +237,14 @@ def ensure_unique_destination(destination: Path) -> Path:
 
 
 def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> None:
+def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> None:
+    if pre_existing:
+        return
+    try:
+        if target_dir.exists() and target_dir.is_dir() and not any(target_dir.iterdir()):
+            target_dir.rmdir()
+    except OSError:
+        pass
     target_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [command, "x", str(archive), f"-o{target_dir}", "-y"],
@@ -297,8 +305,6 @@ def process_downloads(
         relative_parent = subdir.relative_to(paths.download_root)
         target_dir = paths.extracted_root / relative_parent
 
-        if not demo_mode:
-            target_dir.mkdir(parents=True, exist_ok=True)
 
         total_groups = len(groups)
         for index, group in enumerate(groups, 1):
@@ -337,14 +343,17 @@ def process_downloads(
                     group.part_count,
                     target_dir,
                 )
+                pre_existing_target = target_dir.exists()
                 try:
                     extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
                 except (shutil.ReadError, RuntimeError) as exc:
                     _logger.error("Extract failed for %s: %s", group.primary, exc)
+                    _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
                     failed.append(group.primary)
                     continue
                 except Exception:  # noqa: BLE001
                     _logger.exception("Unexpected error while extracting %s", group.primary)
+                    _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
                     failed.append(group.primary)
                     continue
 
@@ -388,3 +397,5 @@ __all__ = [
     "validate_archive_group",
     "resolve_seven_zip_command",
 ]
+
+
