@@ -9,7 +9,7 @@ description = "Automate extraction of multi-part downloads and finished-folder c
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Mario" }
+    { name = "Rokk001" }
 ]
 requires-python = ">=3.11"
 dependencies = []
@@ -18,9 +18,9 @@ dependencies = []
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/Mario/emby-extractor"
-Source = "https://github.com/Mario/emby-extractor"
-Issues = "https://github.com/Mario/emby-extractor/issues"
+Homepage = "https://github.com/Rokk001/emby-extractor"
+Source = "https://github.com/Rokk001/emby-extractor"
+Issues = "https://github.com/Rokk001/emby-extractor/issues"
 
 [project.scripts]
 emby-extractor = "emby_extractor.cli:main"
