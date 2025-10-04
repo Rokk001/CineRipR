@@ -1,4 +1,4 @@
-"""Command line interface for the emby extractor."""
+﻿"""Command line interface for the emby extractor."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
-from .archives import ProcessResult, process_downloads
+from .archives import ProcessResult, process_downloads, resolve_seven_zip_command
 from .cleanup import cleanup_finished
 from .config import ConfigurationError, Paths, Settings, load_settings
 
@@ -134,6 +134,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings = load_and_merge_settings(args)
     except (ConfigurationError, FileNotFoundError) as exc:
         _LOGGER.error("Configuration error: %s", exc)
+        return 1
+
+    if resolve_seven_zip_command(settings.seven_zip_path) is None:
+        _LOGGER.error("7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.")
         return 1
 
     try:

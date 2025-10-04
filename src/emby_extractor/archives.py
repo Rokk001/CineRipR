@@ -172,20 +172,21 @@ def _detect_archive_format(archive: Path) -> str | None:
     return None
 
 
-def _resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
+def resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
     if seven_zip_path is not None:
-        if seven_zip_path.is_absolute():
-            return str(seven_zip_path)
-        resolved = shutil.which(str(seven_zip_path))
+        candidate = Path(seven_zip_path)
+        if candidate.is_absolute():
+            return str(candidate)
+        resolved = shutil.which(str(candidate))
         if resolved:
             return resolved
-        candidate = (Path.cwd() / seven_zip_path).resolve()
+        candidate = (Path.cwd() / candidate).resolve()
         if candidate.exists():
             return str(candidate)
         return str(seven_zip_path)
 
-    for candidate in ("7z", "7za", "7zr"):
-        resolved = shutil.which(candidate)
+    for name in ("7z", "7za", "7zr"):
+        resolved = shutil.which(name)
         if resolved:
             return resolved
     return None
@@ -194,7 +195,7 @@ def _resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
 def can_extract_archive(archive: Path, *, seven_zip_path: Path | None) -> tuple[bool, str | None]:
     format_name = _detect_archive_format(archive)
     if format_name == "rar":
-        command = _resolve_seven_zip_command(seven_zip_path)
+        command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
             return False, "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
         return True, None
@@ -253,7 +254,7 @@ def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> No
 def extract_archive(archive: Path, target_dir: Path, *, seven_zip_path: Path | None) -> None:
     format_name = _detect_archive_format(archive)
     if format_name == "rar":
-        command = _resolve_seven_zip_command(seven_zip_path)
+        command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
             raise RuntimeError("7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.")
         _extract_with_seven_zip(command, archive, target_dir)
@@ -385,4 +386,5 @@ __all__ = [
     "extract_archive",
     "can_extract_archive",
     "validate_archive_group",
+    "resolve_seven_zip_command",
 ]
