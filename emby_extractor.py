@@ -14,12 +14,12 @@ from pathlib import Path
 from typing import Iterator
 
 CONFIG = {
-    "download_root": r"\\hs\Download\dcpp",
-    "extracted_root": r"\\hs\Multimedia\Neu\_extracted",
-    "finished_root": r"\\hs\Multimedia\Neu\_finished",
+    "download_root": r"C:\\CHANGE_ME\\Download",
+    "extracted_root": r"C:\\CHANGE_ME\\Extracted",
+    "finished_root": r"C:\\CHANGE_ME\\Finished",
     "finished_retention_days": 14,
     "enable_delete": False,
-    "demo_mode": True,
+    "demo_mode": False,
 }
 
 
@@ -121,6 +121,54 @@ class Settings:
         return cls(paths=paths, retention_days=retention_days, enable_delete=enable_delete, demo_mode=demo_mode)
 
 
+def _format_progress(current: int, total: int, *, width: int = 20) -> str:
+    if total <= 0:
+        return f"[{'-' * width}] 0% (0/0)"
+    ratio = max(0.0, min(1.0, current / total))
+    filled = int(ratio * width)
+    if current > 0 and filled == 0:
+        filled = 1
+    bar = "#" * filled + "-" * (width - filled)
+    percent = int(round(ratio * 100))
+    return f"[{bar}] {percent:3d}% ({current}/{total})"
+
+
+def _log_path_summary(log_fn, label: str, paths: list[Path], *, limit: int = 5) -> None:
+    if not paths:
+        return
+    sorted_paths = sorted(paths, key=lambda path: str(path).lower())
+    log_fn("%s (%s)", label, len(sorted_paths))
+    for path in sorted_paths[:limit]:
+        log_fn("  %s", path)
+    remaining = len(sorted_paths) - limit
+    if remaining > 0:
+        log_fn("  ... %s more", remaining)
+
+
+def _is_supported_archive(entry: Path) -> bool:
+    name = entry.name.lower()
+    if any(name.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+        return True
+
+    part_match = _PART_VOLUME_RE.match(name)
+    if part_match:
+        candidate = f"{part_match.group('base')}{part_match.group('ext')}"
+        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+            return True
+
+    r_match = _R_VOLUME_RE.match(name)
+    if r_match:
+        return True  # handled as .rar group later
+
+    split_match = _SPLIT_EXT_RE.match(name)
+    if split_match:
+        candidate = f"{split_match.group('base')}{split_match.group('ext')}"
+        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+            return True
+
+    return False
+
+
 def _iter_download_subdirs(download_root: Path) -> Iterator[Path]:
     for entry in sorted(download_root.iterdir(), key=lambda path: path.name.lower()):
         if entry.is_dir():
@@ -133,8 +181,7 @@ def _split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
     for entry in sorted(directory.iterdir(), key=lambda path: path.name.lower()):
         if not entry.is_file():
             continue
-        lower_name = entry.name.lower()
-        if any(lower_name.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
+        if _is_supported_archive(entry):
             supported.append(entry)
         else:
             unsupported.append(entry)
@@ -147,20 +194,29 @@ def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
     part_match = _PART_VOLUME_RE.match(lower_name)
     if part_match:
         base = f"{part_match.group('base')}{part_match.group('ext')}"
-        part_index = int(part_match.group('index'))
-        return base, part_index if part_index >= 0 else 0
+        try:
+            part_index = int(part_match.group('index'))
+        except ValueError:
+            part_index = 0
+        return base, max(part_index, 0)
 
     r_match = _R_VOLUME_RE.match(lower_name)
     if r_match:
         base = f"{r_match.group('base')}.rar"
-        part_index = int(r_match.group('index'))
-        return base, part_index if part_index >= 0 else 0
+        try:
+            part_index = int(r_match.group('index'))
+        except ValueError:
+            part_index = 0
+        return base, max(part_index, 0)
 
     split_match = _SPLIT_EXT_RE.match(lower_name)
     if split_match:
         base = f"{split_match.group('base')}{split_match.group('ext')}"
-        part_index = int(split_match.group('index'))
-        return base, part_index if part_index >= 0 else 0
+        try:
+            part_index = int(split_match.group('index'))
+        except ValueError:
+            part_index = 0
+        return base, max(part_index, 0)
 
     return lower_name, -1
 
@@ -205,26 +261,16 @@ def ensure_unique_destination(destination: Path) -> Path:
         counter += 1
 
 
-def extract_archive(archive: Path, target_dir: Path, *, demo_mode: bool) -> None:
-    if demo_mode:
-        logging.info("Demo mode: would extract %s to %s", archive, target_dir)
-        return
-
-    logging.info("Extracting %s to %s", archive, target_dir)
+def extract_archive(archive: Path, target_dir: Path) -> None:
     shutil.unpack_archive(str(archive), str(target_dir))
 
 
-def move_to_finished(archive: Path, finished_root: Path, relative_parent: Path, *, demo_mode: bool) -> None:
+def move_to_finished(archive: Path, finished_root: Path, relative_parent: Path) -> Path:
     destination_dir = finished_root / relative_parent
-    destination = ensure_unique_destination(destination_dir / archive.name)
-
-    if demo_mode:
-        logging.info("Demo mode: would move %s to %s", archive, destination)
-        return
-
     destination_dir.mkdir(parents=True, exist_ok=True)
-    logging.info("Moving %s to %s", archive, destination)
-    shutil.move(str(archive), str(destination))
+    destination = ensure_unique_destination(destination_dir / archive.name)
+    moved_to = Path(shutil.move(str(archive), str(destination)))
+    return moved_to
 
 
 def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path], list[Path]]:
@@ -249,24 +295,40 @@ def process_downloads(paths: Paths, *, demo_mode: bool) -> tuple[int, list[Path]
         if not demo_mode:
             target_dir.mkdir(parents=True, exist_ok=True)
 
-        for archive in primary_archives:
-            try:
-                extract_archive(archive, target_dir, demo_mode=demo_mode)
-            except shutil.ReadError as exc:
-                logging.error("Extract failed for %s: %s", archive, exc)
-                failed.append(archive)
-                continue
-            except Exception:
-                logging.exception("Unexpected error while extracting %s", archive)
-                failed.append(archive)
-                continue
+        total_archives = len(primary_archives)
+        for index, archive in enumerate(primary_archives, 1):
+            progress = _format_progress(index, total_archives)
 
-            try:
-                move_to_finished(archive, paths.finished_root, relative_parent, demo_mode=demo_mode)
-            except Exception:
-                logging.exception("Failed to move %s to the finished directory", archive)
-                failed.append(archive)
-                continue
+            if demo_mode:
+                logging.info("%s Demo: would extract %s to %s", progress, archive, target_dir)
+            else:
+                logging.info("%s Extracting %s to %s", progress, archive, target_dir)
+                try:
+                    extract_archive(archive, target_dir)
+                except shutil.ReadError as exc:
+                    logging.error("Extract failed for %s: %s", archive, exc)
+                    failed.append(archive)
+                    continue
+                except Exception:
+                    logging.exception("Unexpected error while extracting %s", archive)
+                    failed.append(archive)
+                    continue
+
+            destination_dir = paths.finished_root / relative_parent
+            destination = ensure_unique_destination(destination_dir / archive.name)
+
+            if demo_mode:
+                logging.info("%s Demo: would move %s to %s", progress, archive, destination)
+            else:
+                logging.info("%s Moving %s to %s", progress, archive, destination)
+                try:
+                    moved_to = move_to_finished(archive, paths.finished_root, relative_parent)
+                except Exception:
+                    logging.exception("Failed to move %s to the finished directory", archive)
+                    failed.append(archive)
+                    continue
+                else:
+                    destination = moved_to
 
             processed += 1
 
@@ -363,26 +425,11 @@ def main() -> int:
     if settings.demo_mode:
         logging.info("Demo mode: all actions were simulated only.")
 
-    if failed:
-        logging.error("Failed archives (%s):", len(failed))
-        for item in failed:
-            logging.error("  %s", item)
-    if unsupported:
-        logging.warning("Unsupported files (%s):", len(unsupported))
-        for item in unsupported:
-            logging.warning("  %s", item)
-    if deleted:
-        logging.info("Deleted finished files (%s):", len(deleted))
-        for item in deleted:
-            logging.info("  %s", item)
-    if skipped_cleanup:
-        logging.info("Skipped finished files (%s):", len(skipped_cleanup))
-        for item in skipped_cleanup:
-            logging.info("  %s", item)
-    if cleanup_failed:
-        logging.error("Failed to clean finished directory (%s):", len(cleanup_failed))
-        for item in cleanup_failed:
-            logging.error("  %s", item)
+    _log_path_summary(logging.error, "Failed archives", failed)
+    _log_path_summary(logging.warning, "Unsupported files", unsupported)
+    _log_path_summary(logging.info, "Deleted finished files", deleted)
+    _log_path_summary(logging.info, "Skipped finished files", skipped_cleanup)
+    _log_path_summary(logging.error, "Failed to clean finished directory", cleanup_failed)
 
     if failed or cleanup_failed:
         return 2
