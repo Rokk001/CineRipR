@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 from .config import Paths, SubfolderPolicy
-from .progress import format_progress
+from .progress import format_progress, ProgressTracker
 
 _logger = logging.getLogger(__name__)
 
@@ -312,14 +312,25 @@ def extract_archive(archive: Path, target_dir: Path, *, seven_zip_path: Path | N
         shutil.unpack_archive(str(archive), str(target_dir))
 
 
-def move_archive_group(files: Sequence[Path], finished_root: Path, relative_parent: Path) -> list[Path]:
+def move_archive_group(
+    files: Sequence[Path],
+    finished_root: Path,
+    relative_parent: Path,
+    *,
+    tracker: ProgressTracker | None = None,
+    logger: logging.Logger | None = None,
+) -> list[Path]:
     destination_dir = finished_root / relative_parent
     destination_dir.mkdir(parents=True, exist_ok=True)
     moved: list[Path] = []
-    for src in files:
+    for index, src in enumerate(files, 1):
         destination = ensure_unique_destination(destination_dir / src.name)
-        moved.append(Path(shutil.move(str(src), str(destination))))
+        moved_path = Path(shutil.move(str(src), str(destination)))
+        moved.append(moved_path)
+        if tracker is not None and logger is not None:
+            tracker.advance(logger, f"Moved {src.name}", absolute=index)
     return moved
+
 
 
 def process_downloads(
@@ -362,15 +373,22 @@ def process_downloads(
                     failed.append(group.primary)
                     continue
 
+                part_count = max(group.part_count, 1)
+                extract_tracker = ProgressTracker(part_count)
+                move_tracker = ProgressTracker(part_count)
+                extract_tracker.log(
+                    _logger,
+                    f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
+                )
+
                 if should_extract:
                     if demo_mode:
-                        _logger.info(
-                            "%s Demo: would extract %s (%s file(s)) to %s",
-                            progress_before,
-                            group.primary,
-                            group.part_count,
-                            target_dir,
-                        )
+                        for idx, member in enumerate(group.members, 1):
+                            extract_tracker.advance(
+                                _logger,
+                                f"Demo: would read {member.name}",
+                                absolute=idx,
+                            )
                     else:
                         can_extract, reason = can_extract_archive(group.primary, seven_zip_path=seven_zip_path)
                         if not can_extract:
@@ -383,13 +401,17 @@ def process_downloads(
                             failed.append(group.primary)
                             continue
 
-                        _logger.info(
-                            "%s Extracting %s (%s file(s)) to %s",
-                            progress_before,
-                            group.primary,
-                            group.part_count,
-                            target_dir,
-                        )
+                        for idx, member in enumerate(group.members, 1):
+                            try:
+                                member.stat()
+                            except OSError:
+                                pass
+                            extract_tracker.advance(
+                                _logger,
+                                f"Reading {member.name}",
+                                absolute=idx,
+                            )
+
                         pre_existing_target = target_dir.exists()
                         try:
                             extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
@@ -404,35 +426,40 @@ def process_downloads(
                             failed.append(group.primary)
                             continue
                         else:
-                            _logger.info(
-                                "%s Finished extracting %s to %s",
-                                progress_after,
-                                group.primary,
-                                target_dir,
+                            extract_tracker.complete(
+                                _logger,
+                                f"Finished extracting {group.primary.name}",
                             )
                 else:
-                    message = "%s Skipping extraction for %s (disabled in configuration)"
-                    progress_for_skip = progress_before if demo_mode else progress_after
-                    _logger.info(message, progress_for_skip, group.primary)
+                    extract_tracker.complete(
+                        _logger,
+                        f"Skipping extraction for {group.primary.name} (disabled in configuration)",
+                    )
 
                 if demo_mode:
-                    _logger.info(
-                        "%s Demo: would move %s file(s) for archive %s to %s",
-                        progress_after,
-                        group.part_count,
-                        group.primary,
-                        destination_dir,
+                    move_tracker.log(
+                        _logger,
+                        f"Preparing to move {group.part_count} file(s) for {group.primary.name}",
                     )
+                    for idx, member in enumerate(group.members, 1):
+                        move_tracker.advance(
+                            _logger,
+                            f"Demo: would move {member.name}",
+                            absolute=idx,
+                        )
                 else:
-                    _logger.info(
-                        "%s Moving %s file(s) for archive %s to %s",
-                        progress_after,
-                        group.part_count,
-                        group.primary,
-                        destination_dir,
+                    move_tracker.log(
+                        _logger,
+                        f"Moving {group.part_count} file(s) to {destination_dir}",
                     )
                     try:
-                        move_archive_group(group.members, paths.finished_root, relative_parent)
+                        move_archive_group(
+                            group.members,
+                            paths.finished_root,
+                            relative_parent,
+                            tracker=move_tracker,
+                            logger=_logger,
+                        )
                     except Exception:  # noqa: BLE001
                         _logger.exception("Failed to move archive %s to the finished directory", group.primary)
                         failed.append(group.primary)
@@ -447,7 +474,6 @@ def process_downloads(
                 _remove_empty_tree(target_dir, stop=paths.extracted_root)
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
-
 
 
 
