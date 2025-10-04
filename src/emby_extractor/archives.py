@@ -236,7 +236,6 @@ def ensure_unique_destination(destination: Path) -> Path:
         counter += 1
 
 
-def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> None:
 def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> None:
     if pre_existing:
         return
@@ -245,6 +244,9 @@ def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> N
             target_dir.rmdir()
     except OSError:
         pass
+
+
+def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [command, "x", str(archive), f"-o{target_dir}", "-y"],
@@ -308,18 +310,19 @@ def process_downloads(
 
         total_groups = len(groups)
         for index, group in enumerate(groups, 1):
-            progress = format_progress(index, total_groups)
+            progress_before = format_progress(index - 1, total_groups)
+            progress_after = format_progress(index, total_groups)
 
             complete, reason = validate_archive_group(group)
             if not complete:
-                _logger.warning("%s Skipping %s: %s", progress, group.primary, reason)
+                _logger.warning("%s Skipping %s: %s", progress_before, group.primary, reason)
                 failed.append(group.primary)
                 continue
 
             if demo_mode:
                 _logger.info(
                     "%s Demo: would extract %s (%s file(s)) to %s",
-                    progress,
+                    progress_before,
                     group.primary,
                     group.part_count,
                     target_dir,
@@ -329,7 +332,7 @@ def process_downloads(
                 if not can_extract:
                     _logger.error(
                         "%s Pre-extraction check failed for %s: %s",
-                        progress,
+                        progress_before,
                         group.primary,
                         reason,
                     )
@@ -338,7 +341,7 @@ def process_downloads(
 
                 _logger.info(
                     "%s Extracting %s (%s file(s)) to %s",
-                    progress,
+                    progress_before,
                     group.primary,
                     group.part_count,
                     target_dir,
@@ -361,7 +364,7 @@ def process_downloads(
             if demo_mode:
                 _logger.info(
                     "%s Demo: would move %s file(s) for archive %s to %s",
-                    progress,
+                    progress_after,
                     group.part_count,
                     group.primary,
                     destination_dir,
@@ -369,7 +372,7 @@ def process_downloads(
             else:
                 _logger.info(
                     "%s Moving %s file(s) for archive %s to %s",
-                    progress,
+                    progress_after,
                     group.part_count,
                     group.primary,
                     destination_dir,
