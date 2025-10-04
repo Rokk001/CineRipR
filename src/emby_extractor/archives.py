@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Sequence
 
-from .config import Paths
+from .config import Paths, SubfolderPolicy
 from .progress import format_progress
 
 _logger = logging.getLogger(__name__)
@@ -95,6 +95,29 @@ def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
         else:
             unsupported.append(entry)
     return supported, unsupported
+
+
+def _iter_release_directories(base_dir: Path, download_root: Path, policy: SubfolderPolicy) -> list[tuple[Path, Path]]:
+    contexts: list[tuple[Path, Path]] = []
+    def _append(directory: Path) -> None:
+        contexts.append((directory, directory.relative_to(download_root)))
+
+    _append(base_dir)
+    if not policy.include_any:
+        return contexts
+
+    for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
+        if not child.is_dir():
+            continue
+        name = child.name.lower()
+        if name == 'sample' and policy.include_sample:
+            _append(child)
+        elif name == 'sub' and policy.include_sub:
+            _append(child)
+        elif name not in {'sample', 'sub'} and policy.include_other:
+            _append(child)
+
+    return contexts
 
 
 def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
@@ -288,6 +311,7 @@ def process_downloads(
     *,
     demo_mode: bool,
     seven_zip_path: Path | None,
+    subfolders: SubfolderPolicy,
 ) -> ProcessResult:
     if not SUPPORTED_ARCHIVE_SUFFIXES and seven_zip_path is None:
         raise RuntimeError("No supported archive formats available in the Python standard library.")
@@ -296,97 +320,100 @@ def process_downloads(
     failed: list[Path] = []
     unsupported: list[Path] = []
 
-    for subdir in iter_download_subdirs(paths.download_root):
-        archives, unsupported_entries = split_directory_entries(subdir)
-        unsupported.extend(unsupported_entries)
-        if not archives:
-            _logger.debug("No supported archives found in %s", subdir)
-            continue
+    download_root = paths.download_root
 
-        groups = build_archive_groups(archives)
-        relative_parent = subdir.relative_to(paths.download_root)
-        target_dir = paths.extracted_root / relative_parent
-
-
-        total_groups = len(groups)
-        for index, group in enumerate(groups, 1):
-            progress_before = format_progress(index - 1, total_groups)
-            progress_after = format_progress(index, total_groups)
-
-            complete, reason = validate_archive_group(group)
-            if not complete:
-                _logger.warning("%s Skipping %s: %s", progress_before, group.primary, reason)
-                failed.append(group.primary)
+    for release_dir in iter_download_subdirs(download_root):
+        contexts = _iter_release_directories(release_dir, download_root, subfolders)
+        for current_dir, relative_parent in contexts:
+            archives, unsupported_entries = split_directory_entries(current_dir)
+            unsupported.extend(unsupported_entries)
+            if not archives:
+                _logger.debug("No supported archives found in %s", current_dir)
                 continue
 
-            if demo_mode:
-                _logger.info(
-                    "%s Demo: would extract %s (%s file(s)) to %s",
-                    progress_before,
-                    group.primary,
-                    group.part_count,
-                    target_dir,
-                )
-            else:
-                can_extract, reason = can_extract_archive(group.primary, seven_zip_path=seven_zip_path)
-                if not can_extract:
-                    _logger.error(
-                        "%s Pre-extraction check failed for %s: %s",
+            groups = build_archive_groups(archives)
+            target_dir = paths.extracted_root / relative_parent
+
+            total_groups = len(groups)
+            for index, group in enumerate(groups, 1):
+                progress_before = format_progress(index - 1, total_groups)
+                progress_after = format_progress(index, total_groups)
+
+                complete, reason = validate_archive_group(group)
+                if not complete:
+                    _logger.warning("%s Skipping %s: %s", progress_before, group.primary, reason)
+                    failed.append(group.primary)
+                    continue
+
+                if demo_mode:
+                    _logger.info(
+                        "%s Demo: would extract %s (%s file(s)) to %s",
                         progress_before,
                         group.primary,
-                        reason,
+                        group.part_count,
+                        target_dir,
                     )
-                    failed.append(group.primary)
-                    continue
+                else:
+                    can_extract, reason = can_extract_archive(group.primary, seven_zip_path=seven_zip_path)
+                    if not can_extract:
+                        _logger.error(
+                            "%s Pre-extraction check failed for %s: %s",
+                            progress_before,
+                            group.primary,
+                            reason,
+                        )
+                        failed.append(group.primary)
+                        continue
 
-                _logger.info(
-                    "%s Extracting %s (%s file(s)) to %s",
-                    progress_before,
-                    group.primary,
-                    group.part_count,
-                    target_dir,
-                )
-                pre_existing_target = target_dir.exists()
-                try:
-                    extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
-                except (shutil.ReadError, RuntimeError) as exc:
-                    _logger.error("Extract failed for %s: %s", group.primary, exc)
-                    _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
-                    failed.append(group.primary)
-                    continue
-                except Exception:  # noqa: BLE001
-                    _logger.exception("Unexpected error while extracting %s", group.primary)
-                    _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
-                    failed.append(group.primary)
-                    continue
+                    _logger.info(
+                        "%s Extracting %s (%s file(s)) to %s",
+                        progress_before,
+                        group.primary,
+                        group.part_count,
+                        target_dir,
+                    )
+                    pre_existing_target = target_dir.exists()
+                    try:
+                        extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
+                    except (shutil.ReadError, RuntimeError) as exc:
+                        _logger.error("Extract failed for %s: %s", group.primary, exc)
+                        _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
+                        failed.append(group.primary)
+                        continue
+                    except Exception:  # noqa: BLE001
+                        _logger.exception("Unexpected error while extracting %s", group.primary)
+                        _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
+                        failed.append(group.primary)
+                        continue
 
-            destination_dir = paths.finished_root / relative_parent
-            if demo_mode:
-                _logger.info(
-                    "%s Demo: would move %s file(s) for archive %s to %s",
-                    progress_after,
-                    group.part_count,
-                    group.primary,
-                    destination_dir,
-                )
-            else:
-                _logger.info(
-                    "%s Moving %s file(s) for archive %s to %s",
-                    progress_after,
-                    group.part_count,
-                    group.primary,
-                    destination_dir,
-                )
-                try:
-                    move_archive_group(group.members, paths.finished_root, relative_parent)
-                except Exception:  # noqa: BLE001
-                    _logger.exception("Failed to move archive %s to the finished directory", group.primary)
-                    failed.append(group.primary)
-                    continue
+                destination_dir = paths.finished_root / relative_parent
+                if demo_mode:
+                    _logger.info(
+                        "%s Demo: would move %s file(s) for archive %s to %s",
+                        progress_after,
+                        group.part_count,
+                        group.primary,
+                        destination_dir,
+                    )
+                else:
+                    _logger.info(
+                        "%s Moving %s file(s) for archive %s to %s",
+                        progress_after,
+                        group.part_count,
+                        group.primary,
+                        destination_dir,
+                    )
+                    try:
+                        move_archive_group(group.members, paths.finished_root, relative_parent)
+                    except Exception:  # noqa: BLE001
+                        _logger.exception("Failed to move archive %s to the finished directory", group.primary)
+                        failed.append(group.primary)
+                        continue
 
-            processed += 1
+                processed += 1
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
+
 
 
 __all__ = [

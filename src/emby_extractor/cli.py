@@ -11,7 +11,7 @@ from typing import Sequence
 from . import __version__
 from .archives import ProcessResult, process_downloads, resolve_seven_zip_command
 from .cleanup import cleanup_finished
-from .config import ConfigurationError, Paths, Settings, load_settings
+from .config import ConfigurationError, Paths, Settings, SubfolderPolicy, load_settings
 
 DEFAULT_CONFIG = Path("emby_extractor.toml")
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +43,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="demo_mode",
         action=argparse.BooleanOptionalAction,
         help="Enable demo mode (only log actions without modifying files)",
+    )
+    parser.add_argument(
+        "--include-sample",
+        dest="include_sample",
+        action=argparse.BooleanOptionalAction,
+        help="Process subfolder named 'Sample' when present",
+    )
+    parser.add_argument(
+        "--include-sub",
+        dest="include_sub",
+        action=argparse.BooleanOptionalAction,
+        help="Process subfolder named 'Sub' when present",
+    )
+    parser.add_argument(
+        "--include-other",
+        dest="include_other",
+        action=argparse.BooleanOptionalAction,
+        help="Process any other subdirectories inside a release folder",
     )
     parser.add_argument(
         "--seven-zip",
@@ -101,6 +119,22 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     if args.demo_mode is not None:
         demo_mode = args.demo_mode
 
+    subfolders = settings.subfolders
+    include_sample = subfolders.include_sample
+    include_sub = subfolders.include_sub
+    include_other = subfolders.include_other
+    if args.include_sample is not None:
+        include_sample = args.include_sample
+    if args.include_sub is not None:
+        include_sub = args.include_sub
+    if args.include_other is not None:
+        include_other = args.include_other
+    subfolders = SubfolderPolicy(
+        include_sample=include_sample,
+        include_sub=include_sub,
+        include_other=include_other,
+    )
+
     seven_zip_path = settings.seven_zip_path
     if args.seven_zip is not None:
         seven_zip_path = args.seven_zip
@@ -110,6 +144,7 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         retention_days=retention_days,
         enable_delete=enable_delete,
         demo_mode=demo_mode,
+        subfolders=subfolders,
         seven_zip_path=seven_zip_path,
     )
 
@@ -156,6 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             settings.paths,
             demo_mode=settings.demo_mode,
             seven_zip_path=settings.seven_zip_path,
+            subfolders=settings.subfolders,
         )
     except Exception as exc:
         _LOGGER.error("Processing error: %s", exc)

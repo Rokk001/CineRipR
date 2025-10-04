@@ -35,6 +35,11 @@ finished_retention_days = 14
 enable_delete = false
 demo_mode = false
 
+[subfolders]
+include_sample = false
+include_sub = false
+include_other = false
+
 [tools]
 seven_zip = "C:/Program Files/7-Zip/7z.exe"
 ```

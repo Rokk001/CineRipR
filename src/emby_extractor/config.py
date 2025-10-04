@@ -38,6 +38,19 @@ class Paths:
 
 
 @dataclass(frozen=True)
+class SubfolderPolicy:
+    """Controls which named subdirectories inside a release are processed."""
+
+    include_sample: bool = False
+    include_sub: bool = False
+    include_other: bool = False
+
+    @property
+    def include_any(self) -> bool:
+        return self.include_sample or self.include_sub or self.include_other
+
+
+@dataclass(frozen=True)
 class Settings:
     """High level settings controlling the extractor behavior."""
 
@@ -45,6 +58,7 @@ class Settings:
     retention_days: int = 14
     enable_delete: bool = False
     demo_mode: bool = False
+    subfolders: SubfolderPolicy = SubfolderPolicy()
     seven_zip_path: Path | None = None
 
     @classmethod
@@ -86,6 +100,18 @@ class Settings:
         enable_delete = _read_bool(options, "enable_delete", default=False)
         demo_mode = _read_bool(options, "demo_mode", default=False)
 
+        subfolders_data = data.get("subfolders")
+        if subfolders_data is None:
+            subfolder_policy = SubfolderPolicy()
+        else:
+            if not isinstance(subfolders_data, dict):
+                raise ConfigurationError("'subfolders' section must be a mapping")
+            subfolder_policy = SubfolderPolicy(
+                include_sample=_read_bool(subfolders_data, "include_sample", default=False),
+                include_sub=_read_bool(subfolders_data, "include_sub", default=False),
+                include_other=_read_bool(subfolders_data, "include_other", default=False),
+            )
+
         seven_zip_path: Path | None = None
         tools_data = data.get("tools")
         if isinstance(tools_data, dict) and "seven_zip" in tools_data:
@@ -106,6 +132,7 @@ class Settings:
             retention_days=retention_days,
             enable_delete=enable_delete,
             demo_mode=demo_mode,
+            subfolders=subfolder_policy,
             seven_zip_path=seven_zip_path,
         )
 
@@ -162,6 +189,7 @@ def load_settings(config_file: Path | None) -> Settings:
 __all__ = [
     "ConfigurationError",
     "Paths",
+    "SubfolderPolicy",
     "Settings",
     "load_settings",
 ]

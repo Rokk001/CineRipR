@@ -27,6 +27,11 @@ finished_retention_days = 7
 enable_delete = true
 demo_mode = true
 
+[subfolders]
+include_sample = true
+include_sub = false
+include_other = true
+
 [tools]
 seven_zip = "tools/7z.exe"
 """
@@ -38,6 +43,9 @@ seven_zip = "tools/7z.exe"
     assert settings.enable_delete is True
     assert settings.demo_mode is True
     assert settings.paths.download_root == (config_path.parent / "downloads").resolve()
+    assert settings.subfolders.include_sample is True
+    assert settings.subfolders.include_sub is False
+    assert settings.subfolders.include_other is True
     assert settings.seven_zip_path == (config_path.parent / "tools" / "7z.exe").resolve()
 
 
