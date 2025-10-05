@@ -735,6 +735,14 @@ def process_downloads(
     for download_root in paths.download_roots:
         for release_dir in iter_download_subdirs(download_root):
             contexts = _iter_release_directories(release_dir, download_root, subfolders)
+            try:
+                _logger.debug(
+                    "Contexts for %s: %s",
+                    release_dir,
+                    ", ".join(str(p) for p, _rel, _ex in contexts),
+                )
+            except Exception:
+                pass
             for current_dir, relative_parent, should_extract in contexts:
                 archives, unsupported_entries = split_directory_entries(current_dir)
             unsupported.extend(unsupported_entries)
