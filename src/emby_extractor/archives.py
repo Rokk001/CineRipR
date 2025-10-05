@@ -688,10 +688,16 @@ def process_downloads(
                             continue
                         # copy to extracted
                         try:
-                            shutil.copy2(
-                                str(entry),
-                                str(ensure_unique_destination(target_dir / entry.name)),
-                            )
+                            # Only copy desired companions to extracted; skip .sfv files
+                            if entry.suffix.lower() != ".sfv":
+                                shutil.copy2(
+                                    str(entry),
+                                    str(
+                                        ensure_unique_destination(
+                                            target_dir / entry.name
+                                        )
+                                    ),
+                                )
                         except OSError:
                             pass
                         # move to finished
