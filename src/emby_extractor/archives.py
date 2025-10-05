@@ -263,16 +263,18 @@ def _ensure_standard_subdirs(
     extracted_root: Path, relative_parent: Path, policy: SubfolderPolicy | None = None
 ) -> None:
     base = extracted_root / relative_parent
-    # Create normalized standard subdirectories based on policy
+    current = base.name.lower()
+    # Create normalized standard subdirectories based on policy, but avoid nesting
     desired: list[str] = []
     if policy is None:
         desired = ["Subs", "Sample", "Sonstige"]
     else:
-        if policy.include_sub:
+        if policy.include_sub and current != "subs":
             desired.append("Subs")
-        if policy.include_sample:
+        if policy.include_sample and current != "sample":
             desired.append("Sample")
-        if policy.include_other:
+        # normalized name is "Sonstige"
+        if policy.include_other and current != "sonstige":
             desired.append("Sonstige")
     for name in desired:
         try:
