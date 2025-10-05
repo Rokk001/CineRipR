@@ -735,6 +735,18 @@ def process_downloads(
     for download_root in paths.download_roots:
         for release_dir in iter_download_subdirs(download_root):
             contexts = _iter_release_directories(release_dir, download_root, subfolders)
+            # Prioritize episode folders over special subfolders like Subs/Sample
+            try:
+
+                def _prio(entry: tuple[Path, Path, bool]) -> tuple[int, str]:
+                    _dir, rel, _ex = entry
+                    name = rel.name.lower()
+                    special = 1 if name in {"subs", "sample", "sonstige"} else 0
+                    return (special, str(rel).lower())
+
+                contexts = sorted(contexts, key=_prio)
+            except Exception:
+                pass
             try:
                 _logger.debug(
                     "Contexts for %s: %s",
@@ -745,41 +757,58 @@ def process_downloads(
                 pass
             for current_dir, relative_parent, should_extract in contexts:
                 archives, unsupported_entries = split_directory_entries(current_dir)
-            unsupported.extend(unsupported_entries)
-            if not archives:
-                # Handle already-extracted content: copy files to extracted and move to finished
-                try:
-                    target_dir = paths.extracted_root / relative_parent
-                    finished_dir = paths.finished_root / current_dir.relative_to(
-                        download_root
+            try:
+                if archives:
+                    preview = ", ".join(a.name for a in archives[:3])
+                    _logger.debug(
+                        "Found %s archive(s) in %s: %s%s",
+                        len(archives),
+                        current_dir,
+                        preview,
+                        " ..." if len(archives) > 3 else "",
                     )
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    finished_dir.mkdir(parents=True, exist_ok=True)
-                    for entry in sorted(
-                        current_dir.iterdir(), key=lambda p: p.name.lower()
-                    ):
-                        if not entry.is_file():
-                            continue
-                        # copy to extracted
-                        try:
-                            shutil.copy2(
-                                str(entry),
-                                str(ensure_unique_destination(target_dir / entry.name)),
-                            )
-                        except OSError:
-                            pass
-                        # move to finished
-                        try:
-                            destination = ensure_unique_destination(
-                                finished_dir / entry.name
-                            )
-                            shutil.move(str(entry), str(destination))
-                        except OSError:
-                            pass
-                except OSError:
-                    pass
-                _logger.debug("No supported archives found in %s", current_dir)
-                continue
+                else:
+                    _logger.debug("No supported archives found in %s", current_dir)
+            except Exception:
+                pass
+                unsupported.extend(unsupported_entries)
+                if not archives:
+                    # Handle already-extracted content: copy files to extracted and move to finished
+                    try:
+                        target_dir = paths.extracted_root / relative_parent
+                        finished_dir = paths.finished_root / current_dir.relative_to(
+                            download_root
+                        )
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        finished_dir.mkdir(parents=True, exist_ok=True)
+                        for entry in sorted(
+                            current_dir.iterdir(), key=lambda p: p.name.lower()
+                        ):
+                            if not entry.is_file():
+                                continue
+                            # copy to extracted
+                            try:
+                                shutil.copy2(
+                                    str(entry),
+                                    str(
+                                        ensure_unique_destination(
+                                            target_dir / entry.name
+                                        )
+                                    ),
+                                )
+                            except OSError:
+                                pass
+                            # move to finished
+                            try:
+                                destination = ensure_unique_destination(
+                                    finished_dir / entry.name
+                                )
+                                shutil.move(str(entry), str(destination))
+                            except OSError:
+                                pass
+                    except OSError:
+                        pass
+                    continue
 
             groups = build_archive_groups(archives)
             target_dir = paths.extracted_root / relative_parent
