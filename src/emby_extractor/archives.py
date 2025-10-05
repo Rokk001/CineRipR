@@ -187,7 +187,7 @@ def _iter_release_directories(
                     except OSError:
                         ep_contains_any_files = False
                     # flatten episodes into the season folder
-                    season_rel = base_prefix / child.relative_to(download_root)
+                    season_rel = base_prefix / episode_dir.relative_to(download_root)
                     _append(
                         episode_dir,
                         season_rel,
@@ -195,6 +195,8 @@ def _iter_release_directories(
                     )
             except OSError:
                 pass
+            # Do not treat the Season folder itself as a processing context
+            continue
 
         # Decide if we should extract this child dir
         contains_archives = _contains_supported_archives(child)
