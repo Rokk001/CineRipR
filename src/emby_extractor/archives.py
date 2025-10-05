@@ -420,7 +420,7 @@ def _extract_with_seven_zip(
                         current = int(round((percent / 100) * progress.total))
                         progress.advance(
                             _logger,
-                            f"Extracting with 7-Zip: {percent}%",
+                            f"Extracting with 7-Zip: {percent}% ({archive.name})",
                             absolute=current,
                         )
     process.wait()
@@ -556,6 +556,12 @@ def process_downloads(
                     _logger,
                     f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
                 )
+                # Mark preparation step complete at 100%
+                read_tracker.advance(
+                    _logger,
+                    f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
+                    absolute=part_count,
+                )
 
                 if should_extract:
                     if demo_mode:
@@ -589,8 +595,7 @@ def process_downloads(
                                 f"Reading {member.name}",
                                 absolute=idx,
                             )
-                        # Finish read tracker
-                        read_tracker.complete(_logger, "Finished reading archive parts")
+                        # Do not emit an extra completion line; the last loop advance hits 100%
 
                         pre_existing_target = target_dir.exists()
                         try:
