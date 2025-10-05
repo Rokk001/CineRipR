@@ -151,13 +151,14 @@ def _iter_release_directories(
                 norm = _normalize_special_subdir(sub.name)
                 if norm is None:
                     continue
-                contains_archives = _contains_supported_archives(sub)
+                # Respect policy strictly: only process when the flag is enabled
+                # (do not auto-include based on contains_archives)
                 if norm == "Subs":
-                    should = policy.include_sub or contains_archives
+                    should = policy.include_sub
                 elif norm == "Sample":
-                    should = policy.include_sample or contains_archives
+                    should = policy.include_sample
                 else:
-                    should = policy.include_other or contains_archives
+                    should = policy.include_other
                 rel = base_prefix / parent.relative_to(download_root) / norm
                 _append(sub, rel, should)
         except OSError:
