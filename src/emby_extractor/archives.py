@@ -418,7 +418,11 @@ def _extract_with_seven_zip(
                     if progress.total > 0:
                         percent = max(0, min(100, int(m.group(1))))
                         current = int(round((percent / 100) * progress.total))
-                        progress.advance(_logger, f"7z: {percent}%", absolute=current)
+                        progress.advance(
+                            _logger,
+                            f"Extracting with 7-Zip: {percent}%",
+                            absolute=current,
+                        )
     process.wait()
     if process.returncode != 0:
         stderr = "".join(stdout_lines).strip()
@@ -446,6 +450,8 @@ def extract_archive(
     else:
         target_dir.mkdir(parents=True, exist_ok=True)
         shutil.unpack_archive(str(archive), str(target_dir))
+        if progress is not None:
+            progress.complete(_logger, "Finished extracting archive")
 
 
 def move_archive_group(
@@ -494,7 +500,9 @@ def process_downloads(
                 # Handle already-extracted content: copy files to extracted and move to finished
                 try:
                     target_dir = paths.extracted_root / relative_parent
-                    finished_dir = paths.finished_root / relative_parent
+                    finished_dir = paths.finished_root / current_dir.relative_to(
+                        download_root
+                    )
                     target_dir.mkdir(parents=True, exist_ok=True)
                     finished_dir.mkdir(parents=True, exist_ok=True)
                     for entry in sorted(
@@ -525,7 +533,8 @@ def process_downloads(
 
             groups = build_archive_groups(archives)
             target_dir = paths.extracted_root / relative_parent
-            destination_dir = paths.finished_root / relative_parent
+            finished_relative_parent = current_dir.relative_to(download_root)
+            destination_dir = paths.finished_root / finished_relative_parent
 
             total_groups = len(groups)
             for index, group in enumerate(groups, 1):
@@ -540,9 +549,10 @@ def process_downloads(
                     continue
 
                 part_count = max(group.part_count, 1)
-                extract_tracker = ProgressTracker(part_count, single_line=True)
+                read_tracker = ProgressTracker(part_count, single_line=True)
+                extract_tracker = ProgressTracker(100, single_line=True)
                 move_tracker = ProgressTracker(part_count, single_line=True)
-                extract_tracker.log(
+                read_tracker.log(
                     _logger,
                     f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
                 )
@@ -550,7 +560,7 @@ def process_downloads(
                 if should_extract:
                     if demo_mode:
                         for idx, member in enumerate(group.members, 1):
-                            extract_tracker.advance(
+                            read_tracker.advance(
                                 _logger,
                                 f"Demo: would read {member.name}",
                                 absolute=idx,
@@ -574,11 +584,13 @@ def process_downloads(
                                 member.stat()
                             except OSError:
                                 pass
-                            extract_tracker.advance(
+                            read_tracker.advance(
                                 _logger,
                                 f"Reading {member.name}",
                                 absolute=idx,
                             )
+                        # Finish read tracker
+                        read_tracker.complete(_logger, "Finished reading archive parts")
 
                         pre_existing_target = target_dir.exists()
                         try:
@@ -612,7 +624,7 @@ def process_downloads(
                                 f"Finished extracting {group.primary.name}",
                             )
                 else:
-                    extract_tracker.complete(
+                    read_tracker.complete(
                         _logger,
                         f"Skipping extraction for {group.primary.name} (disabled in configuration)",
                     )
@@ -634,6 +646,10 @@ def process_downloads(
                             f"Demo: would move {member.name}",
                             absolute=idx,
                         )
+                    move_tracker.complete(
+                        _logger,
+                        f"Finished (demo) moving {group.part_count} file(s) for {group.primary.name}",
+                    )
                 else:
                     move_tracker.log(
                         _logger,
@@ -643,7 +659,7 @@ def process_downloads(
                         move_archive_group(
                             group.members,
                             paths.finished_root,
-                            relative_parent,
+                            finished_relative_parent,
                             tracker=move_tracker,
                             logger=_logger,
                         )
@@ -654,6 +670,11 @@ def process_downloads(
                         )
                         failed.append(group.primary)
                         continue
+                    else:
+                        move_tracker.complete(
+                            _logger,
+                            f"Finished moving {group.part_count} file(s) to {destination_dir}",
+                        )
 
                 processed += 1
 
