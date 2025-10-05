@@ -27,9 +27,13 @@ def _build_supported_suffixes() -> tuple[str, ...]:
 
 
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
-_PART_VOLUME_RE = re.compile(r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE)
+_PART_VOLUME_RE = re.compile(
+    r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE
+)
 _R_VOLUME_RE = re.compile(r"^(?P<base>.+?)\.r(?P<index>\d+)$", re.IGNORECASE)
-_SPLIT_EXT_RE = re.compile(r"^(?P<base>.+?)(?P<ext>(?:\.[^.]+)+)\.(?P<index>\d+)$", re.IGNORECASE)
+_SPLIT_EXT_RE = re.compile(
+    r"^(?P<base>.+?)(?P<ext>(?:\.[^.]+)+)\.(?P<index>\d+)$", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -63,7 +67,9 @@ def _is_supported_archive(entry: Path) -> bool:
     part_match = _PART_VOLUME_RE.match(name)
     if part_match:
         candidate = f"{part_match.group('base')}{part_match.group('ext')}"
-        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES) or candidate.endswith(".rar"):
+        if any(
+            candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES
+        ) or candidate.endswith(".rar"):
             return True
 
     if _R_VOLUME_RE.match(name):
@@ -72,7 +78,9 @@ def _is_supported_archive(entry: Path) -> bool:
     split_match = _SPLIT_EXT_RE.match(name)
     if split_match:
         candidate = f"{split_match.group('base')}{split_match.group('ext')}"
-        if any(candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES) or candidate.endswith(".rar"):
+        if any(
+            candidate.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES
+        ) or candidate.endswith(".rar"):
             return True
 
     return False
@@ -97,27 +105,85 @@ def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
     return supported, unsupported
 
 
-def _iter_release_directories(base_dir: Path, download_root: Path, policy: SubfolderPolicy) -> list[tuple[Path, Path, bool]]:
+def _iter_release_directories(
+    base_dir: Path, download_root: Path, policy: SubfolderPolicy
+) -> list[tuple[Path, Path, bool]]:
     contexts: list[tuple[Path, Path, bool]] = []
 
-    def _append(directory: Path, should_extract: bool) -> None:
-        contexts.append((directory, directory.relative_to(download_root), should_extract))
+    def _contains_supported_archives(directory: Path) -> bool:
+        try:
+            for entry in directory.iterdir():
+                if entry.is_file() and _is_supported_archive(entry):
+                    return True
+        except OSError:
+            return False
+        return False
 
-    _append(base_dir, True)
+    def _is_season_dir(path: Path) -> bool:
+        name = path.name.strip().lower()
+        return bool(re.match(r"^season\s*\d+$", name))
+
+    def _normalize_special_subdir(name: str) -> str | None:
+        lower = name.strip().lower()
+        if lower in {"sub", "subs", "untertitel"}:
+            return "Subs"
+        if lower == "sample":
+            return "Sample"
+        if lower in {"sonstige", "other", "misc"}:
+            return "Sonstige"
+        return None
+
+    def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
+        contexts.append((directory, relative_parent, should_extract))
+
+    # Always consider the release root itself
+    _append(base_dir, base_dir.relative_to(download_root), True)
 
     for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
         if not child.is_dir():
             continue
-        name = child.name.lower()
-        if name == 'sample':
-            should_extract = policy.include_sample
-        elif name == 'sub':
-            should_extract = policy.include_sub
+
+        child_name = child.name
+        normalized = _normalize_special_subdir(child_name)
+
+        # Decide if we should extract this child dir
+        contains_archives = _contains_supported_archives(child)
+        if normalized == "Sample":
+            should_extract = policy.include_sample or contains_archives
+        elif normalized == "Subs":
+            should_extract = policy.include_sub or contains_archives
+        elif normalized == "Sonstige":
+            should_extract = policy.include_other or contains_archives
         else:
-            should_extract = policy.include_other
-        _append(child, should_extract)
+            should_extract = policy.include_other or contains_archives
+
+        # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
+        if _is_season_dir(base_dir) and contains_archives:
+            season_rel = base_dir.relative_to(download_root)
+            _append(child, season_rel, should_extract)
+            continue
+
+        # For normalized special subdirs, map the relative parent to the normalized name
+        if normalized is not None:
+            rel = base_dir.relative_to(download_root) / normalized
+            _append(child, rel, should_extract)
+            continue
+
+        # Default: mirror structure
+        _append(child, child.relative_to(download_root), should_extract)
 
     return contexts
+
+
+def _ensure_standard_subdirs(extracted_root: Path, relative_parent: Path) -> None:
+    base = extracted_root / relative_parent
+    # Create normalized standard subdirectories for movies
+    for name in ("Subs", "Sample", "Sonstige"):
+        try:
+            (base / name).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            # Non-fatal: creation might fail due to permissions
+            pass
 
 
 def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
@@ -129,19 +195,19 @@ def _compute_archive_group_key(archive: Path) -> tuple[str, int]:
     part_match = _PART_VOLUME_RE.match(lower_name)
     if part_match:
         base = f"{part_match.group('base')}{part_match.group('ext')}"
-        part_index = int(part_match.group('index') or 0)
+        part_index = int(part_match.group("index") or 0)
         return base, max(part_index, 0)
 
     r_match = _R_VOLUME_RE.match(lower_name)
     if r_match:
         base = f"{r_match.group('base')}.rar"
-        part_index = int(r_match.group('index') or 0)
+        part_index = int(r_match.group("index") or 0)
         return base, max(part_index, 0)
 
     split_match = _SPLIT_EXT_RE.match(lower_name)
     if split_match:
         base = f"{split_match.group('base')}{split_match.group('ext')}"
-        part_index = int(split_match.group('index') or 0)
+        part_index = int(split_match.group("index") or 0)
         return base, max(part_index, 0)
 
     return lower_name, -1
@@ -159,7 +225,11 @@ def build_archive_groups(archives: Sequence[Path]) -> list[ArchiveGroup]:
         ordered_paths = tuple(path for _order, path in items)
         order_map = {path: order for order, path in items}
         primary = ordered_paths[0]
-        groups.append(ArchiveGroup(key=key, primary=primary, members=ordered_paths, order_map=order_map))
+        groups.append(
+            ArchiveGroup(
+                key=key, primary=primary, members=ordered_paths, order_map=order_map
+            )
+        )
 
     groups.sort(key=lambda group: group.primary.name.lower())
     return groups
@@ -174,8 +244,12 @@ def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
         if positives != expected:
             missing = sorted(set(expected) - set(positives))
             if missing:
-                return False, "missing volume index(es): " + ", ".join(str(value) for value in missing)
-        if group.key.endswith(".rar") and not any(order < 0 for order in orders.values()):
+                return False, "missing volume index(es): " + ", ".join(
+                    str(value) for value in missing
+                )
+        if group.key.endswith(".rar") and not any(
+            order < 0 for order in orders.values()
+        ):
             return False, "missing base .rar volume"
 
     if not group.primary.exists():
@@ -215,12 +289,17 @@ def resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
     return None
 
 
-def can_extract_archive(archive: Path, *, seven_zip_path: Path | None) -> tuple[bool, str | None]:
+def can_extract_archive(
+    archive: Path, *, seven_zip_path: Path | None
+) -> tuple[bool, str | None]:
     format_name = _detect_archive_format(archive)
     if format_name == "rar":
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
-            return False, "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
+            return (
+                False,
+                "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.",
+            )
         return True, None
 
     if format_name == "zip":
@@ -263,7 +342,11 @@ def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> N
     if pre_existing:
         return
     try:
-        if target_dir.exists() and target_dir.is_dir() and not any(target_dir.iterdir()):
+        if (
+            target_dir.exists()
+            and target_dir.is_dir()
+            and not any(target_dir.iterdir())
+        ):
             target_dir.rmdir()
     except OSError:
         pass
@@ -296,16 +379,21 @@ def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> No
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
         raise RuntimeError(
-            f"7-Zip extraction failed (exit code {result.returncode})" + (f": {stderr}" if stderr else "")
+            f"7-Zip extraction failed (exit code {result.returncode})"
+            + (f": {stderr}" if stderr else "")
         )
 
 
-def extract_archive(archive: Path, target_dir: Path, *, seven_zip_path: Path | None) -> None:
+def extract_archive(
+    archive: Path, target_dir: Path, *, seven_zip_path: Path | None
+) -> None:
     format_name = _detect_archive_format(archive)
     if format_name == "rar":
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
-            raise RuntimeError("7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.")
+            raise RuntimeError(
+                "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
+            )
         _extract_with_seven_zip(command, archive, target_dir)
     else:
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -332,7 +420,6 @@ def move_archive_group(
     return moved
 
 
-
 def process_downloads(
     paths: Paths,
     *,
@@ -341,7 +428,9 @@ def process_downloads(
     subfolders: SubfolderPolicy,
 ) -> ProcessResult:
     if not SUPPORTED_ARCHIVE_SUFFIXES and seven_zip_path is None:
-        raise RuntimeError("No supported archive formats available in the Python standard library.")
+        raise RuntimeError(
+            "No supported archive formats available in the Python standard library."
+        )
 
     processed = 0
     failed: list[Path] = []
@@ -365,11 +454,12 @@ def process_downloads(
             total_groups = len(groups)
             for index, group in enumerate(groups, 1):
                 progress_before = format_progress(index - 1, total_groups)
-                progress_after = format_progress(index, total_groups)
 
                 complete, reason = validate_archive_group(group)
                 if not complete:
-                    _logger.warning("%s Skipping %s: %s", progress_before, group.primary, reason)
+                    _logger.warning(
+                        "%s Skipping %s: %s", progress_before, group.primary, reason
+                    )
                     failed.append(group.primary)
                     continue
 
@@ -390,7 +480,9 @@ def process_downloads(
                                 absolute=idx,
                             )
                     else:
-                        can_extract, reason = can_extract_archive(group.primary, seven_zip_path=seven_zip_path)
+                        can_extract, reason = can_extract_archive(
+                            group.primary, seven_zip_path=seven_zip_path
+                        )
                         if not can_extract:
                             _logger.error(
                                 "%s Pre-extraction check failed for %s: %s",
@@ -414,15 +506,25 @@ def process_downloads(
 
                         pre_existing_target = target_dir.exists()
                         try:
-                            extract_archive(group.primary, target_dir, seven_zip_path=seven_zip_path)
+                            extract_archive(
+                                group.primary, target_dir, seven_zip_path=seven_zip_path
+                            )
                         except (shutil.ReadError, RuntimeError) as exc:
-                            _logger.error("Extract failed for %s: %s", group.primary, exc)
-                            _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
+                            _logger.error(
+                                "Extract failed for %s: %s", group.primary, exc
+                            )
+                            _cleanup_failed_extraction_dir(
+                                target_dir, pre_existing=pre_existing_target
+                            )
                             failed.append(group.primary)
                             continue
                         except Exception:  # noqa: BLE001
-                            _logger.exception("Unexpected error while extracting %s", group.primary)
-                            _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing_target)
+                            _logger.exception(
+                                "Unexpected error while extracting %s", group.primary
+                            )
+                            _cleanup_failed_extraction_dir(
+                                target_dir, pre_existing=pre_existing_target
+                            )
                             failed.append(group.primary)
                             continue
                         else:
@@ -435,6 +537,12 @@ def process_downloads(
                         _logger,
                         f"Skipping extraction for {group.primary.name} (disabled in configuration)",
                     )
+
+                # Ensure standard subfolders exist under the parent target directory
+                try:
+                    _ensure_standard_subdirs(paths.extracted_root, relative_parent)
+                except OSError:
+                    pass
 
                 if demo_mode:
                     move_tracker.log(
@@ -461,7 +569,10 @@ def process_downloads(
                             logger=_logger,
                         )
                     except Exception:  # noqa: BLE001
-                        _logger.exception("Failed to move archive %s to the finished directory", group.primary)
+                        _logger.exception(
+                            "Failed to move archive %s to the finished directory",
+                            group.primary,
+                        )
                         failed.append(group.primary)
                         continue
 
@@ -473,8 +584,11 @@ def process_downloads(
             if not demo_mode and should_extract:
                 _remove_empty_tree(target_dir, stop=paths.extracted_root)
 
-    return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
+        # After finishing this release, remove empty directories under the download root
+        if not demo_mode:
+            _remove_empty_tree(release_dir, stop=download_root)
 
+    return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 
 
 __all__ = [
@@ -488,5 +602,3 @@ __all__ = [
     "validate_archive_group",
     "resolve_seven_zip_command",
 ]
-
-
