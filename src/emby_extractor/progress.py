@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import os
+import random
 import sys
 
 _BLUE = "\033[34m"
+_RED = "\033[31m"
+_GREEN = "\033[32m"
+_YELLOW = "\033[33m"
+_MAGENTA = "\033[35m"
+_CYAN = "\033[36m"
 _RESET = "\033[0m"
+
+_PALETTE = (_RED, _GREEN, _YELLOW, _BLUE, _MAGENTA, _CYAN)
+_LAST_COLOR: str | None = None
 
 
 def _supports_color() -> bool:
@@ -16,13 +25,26 @@ def _supports_color() -> bool:
 _COLOR_ENABLED = _supports_color()
 
 
-def _paint(text: str) -> str:
+def _pick_color() -> str:
+    global _LAST_COLOR
+    choices = list(_PALETTE)
+    if _LAST_COLOR in choices and len(choices) > 1:
+        choices.remove(_LAST_COLOR)
+    color = random.choice(choices)
+    _LAST_COLOR = color
+    return color
+
+
+def _paint(text: str, *, color: str | None = None) -> str:
     if not _COLOR_ENABLED:
         return text
-    return f"{_BLUE}{text}{_RESET}"
+    chosen = color or _BLUE
+    return f"{chosen}{text}{_RESET}"
 
 
-def format_progress(current: int, total: int, *, width: int = 20) -> str:
+def format_progress(
+    current: int, total: int, *, width: int = 20, color: str | None = None
+) -> str:
     safe_total = max(total, 1)
     safe_current = max(0, min(current, safe_total))
     ratio = safe_current / safe_total
@@ -31,24 +53,49 @@ def format_progress(current: int, total: int, *, width: int = 20) -> str:
         filled = 1
     bar = "#" * filled + "-" * (width - filled)
     percent = int(round(ratio * 100))
-    return f"{_paint('[' + bar + ']')} {percent:3d}% ({safe_current}/{safe_total})"
+    return f"{_paint('[' + bar + ']', color=color)} {percent:3d}% ({safe_current}/{safe_total})"
 
 
 class ProgressTracker:
     """Utility to emit progress log lines with consistent formatting."""
 
-    def __init__(self, total: int, *, width: int = 20) -> None:
+    def __init__(
+        self,
+        total: int,
+        *,
+        width: int = 20,
+        color: str | None = None,
+        single_line: bool = False,
+    ) -> None:
         self.total = max(int(total), 1)
         self.width = width
         self.current = 0
+        self.color = color or (_pick_color() if _COLOR_ENABLED else None)
+        self._inline = bool(single_line and sys.stdout.isatty())
+        self._last_len = 0
 
     def _emit(self, logger, message: str) -> None:
-        logger.info("%s %s", format_progress(self.current, self.total, width=self.width), message)
+        text = f"{format_progress(self.current, self.total, width=self.width, color=self.color)} {message}"
+        if self._inline:
+            try:
+                line = "\r" + text
+                padding = max(0, self._last_len - len(text))
+                if padding:
+                    line += " " * padding
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                self._last_len = len(text)
+            except Exception:
+                logger.info(text)
+        else:
+            logger.info(text)
 
     def log(self, logger, message: str) -> None:
         self._emit(logger, message)
 
-    def advance(self, logger, message: str, *, steps: int = 1, absolute: int | None = None) -> None:
+    def advance(
+        self, logger, message: str, *, steps: int = 1, absolute: int | None = None
+    ) -> None:
         if absolute is not None:
             self.current = max(0, min(self.total, absolute))
         else:
@@ -58,6 +105,12 @@ class ProgressTracker:
     def complete(self, logger, message: str) -> None:
         self.current = self.total
         self._emit(logger, message)
+        if self._inline:
+            try:
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+            except Exception:
+                pass
 
 
 __all__ = ["format_progress", "ProgressTracker"]

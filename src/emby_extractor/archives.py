@@ -373,24 +373,55 @@ def _remove_empty_tree(directory: Path, *, stop: Path) -> None:
             current = current.parent
 
 
-def _extract_with_seven_zip(command: str, archive: Path, target_dir: Path) -> None:
+def _extract_with_seven_zip(
+    command: str,
+    archive: Path,
+    target_dir: Path,
+    *,
+    progress: ProgressTracker | None = None,
+) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [command, "x", str(archive), f"-o{target_dir}", "-y"],
-        check=False,
-        capture_output=True,
+    # Use -bb1 for basic progress and stream stdout for parsing percentage lines
+    process = subprocess.Popen(
+        [command, "x", str(archive), f"-o{target_dir}", "-y", "-bsp1", "-bso1", "-bb1"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
-    if result.returncode != 0:
-        stderr = (result.stderr or "").strip()
+    if process.stdout is None:
+        stdout_lines: list[str] = []
+    else:
+        stdout_lines = []
+        for line in process.stdout:
+            stdout_lines.append(line)
+            if progress is not None:
+                text = line.strip()
+                # Typical 7z progress lines contain percentages like " 12%"
+                m = re.search(r"(\d{1,3})%", text)
+                if m:
+                    try:
+                        percent = max(0, min(100, int(m.group(1))))
+                        # Map 0..100 to tracker current
+                        current = int(round((percent / 100) * progress.total))
+                        progress.advance(_logger, f"7z: {percent}%", absolute=current)
+                    except Exception:  # noqa: BLE001
+                        pass
+    process.wait()
+    if process.returncode != 0:
+        stderr = "".join(stdout_lines).strip()
         raise RuntimeError(
-            f"7-Zip extraction failed (exit code {result.returncode})"
+            f"7-Zip extraction failed (exit code {process.returncode})"
             + (f": {stderr}" if stderr else "")
         )
 
 
 def extract_archive(
-    archive: Path, target_dir: Path, *, seven_zip_path: Path | None
+    archive: Path,
+    target_dir: Path,
+    *,
+    seven_zip_path: Path | None,
+    progress: ProgressTracker | None = None,
 ) -> None:
     format_name = _detect_archive_format(archive)
     if format_name == "rar":
@@ -399,7 +430,7 @@ def extract_archive(
             raise RuntimeError(
                 "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
             )
-        _extract_with_seven_zip(command, archive, target_dir)
+        _extract_with_seven_zip(command, archive, target_dir, progress=progress)
     else:
         target_dir.mkdir(parents=True, exist_ok=True)
         shutil.unpack_archive(str(archive), str(target_dir))
@@ -498,8 +529,8 @@ def process_downloads(
                     continue
 
                 part_count = max(group.part_count, 1)
-                extract_tracker = ProgressTracker(part_count)
-                move_tracker = ProgressTracker(part_count)
+                extract_tracker = ProgressTracker(part_count, single_line=True)
+                move_tracker = ProgressTracker(part_count, single_line=True)
                 extract_tracker.log(
                     _logger,
                     f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
@@ -541,7 +572,10 @@ def process_downloads(
                         pre_existing_target = target_dir.exists()
                         try:
                             extract_archive(
-                                group.primary, target_dir, seven_zip_path=seven_zip_path
+                                group.primary,
+                                target_dir,
+                                seven_zip_path=seven_zip_path,
+                                progress=extract_tracker,
                             )
                         except (shutil.ReadError, RuntimeError) as exc:
                             _logger.error(
