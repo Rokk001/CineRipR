@@ -29,6 +29,8 @@ def _build_supported_suffixes() -> tuple[str, ...]:
 
 
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
+# TV tag detection: S01E01 or just S01
+_TV_TAG_RE = re.compile(r"s\d{2}(?:e\d{2})?", re.IGNORECASE)
 _PART_VOLUME_RE = re.compile(
     r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE
 )
@@ -138,20 +140,25 @@ def _iter_release_directories(
     def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
         contexts.append((directory, relative_parent, should_extract))
 
-    # Determine whether this release looks like a TV show (has Season xx) or a Movie
-    has_season_child = False
-    try:
-        for child in base_dir.iterdir():
-            if child.is_dir() and _is_season_dir(child):
-                has_season_child = True
-                break
-    except OSError:
-        has_season_child = False
-    base_prefix = (
-        Path("TV-Shows")
-        if has_season_child or _is_season_dir(base_dir)
-        else Path("Movies")
-    )
+    # Determine whether this release looks like a TV show by season dirs or TV tags
+    def _looks_like_tv(root: Path) -> bool:
+        if _is_season_dir(root):
+            return True
+        if _TV_TAG_RE.search(root.name):
+            return True
+        try:
+            for child in root.iterdir():
+                if child.is_dir() and (
+                    _is_season_dir(child) or _TV_TAG_RE.search(child.name)
+                ):
+                    return True
+                if child.is_file() and _TV_TAG_RE.search(child.name):
+                    return True
+        except OSError:
+            pass
+        return False
+
+    base_prefix = Path("TV-Shows") if _looks_like_tv(base_dir) else Path("Movies")
 
     # Always consider the release root itself, prefixed by category
     _append(base_dir, base_prefix / base_dir.relative_to(download_root), True)
