@@ -29,6 +29,8 @@ def _build_supported_suffixes() -> tuple[str, ...]:
 
 
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
+# File types that must never remain in extracted output
+_UNWANTED_EXTRACTED_SUFFIXES = {".sfv"}
 # TV tag detection: S01E01 or just S01
 _TV_TAG_RE = re.compile(r"s\d{2}(?:e\d{2})?", re.IGNORECASE)
 _PART_VOLUME_RE = re.compile(
@@ -440,7 +442,17 @@ def _extract_with_seven_zip(
     output_arg = f"-o{_win_long_path(target_dir)}"
     archive_arg = _win_long_path(archive)
     process = subprocess.Popen(
-        [command, "x", archive_arg, output_arg, "-y", "-bsp1", "-bso1", "-bb1"],
+        [
+            command,
+            "x",
+            archive_arg,
+            output_arg,
+            "-y",
+            "-bsp1",
+            "-bso1",
+            "-bb1",
+            "-x!*.sfv",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -488,6 +500,7 @@ def _extract_with_seven_zip(
                         "-bsp1",
                         "-bso1",
                         "-bb1",
+                        "-x!*.sfv",
                     ],
                     check=False,
                     capture_output=True,
@@ -498,6 +511,16 @@ def _extract_with_seven_zip(
                 if retry.returncode == 0:
                     # Move contents from tmp_out into target_dir
                     target_dir.mkdir(parents=True, exist_ok=True)
+                    # Remove unwanted files from tmp_out before moving
+                    for unwanted in _UNWANTED_EXTRACTED_SUFFIXES:
+                        try:
+                            for p in tmp_out.rglob(f"*{unwanted}"):
+                                try:
+                                    p.unlink()
+                                except OSError:
+                                    pass
+                        except OSError:
+                            pass
                     for item in tmp_out.iterdir():
                         dest = target_dir / item.name
                         try:
@@ -598,6 +621,9 @@ def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None
         target_dir.mkdir(parents=True, exist_ok=True)
         for entry in sorted(current_dir.iterdir(), key=lambda p: p.name.lower()):
             if entry.is_file() and not _is_supported_archive(entry):
+                # Skip unwanted companions like .sfv
+                if entry.suffix.lower() == ".sfv":
+                    continue
                 try:
                     shutil.copy2(
                         str(entry),
