@@ -31,7 +31,7 @@ extracted_root = "C:/Media/Extracted"
 finished_root = "C:/Media/Finished"
 
 [options]
-finished_retention_days = 14
+finished_retention_days = 15
 enable_delete = false
 demo_mode = false
 

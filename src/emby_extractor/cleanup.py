@@ -28,7 +28,9 @@ def cleanup_finished(
             continue
 
         try:
-            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+            file_mtime = datetime.fromtimestamp(
+                file_path.stat().st_mtime, tz=timezone.utc
+            )
         except FileNotFoundError:  # pragma: no cover - race condition
             continue
 
@@ -47,7 +49,7 @@ def cleanup_finished(
 
         try:
             file_path.unlink()
-        except Exception:  # noqa: BLE001
+        except OSError:
             _logger.exception("Could not delete %s", file_path)
             failed.append(file_path)
             continue
@@ -61,8 +63,12 @@ def cleanup_finished(
     return deleted, failed, skipped
 
 
-def _remove_empty_directories(candidate_directories: Iterable[Path], finished_root: Path) -> None:
-    for directory in sorted(set(candidate_directories), key=lambda path: len(path.parts), reverse=True):
+def _remove_empty_directories(
+    candidate_directories: Iterable[Path], finished_root: Path
+) -> None:
+    for directory in sorted(
+        set(candidate_directories), key=lambda path: len(path.parts), reverse=True
+    ):
         if directory == finished_root:
             continue
         try:

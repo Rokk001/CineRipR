@@ -18,16 +18,24 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract archives and clean finished directory")
+    parser = argparse.ArgumentParser(
+        description="Extract archives and clean finished directory"
+    )
     parser.add_argument(
         "--config",
         type=Path,
         default=DEFAULT_CONFIG,
         help=f"Path to configuration file (default: {DEFAULT_CONFIG})",
     )
-    parser.add_argument("--download-root", type=Path, help="Override download directory root")
-    parser.add_argument("--extracted-root", type=Path, help="Override extracted directory root")
-    parser.add_argument("--finished-root", type=Path, help="Override finished directory root")
+    parser.add_argument(
+        "--download-root", type=Path, help="Override download directory root"
+    )
+    parser.add_argument(
+        "--extracted-root", type=Path, help="Override extracted directory root"
+    )
+    parser.add_argument(
+        "--finished-root", type=Path, help="Override finished directory root"
+    )
     parser.add_argument(
         "--retention-days",
         type=int,
@@ -73,7 +81,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="INFO",
         help="Set the root log level",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     return parser.parse_args(argv)
 
 
@@ -149,7 +159,9 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     )
 
 
-def _log_path_summary(log_fn, label: str, paths: Sequence[Path], *, limit: int = 5) -> None:
+def _log_path_summary(
+    log_fn, label: str, paths: Sequence[Path], *, limit: int = 5
+) -> None:
     if not paths:
         return
     sorted_paths = sorted(paths, key=lambda path: str(path).lower())
@@ -163,7 +175,9 @@ def _log_path_summary(log_fn, label: str, paths: Sequence[Path], *, limit: int =
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=getattr(logging, args.log_level), format="%(levelname)s: %(message)s"
+    )
 
     try:
         settings = load_and_merge_settings(args)
@@ -172,17 +186,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     if resolve_seven_zip_command(settings.seven_zip_path) is None:
-        _LOGGER.error("7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.")
+        _LOGGER.error(
+            "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
+        )
         return 1
 
     try:
         settings.paths.ensure_ready()
-    except Exception as exc:
+    except (FileNotFoundError, NotADirectoryError, OSError) as exc:
         _LOGGER.error("Path validation failed: %s", exc)
         return 1
 
     if settings.demo_mode:
-        _LOGGER.warning("Demo mode enabled: no files will be extracted, moved, or deleted.")
+        _LOGGER.warning(
+            "Demo mode enabled: no files will be extracted, moved, or deleted."
+        )
     elif not settings.enable_delete:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
@@ -193,7 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             seven_zip_path=settings.seven_zip_path,
             subfolders=settings.subfolders,
         )
-    except Exception as exc:
+    except RuntimeError as exc:
         _LOGGER.error("Processing error: %s", exc)
         return 1
 
@@ -212,7 +230,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     _log_path_summary(_LOGGER.warning, "Unsupported files", result.unsupported)
     _log_path_summary(_LOGGER.info, "Deleted finished files", deleted)
     _log_path_summary(_LOGGER.info, "Skipped finished files", skipped_cleanup)
-    _log_path_summary(_LOGGER.error, "Failed to clean finished directory", cleanup_failed)
+    _log_path_summary(
+        _LOGGER.error, "Failed to clean finished directory", cleanup_failed
+    )
 
     if result.failed or cleanup_failed:
         return 2

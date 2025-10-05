@@ -15,7 +15,6 @@ _CYAN = "\033[36m"
 _RESET = "\033[0m"
 
 _PALETTE = (_RED, _GREEN, _YELLOW, _BLUE, _MAGENTA, _CYAN)
-_LAST_COLOR: str | None = None
 
 
 def _supports_color() -> bool:
@@ -25,14 +24,11 @@ def _supports_color() -> bool:
 _COLOR_ENABLED = _supports_color()
 
 
-def _pick_color() -> str:
-    global _LAST_COLOR
+def _pick_color(previous: str | None) -> str:
     choices = list(_PALETTE)
-    if _LAST_COLOR in choices and len(choices) > 1:
-        choices.remove(_LAST_COLOR)
-    color = random.choice(choices)
-    _LAST_COLOR = color
-    return color
+    if previous in choices and len(choices) > 1:
+        choices.remove(previous)
+    return random.choice(choices)
 
 
 def _paint(text: str, *, color: str | None = None) -> str:
@@ -70,7 +66,14 @@ class ProgressTracker:
         self.total = max(int(total), 1)
         self.width = width
         self.current = 0
-        self.color = color or (_pick_color() if _COLOR_ENABLED else None)
+        # choose a color different from the last used by any ProgressTracker
+        if color is not None or not _COLOR_ENABLED:
+            self.color = color
+        else:
+            prev = getattr(ProgressTracker, "_last_color", None)
+            chosen = _pick_color(prev)
+            setattr(ProgressTracker, "_last_color", chosen)
+            self.color = chosen
         self._inline = bool(single_line and sys.stdout.isatty())
         self._last_len = 0
 
@@ -85,7 +88,7 @@ class ProgressTracker:
                 sys.stdout.write(line)
                 sys.stdout.flush()
                 self._last_len = len(text)
-            except Exception:
+            except OSError:
                 logger.info(text)
         else:
             logger.info(text)
@@ -109,7 +112,7 @@ class ProgressTracker:
             try:
                 sys.stdout.write("\n")
                 sys.stdout.flush()
-            except Exception:
+            except OSError:
                 pass
 
 

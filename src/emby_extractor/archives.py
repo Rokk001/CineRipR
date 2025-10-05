@@ -313,7 +313,7 @@ def can_extract_archive(
                 damaged = zf.testzip()
                 if damaged is not None:
                     return False, f"corrupt member: {damaged}"
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, zipfile.BadZipFile) as exc:
             return False, str(exc)
         return True, None
 
@@ -322,7 +322,7 @@ def can_extract_archive(
             with tarfile.open(archive) as tf:
                 for _member in tf:
                     pass
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, tarfile.TarError) as exc:
             return False, str(exc)
         return True, None
 
@@ -400,13 +400,10 @@ def _extract_with_seven_zip(
                 # Typical 7z progress lines contain percentages like " 12%"
                 m = re.search(r"(\d{1,3})%", text)
                 if m:
-                    try:
+                    if progress.total > 0:
                         percent = max(0, min(100, int(m.group(1))))
-                        # Map 0..100 to tracker current
                         current = int(round((percent / 100) * progress.total))
                         progress.advance(_logger, f"7z: {percent}%", absolute=current)
-                    except Exception:  # noqa: BLE001
-                        pass
     process.wait()
     if process.returncode != 0:
         stderr = "".join(stdout_lines).strip()
@@ -586,7 +583,7 @@ def process_downloads(
                             )
                             failed.append(group.primary)
                             continue
-                        except Exception:  # noqa: BLE001
+                        except OSError:
                             _logger.exception(
                                 "Unexpected error while extracting %s", group.primary
                             )
@@ -636,7 +633,7 @@ def process_downloads(
                             tracker=move_tracker,
                             logger=_logger,
                         )
-                    except Exception:  # noqa: BLE001
+                    except OSError:
                         _logger.exception(
                             "Failed to move archive %s to the finished directory",
                             group.primary,
