@@ -31,6 +31,17 @@ def _pick_color(previous: str | None) -> str:
     return random.choice(choices)
 
 
+def next_progress_color() -> str:
+    """Return the next progress color, updating the shared last-color state.
+
+    Ensures the new color differs from the previously used one when possible.
+    """
+    prev = getattr(ProgressTracker, "_last_color", None)
+    chosen = _pick_color(prev)
+    setattr(ProgressTracker, "_last_color", chosen)
+    return chosen
+
+
 def _paint(text: str, *, color: str | None = None) -> str:
     if not _COLOR_ENABLED:
         return text
@@ -116,4 +127,4 @@ class ProgressTracker:
                 pass
 
 
-__all__ = ["format_progress", "ProgressTracker"]
+__all__ = ["format_progress", "ProgressTracker", "next_progress_color"]

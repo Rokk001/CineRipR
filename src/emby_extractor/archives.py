@@ -11,9 +11,11 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Sequence
+import os
+import tempfile
 
 from .config import Paths, SubfolderPolicy
-from .progress import format_progress, ProgressTracker
+from .progress import format_progress, ProgressTracker, next_progress_color
 
 _logger = logging.getLogger(__name__)
 
@@ -195,10 +197,22 @@ def _iter_release_directories(
     return contexts
 
 
-def _ensure_standard_subdirs(extracted_root: Path, relative_parent: Path) -> None:
+def _ensure_standard_subdirs(
+    extracted_root: Path, relative_parent: Path, policy: SubfolderPolicy | None = None
+) -> None:
     base = extracted_root / relative_parent
-    # Create normalized standard subdirectories for movies
-    for name in ("Subs", "Sample", "Sonstige"):
+    # Create normalized standard subdirectories based on policy
+    desired: list[str] = []
+    if policy is None:
+        desired = ["Subs", "Sample", "Sonstige"]
+    else:
+        if policy.include_sub:
+            desired.append("Subs")
+        if policy.include_sample:
+            desired.append("Sample")
+        if policy.include_other:
+            desired.append("Sonstige")
+    for name in desired:
         try:
             (base / name).mkdir(parents=True, exist_ok=True)
         except OSError:
@@ -396,18 +410,42 @@ def _extract_with_seven_zip(
     progress: ProgressTracker | None = None,
 ) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
+
+    def _win_long_path(p: Path) -> str:
+        text = str(p)
+        if os.name != "nt":
+            return text
+        # Normalize to absolute path
+        try:
+            p = p.resolve()
+        except OSError:
+            pass
+        s = str(p)
+        if s.startswith("\\\\?\\"):
+            return s
+        if s.startswith("\\\\"):
+            # UNC path => \\?\UNC\server\share\...
+            return "\\\\?\\UNC" + s[1:]
+        return "\\\\?\\" + s
+
     # Use -bb1 for basic progress and stream stdout for parsing percentage lines
+    # Pass -o<path> without shell quoting; subprocess passes the entire arg safely
+    output_arg = f"-o{_win_long_path(target_dir)}"
+    archive_arg = _win_long_path(archive)
     process = subprocess.Popen(
-        [command, "x", str(archive), f"-o{target_dir}", "-y", "-bsp1", "-bso1", "-bb1"],
+        [command, "x", archive_arg, output_arg, "-y", "-bsp1", "-bso1", "-bb1"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
     if process.stdout is None:
         stdout_lines: list[str] = []
     else:
         stdout_lines = []
+        last_percent: int = -1
         for line in process.stdout:
             stdout_lines.append(line)
             if progress is not None:
@@ -417,15 +455,54 @@ def _extract_with_seven_zip(
                 if m:
                     if progress.total > 0:
                         percent = max(0, min(100, int(m.group(1))))
-                        current = int(round((percent / 100) * progress.total))
-                        progress.advance(
-                            _logger,
-                            f"Extracting with 7-Zip: {percent}% ({archive.name})",
-                            absolute=current,
-                        )
+                        if percent != last_percent:
+                            last_percent = percent
+                            current = int(round((percent / 100) * progress.total))
+                            progress.advance(
+                                _logger,
+                                f'Extracting with 7-Zip: "{archive.name}"',
+                                absolute=current,
+                            )
     process.wait()
     if process.returncode != 0:
         stderr = "".join(stdout_lines).strip()
+        # Fallback: extract to a temporary short path, then move into target
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_out = Path(tmpdir)
+                tmp_arg = f"-o{str(tmp_out)}"
+                retry = subprocess.run(
+                    [
+                        command,
+                        "x",
+                        archive_arg,
+                        tmp_arg,
+                        "-y",
+                        "-bsp1",
+                        "-bso1",
+                        "-bb1",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                if retry.returncode == 0:
+                    # Move contents from tmp_out into target_dir
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    for item in tmp_out.iterdir():
+                        dest = target_dir / item.name
+                        try:
+                            if item.is_dir():
+                                shutil.move(str(item), str(dest))
+                            else:
+                                shutil.move(str(item), str(dest))
+                        except OSError:
+                            pass
+                    return
+        except Exception:
+            pass
         raise RuntimeError(
             f"7-Zip extraction failed (exit code {process.returncode})"
             + (f": {stderr}" if stderr else "")
@@ -474,6 +551,37 @@ def move_archive_group(
     return moved
 
 
+def _move_remaining_to_finished(
+    current_dir: Path,
+    *,
+    finished_root: Path,
+    download_root: Path,
+) -> None:
+    """Move all remaining files (any type) under current_dir to finished.
+
+    This is independent of extraction policy. The destination mirrors the
+    original download structure beneath finished_root.
+    """
+
+    def move_file(src_file: Path) -> None:
+        rel_parent = src_file.parent.relative_to(download_root)
+        dest_dir = finished_root / rel_parent
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            dest = ensure_unique_destination(dest_dir / src_file.name)
+            shutil.move(str(src_file), str(dest))
+        except OSError:
+            pass
+
+    try:
+        for root, _dirs, files in os.walk(current_dir):
+            root_path = Path(root)
+            for fname in files:
+                move_file(root_path / fname)
+    except OSError:
+        pass
+
+
 def process_downloads(
     paths: Paths,
     *,
@@ -493,8 +601,8 @@ def process_downloads(
     for download_root in paths.download_roots:
         for release_dir in iter_download_subdirs(download_root):
             contexts = _iter_release_directories(release_dir, download_root, subfolders)
-        for current_dir, relative_parent, should_extract in contexts:
-            archives, unsupported_entries = split_directory_entries(current_dir)
+            for current_dir, relative_parent, should_extract in contexts:
+                archives, unsupported_entries = split_directory_entries(current_dir)
             unsupported.extend(unsupported_entries)
             if not archives:
                 # Handle already-extracted content: copy files to extracted and move to finished
@@ -549,9 +657,15 @@ def process_downloads(
                     continue
 
                 part_count = max(group.part_count, 1)
-                read_tracker = ProgressTracker(part_count, single_line=True)
-                extract_tracker = ProgressTracker(100, single_line=True)
-                move_tracker = ProgressTracker(part_count, single_line=True)
+                # Pick one color for this archive, apply to all trackers of this archive
+                color = next_progress_color()
+                read_tracker = ProgressTracker(
+                    part_count, single_line=True, color=color
+                )
+                extract_tracker = ProgressTracker(100, single_line=True, color=color)
+                move_tracker = ProgressTracker(
+                    part_count, single_line=True, color=color
+                )
                 read_tracker.log(
                     _logger,
                     f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
@@ -563,6 +677,7 @@ def process_downloads(
                     absolute=part_count,
                 )
 
+                extracted_ok = False
                 if should_extract:
                     if demo_mode:
                         for idx, member in enumerate(group.members, 1):
@@ -571,6 +686,8 @@ def process_downloads(
                                 f"Demo: would read {member.name}",
                                 absolute=idx,
                             )
+                        # In demo, pretend extraction would succeed
+                        extracted_ok = True
                     else:
                         can_extract, reason = can_extract_archive(
                             group.primary, seven_zip_path=seven_zip_path
@@ -628,6 +745,7 @@ def process_downloads(
                                 _logger,
                                 f"Finished extracting {group.primary.name}",
                             )
+                            extracted_ok = True
                 else:
                     read_tracker.complete(
                         _logger,
@@ -636,7 +754,9 @@ def process_downloads(
 
                 # Ensure standard subfolders exist under the parent target directory
                 try:
-                    _ensure_standard_subdirs(paths.extracted_root, relative_parent)
+                    _ensure_standard_subdirs(
+                        paths.extracted_root, relative_parent, subfolders
+                    )
                 except OSError:
                     pass
 
@@ -645,41 +765,61 @@ def process_downloads(
                         _logger,
                         f"Preparing to move {group.part_count} file(s) for {group.primary.name}",
                     )
-                    for idx, member in enumerate(group.members, 1):
-                        move_tracker.advance(
+                    if extracted_ok:
+                        for idx, member in enumerate(group.members, 1):
+                            move_tracker.advance(
+                                _logger,
+                                f"Demo: would move {member.name}",
+                                absolute=idx,
+                            )
+                        move_tracker.complete(
                             _logger,
-                            f"Demo: would move {member.name}",
-                            absolute=idx,
+                            f"Finished (demo) moving {group.part_count} file(s) for {group.primary.name}",
                         )
-                    move_tracker.complete(
-                        _logger,
-                        f"Finished (demo) moving {group.part_count} file(s) for {group.primary.name}",
-                    )
-                else:
-                    move_tracker.log(
-                        _logger,
-                        f"Moving {group.part_count} file(s) to {destination_dir}",
-                    )
-                    try:
-                        move_archive_group(
-                            group.members,
-                            paths.finished_root,
-                            finished_relative_parent,
-                            tracker=move_tracker,
-                            logger=_logger,
-                        )
-                    except OSError:
-                        _logger.exception(
-                            "Failed to move archive %s to the finished directory",
-                            group.primary,
-                        )
-                        failed.append(group.primary)
-                        continue
                     else:
                         move_tracker.complete(
                             _logger,
-                            f"Finished moving {group.part_count} file(s) to {destination_dir}",
+                            "Skipping move: extraction not completed",
                         )
+                else:
+                    if extracted_ok:
+                        move_tracker.log(
+                            _logger,
+                            f"Moving {group.part_count} file(s) to {destination_dir}",
+                        )
+                        try:
+                            move_archive_group(
+                                group.members,
+                                paths.finished_root,
+                                finished_relative_parent,
+                                tracker=move_tracker,
+                                logger=_logger,
+                            )
+                        except OSError:
+                            _logger.exception(
+                                "Failed to move archive %s to the finished directory",
+                                group.primary,
+                            )
+                            failed.append(group.primary)
+                            continue
+                        else:
+                            move_tracker.complete(
+                                _logger,
+                                f"Finished moving {group.part_count} file(s) to {destination_dir}",
+                            )
+                    else:
+                        move_tracker.complete(
+                            _logger,
+                            "Skipping move: extraction not completed",
+                        )
+
+                # After extracting/moving archives, move remaining files and selected subfolders
+                if not demo_mode and extracted_ok:
+                    _move_remaining_to_finished(
+                        current_dir,
+                        finished_root=paths.finished_root,
+                        download_root=download_root,
+                    )
 
                 processed += 1
 
@@ -689,9 +829,9 @@ def process_downloads(
             if not demo_mode and should_extract:
                 _remove_empty_tree(target_dir, stop=paths.extracted_root)
 
-            # After finishing this release, remove empty directories under the download root
-            if not demo_mode:
-                _remove_empty_tree(release_dir, stop=download_root)
+        # After finishing this release, remove empty directories under the download root
+        if not demo_mode:
+            _remove_empty_tree(release_dir, stop=download_root)
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 
