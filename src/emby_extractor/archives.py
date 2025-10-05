@@ -582,6 +582,70 @@ def _move_remaining_to_finished(
         pass
 
 
+def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
+    """Copy non-archive companion files (e.g. .nfo, .srt) from source to extracted.
+
+    Source files remain in place and will be moved to finished later if extraction succeeds.
+    """
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for entry in sorted(current_dir.iterdir(), key=lambda p: p.name.lower()):
+            if entry.is_file() and not _is_supported_archive(entry):
+                try:
+                    shutil.copy2(str(entry), str(ensure_unique_destination(target_dir / entry.name)))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
+def _flatten_single_subdir(directory: Path) -> None:
+    """If directory contains exactly one subdirectory and no files, move its contents up one level."""
+    try:
+        entries = [p for p in directory.iterdir()]
+    except OSError:
+        return
+    files = [p for p in entries if p.is_file()]
+    dirs = [p for p in entries if p.is_dir()]
+    if files:
+        return
+    if len(dirs) != 1:
+        return
+    only = dirs[0]
+    try:
+        for item in only.iterdir():
+            try:
+                shutil.move(str(item), str(directory / item.name))
+            except OSError:
+                continue
+        # remove the now-empty nested folder
+        try:
+            only.rmdir()
+        except OSError:
+            pass
+    except OSError:
+        pass
+
+def _remove_empty_subdirs(root: Path) -> None:
+    """Remove empty subdirectories under the given root directory (depth-first)."""
+    try:
+        # deepest-first order
+        for directory in sorted(
+            (p for p in root.rglob("*") if p.is_dir()),
+            key=lambda p: len(p.parts),
+            reverse=True,
+        ):
+            try:
+                next(directory.iterdir())
+            except StopIteration:
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 def process_downloads(
     paths: Paths,
     *,
@@ -716,6 +780,8 @@ def process_downloads(
 
                         pre_existing_target = target_dir.exists()
                         try:
+                            # copy .nfo and other non-archives alongside extracted media
+                            _copy_non_archives_to_extracted(current_dir, target_dir)
                             extract_archive(
                                 group.primary,
                                 target_dir,
@@ -741,6 +807,8 @@ def process_downloads(
                             failed.append(group.primary)
                             continue
                         else:
+                            # Flatten single nested dir after extraction (common in some releases)
+                            _flatten_single_subdir(target_dir)
                             extract_tracker.complete(
                                 _logger,
                                 f"Finished extracting {group.primary.name}",
@@ -820,6 +888,9 @@ def process_downloads(
                         finished_root=paths.finished_root,
                         download_root=download_root,
                     )
+                    # Remove any now-empty subdirectories under this context and collapse the chain up to download_root
+                    _remove_empty_subdirs(current_dir)
+                    _remove_empty_tree(current_dir, stop=download_root)
 
                 processed += 1
 
