@@ -136,8 +136,23 @@ def _iter_release_directories(
     def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
         contexts.append((directory, relative_parent, should_extract))
 
-    # Always consider the release root itself
-    _append(base_dir, base_dir.relative_to(download_root), True)
+    # Determine whether this release looks like a TV show (has Season xx) or a Movie
+    has_season_child = False
+    try:
+        for child in base_dir.iterdir():
+            if child.is_dir() and _is_season_dir(child):
+                has_season_child = True
+                break
+    except OSError:
+        has_season_child = False
+    base_prefix = (
+        Path("TV-Shows")
+        if has_season_child or _is_season_dir(base_dir)
+        else Path("Movies")
+    )
+
+    # Always consider the release root itself, prefixed by category
+    _append(base_dir, base_prefix / base_dir.relative_to(download_root), True)
 
     for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
         if not child.is_dir():
@@ -164,18 +179,18 @@ def _iter_release_directories(
 
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
         if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
-            season_rel = base_dir.relative_to(download_root)
+            season_rel = base_prefix / base_dir.relative_to(download_root)
             _append(child, season_rel, should_extract)
             continue
 
         # For normalized special subdirs, map the relative parent to the normalized name
         if normalized is not None:
-            rel = base_dir.relative_to(download_root) / normalized
+            rel = base_prefix / base_dir.relative_to(download_root) / normalized
             _append(child, rel, should_extract)
             continue
 
         # Default: mirror structure
-        _append(child, child.relative_to(download_root), should_extract)
+        _append(child, base_prefix / child.relative_to(download_root), should_extract)
 
     return contexts
 
@@ -469,10 +484,9 @@ def process_downloads(
     failed: list[Path] = []
     unsupported: list[Path] = []
 
-    download_root = paths.download_root
-
-    for release_dir in iter_download_subdirs(download_root):
-        contexts = _iter_release_directories(release_dir, download_root, subfolders)
+    for download_root in paths.download_roots:
+        for release_dir in iter_download_subdirs(download_root):
+            contexts = _iter_release_directories(release_dir, download_root, subfolders)
         for current_dir, relative_parent, should_extract in contexts:
             archives, unsupported_entries = split_directory_entries(current_dir)
             unsupported.extend(unsupported_entries)
@@ -649,9 +663,9 @@ def process_downloads(
             if not demo_mode and should_extract:
                 _remove_empty_tree(target_dir, stop=paths.extracted_root)
 
-        # After finishing this release, remove empty directories under the download root
-        if not demo_mode:
-            _remove_empty_tree(release_dir, stop=download_root)
+            # After finishing this release, remove empty directories under the download root
+            if not demo_mode:
+                _remove_empty_tree(release_dir, stop=download_root)
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 

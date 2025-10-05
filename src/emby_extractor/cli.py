@@ -28,7 +28,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=f"Path to configuration file (default: {DEFAULT_CONFIG})",
     )
     parser.add_argument(
-        "--download-root", type=Path, help="Override download directory root"
+        "--download-root",
+        type=Path,
+        action="append",
+        help="Override download directory root (repeatable)",
     )
     parser.add_argument(
         "--extracted-root", type=Path, help="Override extracted directory root"
@@ -97,20 +100,21 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
 
     paths = settings.paths
     if args.download_root is not None:
+        override_roots = tuple(Path(p).resolve() for p in args.download_root)
         paths = Paths(
-            download_root=args.download_root.resolve(),
+            download_roots=override_roots,
             extracted_root=paths.extracted_root,
             finished_root=paths.finished_root,
         )
     if args.extracted_root is not None:
         paths = Paths(
-            download_root=paths.download_root,
+            download_roots=paths.download_roots,
             extracted_root=args.extracted_root.resolve(),
             finished_root=paths.finished_root,
         )
     if args.finished_root is not None:
         paths = Paths(
-            download_root=paths.download_root,
+            download_roots=paths.download_roots,
             extracted_root=paths.extracted_root,
             finished_root=args.finished_root.resolve(),
         )

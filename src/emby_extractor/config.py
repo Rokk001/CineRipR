@@ -20,19 +20,18 @@ class ConfigurationError(RuntimeError):
 class Paths:
     """Container holding all directory paths used by the extractor."""
 
-    download_root: Path
+    download_roots: tuple[Path, ...]
     extracted_root: Path
     finished_root: Path
 
     def ensure_ready(self) -> None:
-        if not self.download_root.exists():
-            raise FileNotFoundError(
-                f"Download directory '{self.download_root}' does not exist."
-            )
-        if not self.download_root.is_dir():
-            raise NotADirectoryError(
-                f"Download path '{self.download_root}' is not a directory."
-            )
+        if not self.download_roots:
+            raise FileNotFoundError("No download directories configured")
+        for root in self.download_roots:
+            if not root.exists():
+                raise FileNotFoundError(f"Download directory '{root}' does not exist.")
+            if not root.is_dir():
+                raise NotADirectoryError(f"Download path '{root}' is not a directory.")
         for target in (self.extracted_root, self.finished_root):
             target.mkdir(parents=True, exist_ok=True)
 
@@ -62,13 +61,17 @@ class Settings:
     seven_zip_path: Path | None = None
 
     @classmethod
-    def from_mapping(cls, data: dict[str, Any], *, base_path: Path | None = None) -> "Settings":
+    def from_mapping(
+        cls, data: dict[str, Any], *, base_path: Path | None = None
+    ) -> "Settings":
         base_path = base_path or Path.cwd()
 
         try:
             raw_paths = data["paths"]
         except KeyError as exc:  # pragma: no cover - config error path
-            raise ConfigurationError("Missing 'paths' section in configuration") from exc
+            raise ConfigurationError(
+                "Missing 'paths' section in configuration"
+            ) from exc
         if not isinstance(raw_paths, dict):
             raise ConfigurationError("'paths' section must be a mapping")
 
@@ -81,22 +84,41 @@ class Settings:
             return path
 
         try:
-            download_root = resolve_path(raw_paths["download_root"], field="download_root")
-            extracted_root = resolve_path(raw_paths["extracted_root"], field="extracted_root")
-            finished_root = resolve_path(raw_paths["finished_root"], field="finished_root")
+            if "download_roots" in raw_paths:
+                raw_roots = raw_paths["download_roots"]
+                if not isinstance(raw_roots, list) or not raw_roots:
+                    raise ConfigurationError(
+                        "'download_roots' must be a non-empty array"
+                    )
+                download_roots = tuple(
+                    resolve_path(item, field="download_roots[]") for item in raw_roots
+                )
+            else:
+                # fallback to single download_root
+                download_roots = (
+                    resolve_path(raw_paths["download_root"], field="download_root"),
+                )
+            extracted_root = resolve_path(
+                raw_paths["extracted_root"], field="extracted_root"
+            )
+            finished_root = resolve_path(
+                raw_paths["finished_root"], field="finished_root"
+            )
         except KeyError as exc:
             raise ConfigurationError(
-                "paths section must define download_root, extracted_root and finished_root"
+                "paths section must define download_roots (or download_root), extracted_root and finished_root"
             ) from exc
 
         paths = Paths(
-            download_root=download_root,
+            download_roots=download_roots,
             extracted_root=extracted_root,
             finished_root=finished_root,
         )
 
         options = data.get("options", data)
-        retention_days = _read_int(options, "finished_retention_days", default=14, minimum=0)
+        retention_days = _read_int(
+            options, "finished_retention_days", default=14, minimum=0
+        )
         enable_delete = _read_bool(options, "enable_delete", default=False)
         demo_mode = _read_bool(options, "demo_mode", default=False)
 
@@ -107,9 +129,13 @@ class Settings:
             if not isinstance(subfolders_data, dict):
                 raise ConfigurationError("'subfolders' section must be a mapping")
             subfolder_policy = SubfolderPolicy(
-                include_sample=_read_bool(subfolders_data, "include_sample", default=False),
+                include_sample=_read_bool(
+                    subfolders_data, "include_sample", default=False
+                ),
                 include_sub=_read_bool(subfolders_data, "include_sub", default=False),
-                include_other=_read_bool(subfolders_data, "include_other", default=False),
+                include_other=_read_bool(
+                    subfolders_data, "include_other", default=False
+                ),
             )
 
         seven_zip_path: Path | None = None
@@ -120,7 +146,9 @@ class Settings:
                 raw_text = str(raw_value).strip()
                 if raw_text:
                     candidate = Path(raw_text)
-                    if candidate.is_absolute() or any(sep in raw_text for sep in ("/", "\\", ":")):
+                    if candidate.is_absolute() or any(
+                        sep in raw_text for sep in ("/", "\\", ":")
+                    ):
                         if not candidate.is_absolute():
                             candidate = (base_path / candidate).resolve()
                         seven_zip_path = candidate
@@ -137,12 +165,16 @@ class Settings:
         )
 
 
-def _read_int(data: dict[str, Any], key: str, *, default: int, minimum: int | None = None) -> int:
+def _read_int(
+    data: dict[str, Any], key: str, *, default: int, minimum: int | None = None
+) -> int:
     value = data.get(key, default)
     try:
         number = int(value)
     except (TypeError, ValueError) as exc:
-        raise ConfigurationError(f"Configuration value '{key}' must be an integer") from exc
+        raise ConfigurationError(
+            f"Configuration value '{key}' must be an integer"
+        ) from exc
     if minimum is not None and number < minimum:
         raise ConfigurationError(f"Configuration value '{key}' must be >= {minimum}")
     return number
@@ -162,7 +194,9 @@ def _read_bool(data: dict[str, Any], key: str, *, default: bool = False) -> bool
             return True
         if normalized in {"0", "false", "no", "n", "off"}:
             return False
-    raise ConfigurationError(f"Cannot interpret value '{value!r}' for '{key}' as boolean")
+    raise ConfigurationError(
+        f"Cannot interpret value '{value!r}' for '{key}' as boolean"
+    )
 
 
 def load_settings(config_file: Path | None) -> Settings:
@@ -181,7 +215,9 @@ def load_settings(config_file: Path | None) -> Settings:
         data = tomllib.load(fh)
 
     if not isinstance(data, dict):  # pragma: no cover - defensive
-        raise ConfigurationError("Configuration file must define a mapping at top level")
+        raise ConfigurationError(
+            "Configuration file must define a mapping at top level"
+        )
 
     return Settings.from_mapping(data, base_path=config_file.parent)
 

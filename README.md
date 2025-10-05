@@ -26,7 +26,8 @@ Create an `emby_extractor.toml` file (a starter version is included in the repos
 ```toml
 # emby_extractor.toml
 [paths]
-download_root = "C:/Media/Download"
+# Multiple download roots supported (repeat lines in CLI with --download-root):
+download_roots = ["C:/Media/Download", "D:/Torrents"]
 extracted_root = "C:/Media/Extracted"
 finished_root = "C:/Media/Finished"
 
@@ -55,7 +56,7 @@ Common flags:
 - `--demo/--no-demo` — toggle demo mode.
 - `--enable-delete/--no-enable-delete` — control cleanup deletions.
 - `--retention-days N` — override retention period.
-- `--download-root`, `--extracted-root`, `--finished-root` — override individual paths.
+- `--download-root` (repeatable), `--extracted-root`, `--finished-root` — override individual paths.
 - `--seven-zip PATH` — point to a custom 7-Zip executable for RAR extraction.
 
 Use `emby-extractor --help` to list all available options.

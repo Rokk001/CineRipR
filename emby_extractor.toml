@@ -2,7 +2,10 @@
 
 [paths]
 # Update the paths below to match your environment.
-download_root = "C:/Media/Download"
+# You can specify multiple download roots:
+# download_roots = ["C:/Media/Download1", "D:/Downloads"]
+# Or the legacy single root:
+download_roots = ["C:/Media/Download"]
 extracted_root = "C:/Media/Extracted"
 finished_root = "C:/Media/Finished"
 
