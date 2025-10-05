@@ -592,7 +592,10 @@ def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None
         for entry in sorted(current_dir.iterdir(), key=lambda p: p.name.lower()):
             if entry.is_file() and not _is_supported_archive(entry):
                 try:
-                    shutil.copy2(str(entry), str(ensure_unique_destination(target_dir / entry.name)))
+                    shutil.copy2(
+                        str(entry),
+                        str(ensure_unique_destination(target_dir / entry.name)),
+                    )
                 except OSError:
                     pass
     except OSError:
@@ -625,6 +628,7 @@ def _flatten_single_subdir(directory: Path) -> None:
             pass
     except OSError:
         pass
+
 
 def _remove_empty_subdirs(root: Path) -> None:
     """Remove empty subdirectories under the given root directory (depth-first)."""

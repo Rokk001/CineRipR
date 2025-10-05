@@ -35,6 +35,13 @@ class Paths:
         for target in (self.extracted_root, self.finished_root):
             target.mkdir(parents=True, exist_ok=True)
 
+    # Backwards compatibility: expose first download root as download_root
+    @property
+    def download_root(self) -> Path:  # pragma: no cover - compatibility shim
+        if not self.download_roots:
+            raise FileNotFoundError("No download directories configured")
+        return self.download_roots[0]
+
 
 @dataclass(frozen=True)
 class SubfolderPolicy:
