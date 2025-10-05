@@ -213,10 +213,11 @@ def _iter_release_directories(
                         ep_contains_any_files = False
                     # episode folder is its own extraction parent
                     season_rel = base_prefix / episode_dir.relative_to(download_root)
+                    # Always extract the main episode directory; subfolders are handled separately per policy
                     _append(
                         episode_dir,
                         season_rel,
-                        ep_contains_archives or ep_contains_any_files,
+                        True,
                     )
                     # also process well-known subfolders (e.g., Subs) within the episode folder
                     _append_normalized_subdirs(episode_dir, base_prefix=base_prefix)
