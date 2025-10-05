@@ -139,22 +139,26 @@ def _iter_release_directories(
     def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
         contexts.append((directory, relative_parent, should_extract))
 
-    # Determine whether this release looks like a TV show (has Season xx folder)
-    # or an episode tag SxxExx in the release name
-    has_season_child = False
-    try:
-        for child in base_dir.iterdir():
-            if child.is_dir() and _is_season_dir(child):
-                has_season_child = True
-                break
-    except OSError:
-        has_season_child = False
-    looks_like_episode = bool(_SXXEXX_RE.search(base_dir.name))
-    base_prefix = (
-        Path("TV-Shows")
-        if (has_season_child or _is_season_dir(base_dir) or looks_like_episode)
-        else Path("Movies")
-    )
+    # Determine whether this release looks like a TV show.
+    # Heuristics: a Season dir exists OR any dir/file name contains SxxExx.
+    def _looks_like_tv_show(root: Path) -> bool:
+        if _is_season_dir(root):
+            return True
+        if _SXXEXX_RE.search(root.name) is not None:
+            return True
+        try:
+            for child in root.iterdir():
+                if child.is_dir() and (
+                    _is_season_dir(child) or _SXXEXX_RE.search(child.name)
+                ):
+                    return True
+                if child.is_file() and _SXXEXX_RE.search(child.name):
+                    return True
+        except OSError:
+            pass
+        return False
+
+    base_prefix = Path("TV-Shows") if _looks_like_tv_show(base_dir) else Path("Movies")
 
     # Always consider the release root itself, prefixed by category
     _append(base_dir, base_prefix / base_dir.relative_to(download_root), True)
@@ -165,6 +169,32 @@ def _iter_release_directories(
 
         child_name = child.name
         normalized = _normalize_special_subdir(child_name)
+
+        # If the child is a Season directory, also consider episode subfolders one level deeper
+        if _is_season_dir(child):
+            try:
+                for episode_dir in sorted(
+                    child.iterdir(), key=lambda p: p.name.lower()
+                ):
+                    if not episode_dir.is_dir():
+                        continue
+                    ep_contains_archives = _contains_supported_archives(episode_dir)
+                    ep_contains_any_files = False
+                    try:
+                        ep_contains_any_files = any(
+                            p.is_file() for p in episode_dir.iterdir()
+                        )
+                    except OSError:
+                        ep_contains_any_files = False
+                    # flatten episodes into the season folder
+                    season_rel = base_prefix / child.relative_to(download_root)
+                    _append(
+                        episode_dir,
+                        season_rel,
+                        ep_contains_archives or ep_contains_any_files,
+                    )
+            except OSError:
+                pass
 
         # Decide if we should extract this child dir
         contains_archives = _contains_supported_archives(child)
@@ -182,10 +212,10 @@ def _iter_release_directories(
         else:
             should_extract = policy.include_other or contains_archives
 
-        # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
+        # Season/.../<episode_dir>: extract into the episode folder itself
         if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
-            season_rel = base_prefix / base_dir.relative_to(download_root)
-            _append(child, season_rel, should_extract)
+            episode_rel = base_prefix / child.relative_to(download_root)
+            _append(child, episode_rel, should_extract)
             continue
 
         # For normalized special subdirs, map the relative parent to the normalized name
