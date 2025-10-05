@@ -90,16 +90,32 @@ def _is_supported_archive(entry: Path) -> bool:
 
 
 def iter_download_subdirs(download_root: Path) -> Iterator[Path]:
-    for entry in sorted(download_root.iterdir(), key=lambda path: path.name.lower()):
-        if entry.is_dir():
-            yield entry
+    try:
+        entries = sorted(download_root.iterdir(), key=lambda path: path.name.lower())
+    except (OSError, PermissionError):
+        _logger.warning("Access denied or error listing: %s", download_root)
+        return
+    for entry in entries:
+        try:
+            if entry.is_dir():
+                yield entry
+        except OSError:
+            continue
 
 
 def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
     supported: list[Path] = []
     unsupported: list[Path] = []
-    for entry in sorted(directory.iterdir(), key=lambda path: path.name.lower()):
-        if not entry.is_file():
+    try:
+        entries = sorted(directory.iterdir(), key=lambda path: path.name.lower())
+    except (OSError, PermissionError):
+        _logger.warning("Access denied or error listing: %s", directory)
+        return supported, unsupported
+    for entry in entries:
+        try:
+            if not entry.is_file():
+                continue
+        except OSError:
             continue
         if _is_supported_archive(entry):
             supported.append(entry)
@@ -203,14 +219,6 @@ def _iter_release_directories(
                 ):
                     if not episode_dir.is_dir():
                         continue
-                    ep_contains_archives = _contains_supported_archives(episode_dir)
-                    ep_contains_any_files = False
-                    try:
-                        ep_contains_any_files = any(
-                            p.is_file() for p in episode_dir.iterdir()
-                        )
-                    except OSError:
-                        ep_contains_any_files = False
                     # episode folder is its own extraction parent
                     season_rel = base_prefix / episode_dir.relative_to(download_root)
                     # Always extract the main episode directory; subfolders are handled separately per policy
@@ -456,15 +464,22 @@ def _remove_empty_tree(directory: Path, *, stop: Path) -> None:
         return
     current = directory
     while current != stop and current.exists():
+        # If we cannot list the directory, assume not empty and stop to avoid crashing
         try:
-            next(current.iterdir())
-            break
-        except StopIteration:
+            it = current.iterdir()
             try:
-                current.rmdir()
-            except OSError:
+                next(it)
+                # has entries -> stop
                 break
-            current = current.parent
+            except StopIteration:
+                pass  # empty
+        except (OSError, PermissionError):
+            break
+        try:
+            current.rmdir()
+        except (OSError, PermissionError):
+            break
+        current = current.parent
 
 
 def _extract_with_seven_zip(
@@ -566,7 +581,7 @@ def _extract_with_seven_zip(
                         except OSError:
                             pass
                     return
-        except Exception:
+        except (OSError, RuntimeError, subprocess.SubprocessError):
             pass
         raise RuntimeError(
             f"7-Zip extraction failed (exit code {process.returncode})"
@@ -733,81 +748,81 @@ def process_downloads(
     unsupported: list[Path] = []
 
     for download_root in paths.download_roots:
-        for release_dir in iter_download_subdirs(download_root):
+        # Also consider the download_root itself when it directly contains a release
+        candidate_roots: list[Path] = [download_root]
+        candidate_roots.extend(iter_download_subdirs(download_root))
+        for release_dir in candidate_roots:
             contexts = _iter_release_directories(release_dir, download_root, subfolders)
+
             # Prioritize episode folders over special subfolders like Subs/Sample
-            try:
+            def _prio(entry: tuple[Path, Path, bool]) -> tuple[int, str]:
+                _dir, rel, _ex = entry
+                name = rel.name.lower()
+                special = 1 if name in {"subs", "sample", "sonstige"} else 0
+                return (special, str(rel).lower())
 
-                def _prio(entry: tuple[Path, Path, bool]) -> tuple[int, str]:
-                    _dir, rel, _ex = entry
-                    name = rel.name.lower()
-                    special = 1 if name in {"subs", "sample", "sonstige"} else 0
-                    return (special, str(rel).lower())
-
-                contexts = sorted(contexts, key=_prio)
-            except Exception:
-                pass
-            try:
+            contexts = sorted(contexts, key=_prio)
+            if _logger.isEnabledFor(logging.DEBUG):
                 _logger.debug(
                     "Contexts for %s: %s",
                     release_dir,
                     ", ".join(str(p) for p, _rel, _ex in contexts),
                 )
-            except Exception:
-                pass
             for current_dir, relative_parent, should_extract in contexts:
                 archives, unsupported_entries = split_directory_entries(current_dir)
-            try:
-                if archives:
-                    preview = ", ".join(a.name for a in archives[:3])
-                    _logger.debug(
-                        "Found %s archive(s) in %s: %s%s",
-                        len(archives),
-                        current_dir,
-                        preview,
-                        " ..." if len(archives) > 3 else "",
-                    )
-                else:
-                    _logger.debug("No supported archives found in %s", current_dir)
-            except Exception:
-                pass
+                if _logger.isEnabledFor(logging.DEBUG):
+                    if archives:
+                        preview = ", ".join(a.name for a in archives[:3])
+                        _logger.debug(
+                            "Found %s archive(s) in %s: %s%s",
+                            len(archives),
+                            current_dir,
+                            preview,
+                            " ..." if len(archives) > 3 else "",
+                        )
+                    else:
+                        _logger.debug("No supported archives found in %s", current_dir)
                 unsupported.extend(unsupported_entries)
                 if not archives:
-                    # Handle already-extracted content: copy files to extracted and move to finished
+                    # Handle already-extracted content:
+                    # 1) Copy the whole file tree (files only) into extracted under relative_parent
+                    # 2) Move all remaining files from the current context to finished (preserving structure)
+                    target_dir = paths.extracted_root / relative_parent
                     try:
-                        target_dir = paths.extracted_root / relative_parent
-                        finished_dir = paths.finished_root / current_dir.relative_to(
-                            download_root
-                        )
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        finished_dir.mkdir(parents=True, exist_ok=True)
-                        for entry in sorted(
-                            current_dir.iterdir(), key=lambda p: p.name.lower()
-                        ):
-                            if not entry.is_file():
-                                continue
-                            # copy to extracted
+                        for root, _dirs, files in os.walk(current_dir):
+                            root_path = Path(root)
+                            rel = root_path.relative_to(current_dir)
+                            out_dir = target_dir / rel
                             try:
-                                shutil.copy2(
-                                    str(entry),
-                                    str(
-                                        ensure_unique_destination(
-                                            target_dir / entry.name
-                                        )
-                                    ),
-                                )
+                                out_dir.mkdir(parents=True, exist_ok=True)
                             except OSError:
                                 pass
-                            # move to finished
-                            try:
-                                destination = ensure_unique_destination(
-                                    finished_dir / entry.name
-                                )
-                                shutil.move(str(entry), str(destination))
-                            except OSError:
-                                pass
+                            for fname in files:
+                                src_file = root_path / fname
+                                try:
+                                    shutil.copy2(
+                                        str(src_file),
+                                        str(
+                                            ensure_unique_destination(
+                                                out_dir / src_file.name
+                                            )
+                                        ),
+                                    )
+                                except OSError:
+                                    pass
                     except OSError:
                         pass
+
+                    # Move everything to finished mirroring the download structure
+                    _move_remaining_to_finished(
+                        current_dir,
+                        finished_root=paths.finished_root,
+                        download_root=download_root,
+                    )
+                    # Cleanup emptied directories under current_dir
+                    _remove_empty_subdirs(current_dir)
+                    _remove_empty_tree(current_dir, stop=download_root)
+                    processed += 1
                     continue
 
             groups = build_archive_groups(archives)

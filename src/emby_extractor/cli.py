@@ -219,12 +219,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         _LOGGER.error("Processing error: %s", exc)
         return 1
 
-    deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
-        settings.paths.finished_root,
-        settings.retention_days,
-        enable_delete=settings.enable_delete,
-        demo_mode=settings.demo_mode,
-    )
+    if settings.enable_delete or settings.demo_mode:
+        deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
+            settings.paths.finished_root,
+            settings.retention_days,
+            enable_delete=settings.enable_delete,
+            demo_mode=settings.demo_mode,
+        )
+    else:
+        _LOGGER.info(
+            "Delete disabled and demo mode off: skipping finished cleanup scan."
+        )
+        deleted = []
+        cleanup_failed = []
+        skipped_cleanup = []
 
     _LOGGER.info("Processed archives: %s", result.processed)
     if settings.demo_mode:
