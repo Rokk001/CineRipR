@@ -148,6 +148,11 @@ def _iter_release_directories(
 
         # Decide if we should extract this child dir
         contains_archives = _contains_supported_archives(child)
+        contains_any_files = False
+        try:
+            contains_any_files = any(p.is_file() for p in child.iterdir())
+        except OSError:
+            contains_any_files = False
         if normalized == "Sample":
             should_extract = policy.include_sample or contains_archives
         elif normalized == "Subs":
@@ -158,7 +163,7 @@ def _iter_release_directories(
             should_extract = policy.include_other or contains_archives
 
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
-        if _is_season_dir(base_dir) and contains_archives:
+        if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
             season_rel = base_dir.relative_to(download_root)
             _append(child, season_rel, should_extract)
             continue
@@ -444,6 +449,35 @@ def process_downloads(
             archives, unsupported_entries = split_directory_entries(current_dir)
             unsupported.extend(unsupported_entries)
             if not archives:
+                # Handle already-extracted content: copy files to extracted and move to finished
+                try:
+                    target_dir = paths.extracted_root / relative_parent
+                    finished_dir = paths.finished_root / relative_parent
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    finished_dir.mkdir(parents=True, exist_ok=True)
+                    for entry in sorted(
+                        current_dir.iterdir(), key=lambda p: p.name.lower()
+                    ):
+                        if not entry.is_file():
+                            continue
+                        # copy to extracted
+                        try:
+                            shutil.copy2(
+                                str(entry),
+                                str(ensure_unique_destination(target_dir / entry.name)),
+                            )
+                        except OSError:
+                            pass
+                        # move to finished
+                        try:
+                            destination = ensure_unique_destination(
+                                finished_dir / entry.name
+                            )
+                            shutil.move(str(entry), str(destination))
+                        except OSError:
+                            pass
+                except OSError:
+                    pass
                 _logger.debug("No supported archives found in %s", current_dir)
                 continue
 
