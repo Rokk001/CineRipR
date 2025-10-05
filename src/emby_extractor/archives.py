@@ -139,6 +139,30 @@ def _iter_release_directories(
     def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
         contexts.append((directory, relative_parent, should_extract))
 
+    def _append_normalized_subdirs(parent: Path, *, base_prefix: Path) -> None:
+        """Append known subdirs (Subs/Sample/Sonstige) for a given parent directory.
+
+        This ensures episode-level subfolders like "Subs" are processed.
+        """
+        try:
+            for sub in sorted(parent.iterdir(), key=lambda p: p.name.lower()):
+                if not sub.is_dir():
+                    continue
+                norm = _normalize_special_subdir(sub.name)
+                if norm is None:
+                    continue
+                contains_archives = _contains_supported_archives(sub)
+                if norm == "Subs":
+                    should = policy.include_sub or contains_archives
+                elif norm == "Sample":
+                    should = policy.include_sample or contains_archives
+                else:
+                    should = policy.include_other or contains_archives
+                rel = base_prefix / parent.relative_to(download_root) / norm
+                _append(sub, rel, should)
+        except OSError:
+            pass
+
     # Determine whether this release looks like a TV show.
     # Heuristics: a Season dir exists OR any dir/file name contains SxxExx.
     def _looks_like_tv_show(root: Path) -> bool:
@@ -186,13 +210,15 @@ def _iter_release_directories(
                         )
                     except OSError:
                         ep_contains_any_files = False
-                    # flatten episodes into the season folder
+                    # episode folder is its own extraction parent
                     season_rel = base_prefix / episode_dir.relative_to(download_root)
                     _append(
                         episode_dir,
                         season_rel,
                         ep_contains_archives or ep_contains_any_files,
                     )
+                    # also process well-known subfolders (e.g., Subs) within the episode folder
+                    _append_normalized_subdirs(episode_dir, base_prefix=base_prefix)
             except OSError:
                 pass
             # Do not treat the Season folder itself as a processing context
