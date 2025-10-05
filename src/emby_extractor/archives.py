@@ -29,6 +29,7 @@ def _build_supported_suffixes() -> tuple[str, ...]:
 
 
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
+_SXXEXX_RE = re.compile(r"s\d{2}e\d{2}", re.IGNORECASE)
 _PART_VOLUME_RE = re.compile(
     r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE
 )
@@ -138,7 +139,8 @@ def _iter_release_directories(
     def _append(directory: Path, relative_parent: Path, should_extract: bool) -> None:
         contexts.append((directory, relative_parent, should_extract))
 
-    # Determine whether this release looks like a TV show (has Season xx) or a Movie
+    # Determine whether this release looks like a TV show (has Season xx folder)
+    # or an episode tag SxxExx in the release name
     has_season_child = False
     try:
         for child in base_dir.iterdir():
@@ -147,9 +149,10 @@ def _iter_release_directories(
                 break
     except OSError:
         has_season_child = False
+    looks_like_episode = bool(_SXXEXX_RE.search(base_dir.name))
     base_prefix = (
         Path("TV-Shows")
-        if has_season_child or _is_season_dir(base_dir)
+        if (has_season_child or _is_season_dir(base_dir) or looks_like_episode)
         else Path("Movies")
     )
 
@@ -583,16 +586,20 @@ def _move_remaining_to_finished(
 
 
 def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
-    """Copy non-archive companion files (e.g. .nfo, .srt) from source to extracted.
+    """Copy companion metadata files (.nfo only) from source to extracted.
 
     Source files remain in place and will be moved to finished later if extraction succeeds.
     """
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
         for entry in sorted(current_dir.iterdir(), key=lambda p: p.name.lower()):
-            if entry.is_file() and not _is_supported_archive(entry):
+            # Copy ONLY .nfo files (case-insensitive)
+            if entry.is_file() and entry.suffix.lower() == ".nfo":
                 try:
-                    shutil.copy2(str(entry), str(ensure_unique_destination(target_dir / entry.name)))
+                    shutil.copy2(
+                        str(entry),
+                        str(ensure_unique_destination(target_dir / entry.name)),
+                    )
                 except OSError:
                     pass
     except OSError:
@@ -625,6 +632,7 @@ def _flatten_single_subdir(directory: Path) -> None:
             pass
     except OSError:
         pass
+
 
 def _remove_empty_subdirs(root: Path) -> None:
     """Remove empty subdirectories under the given root directory (depth-first)."""
