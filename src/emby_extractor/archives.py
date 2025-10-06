@@ -266,8 +266,9 @@ def process_downloads(
             release_failed = False
             is_main_context = False
 
-            # Use consistent color for entire release
-            release_color = next_progress_color()
+            # Track current context color (changes per episode/film)
+            context_color = next_progress_color()
+            last_episode_name: str | None = None
 
             for context_index, (
                 current_dir,
@@ -276,6 +277,25 @@ def process_downloads(
             ) in enumerate(contexts):
                 # Last context is always the main release directory
                 is_main_context = context_index == len(contexts) - 1
+
+                # Determine the episode/film directory (not subfolders like Subs)
+                # If current_dir is a subfolder (Subs, Sample), use parent as episode
+                episode_dir = current_dir
+                if current_dir.parent != release_dir and current_dir.name in (
+                    "Subs",
+                    "Sample",
+                    "Sonstige",
+                    "Proof",
+                ):
+                    episode_dir = current_dir.parent
+
+                # Change color only when we encounter a new episode/film
+                episode_name = episode_dir.name
+                if context_index > 0 and episode_name != last_episode_name:
+                    context_color = next_progress_color()
+
+                # Remember the episode name for next iteration
+                last_episode_name = episode_name
 
                 archives, unsupported_entries = split_directory_entries(current_dir)
                 unsupported.extend(unsupported_entries)
@@ -299,7 +319,7 @@ def process_downloads(
                                 copy_tracker = ProgressTracker(
                                     len(files_to_copy),
                                     single_line=True,
-                                    color=release_color,
+                                    color=context_color,
                                 )
                                 copy_tracker.log(
                                     _logger,
@@ -349,7 +369,7 @@ def process_downloads(
 
                 # Initial announcement - complete immediately
                 announce_tracker = ProgressTracker(
-                    1, single_line=True, color=release_color
+                    1, single_line=True, color=context_color
                 )
                 announce_tracker.complete(
                     _logger,
@@ -358,11 +378,11 @@ def process_downloads(
 
                 # Create trackers for actual work
                 read_tracker = ProgressTracker(
-                    total_parts, single_line=True, color=release_color
+                    total_parts, single_line=True, color=context_color
                 )
                 # For extraction, track by number of archives (not parts)
                 extract_tracker = ProgressTracker(
-                    total_groups, single_line=True, color=release_color
+                    total_groups, single_line=True, color=context_color
                 )
 
                 parts_processed = 0
@@ -431,7 +451,7 @@ def process_downloads(
 
                                 # Create a progress tracker for this specific extraction (0-100%)
                                 extraction_progress = ProgressTracker(
-                                    100, single_line=True, color=release_color
+                                    100, single_line=True, color=context_color
                                 )
                                 extraction_progress.log(
                                     _logger,
@@ -538,8 +558,10 @@ def process_downloads(
                 )
 
                 # Create a single tracker for all moves in this release
+                # Use a new color for the move phase
+                move_color = next_progress_color()
                 move_tracker = ProgressTracker(
-                    total_files_to_move, single_line=True, color=release_color
+                    total_files_to_move, single_line=True, color=move_color
                 )
 
                 if demo_mode:
