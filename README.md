@@ -97,6 +97,33 @@ The tool:
 - Flattens episode directories - content is extracted directly into the season folder
 - Preserves subfolder structure (Subs, Sample) according to your policy settings
 
+## Project Structure
+
+The codebase is organized into focused, maintainable modules:
+
+```
+src/emby_extractor/
+├── __init__.py              # Package version
+├── archive_constants.py     # Constants and regex patterns (62 lines)
+├── archive_detection.py     # Archive discovery and grouping (217 lines)
+├── archive_extraction.py    # Extraction logic with 7-Zip support (317 lines)
+├── path_utils.py            # TV show path organization (178 lines)
+├── file_operations.py       # File/directory management (207 lines)
+├── archives.py              # Main orchestration (505 lines)
+├── cleanup.py               # Cleanup and retention logic
+├── config.py                # Configuration management
+├── progress.py              # Progress tracking and display
+└── cli.py                   # Command-line interface
+```
+
+This modular architecture provides:
+- **Clear separation of concerns**: Each module has a single, well-defined responsibility
+- **Easy testing**: Focused modules with clear interfaces
+- **Better maintainability**: Smaller files are easier to understand and modify
+- **Improved collaboration**: Multiple developers can work on different modules
+
+For detailed refactoring documentation, see [REFACTORING.md](REFACTORING.md).
+
 ## Development
 Run formatting and static checks as needed (example commands shown with `uv`/`pip`):
 ```bash

@@ -27,5 +27,17 @@ All notable changes to this project will be documented in this file.
 - Python 3.11+ required
 - 7-Zip integration for RAR archive support
 - TOML-based configuration
-- Modular architecture with separate modules for archives, cleanup, config, and progress tracking
+- Modular architecture with 6 focused modules:
+  - `archive_constants`: Constants and patterns
+  - `archive_detection`: Archive discovery and grouping
+  - `archive_extraction`: Extraction logic with 7-Zip support
+  - `path_utils`: TV show path organization
+  - `file_operations`: File/directory management
+  - `archives`: Main orchestration
+
+### Code Quality
+- Refactored 1204-line monolithic file into 6 maintainable modules
+- Comprehensive docstrings for all public functions
+- Clear separation of concerns
+- Improved testability with focused module boundaries
 
