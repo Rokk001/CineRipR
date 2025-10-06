@@ -18,7 +18,7 @@ from .progress import ProgressTracker
 
 def detect_archive_format(archive: Path) -> str | None:
     """Detect the archive format by file extension.
-    
+
     Returns:
         Format name (e.g., 'rar', 'zip', 'tar') or None if unknown
     """
@@ -34,10 +34,10 @@ def detect_archive_format(archive: Path) -> str | None:
 
 def resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
     """Find 7-Zip executable path.
-    
+
     Args:
         seven_zip_path: User-configured path or None for auto-detection
-        
+
     Returns:
         Path to 7-Zip executable or None if not found
     """
@@ -65,12 +65,12 @@ def can_extract_archive(
     archive: Path, *, seven_zip_path: Path | None
 ) -> tuple[bool, str | None]:
     """Check if an archive can be extracted and validate its integrity.
-    
+
     Returns:
         Tuple of (can_extract, error_message)
     """
     format_name = detect_archive_format(archive)
-    
+
     if format_name == "rar":
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
@@ -107,13 +107,13 @@ def _win_long_path(p: Path) -> str:
     text = str(p)
     if os.name != "nt":
         return text
-    
+
     # Normalize to absolute path
     try:
         p = p.resolve()
     except OSError:
         pass
-    
+
     s = str(p)
     if s.startswith("\\\\?\\"):
         return s
@@ -128,15 +128,17 @@ def _extract_with_seven_zip(
     archive: Path,
     target_dir: Path,
     *,
+    cpu_cores: int = 2,
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
 ) -> None:
     """Extract RAR archive using 7-Zip with progress tracking.
-    
+
     Args:
         command: Path to 7-Zip executable
         archive: Archive file to extract
         target_dir: Target directory for extraction
+        cpu_cores: Number of CPU cores to use for extraction (default: 2)
         progress: Optional progress tracker
         logger: Optional logger for progress updates
     """
@@ -145,7 +147,8 @@ def _extract_with_seven_zip(
     # Build 7-Zip command with Windows long path support
     output_arg = f"-o{_win_long_path(target_dir)}"
     archive_arg = _win_long_path(archive)
-    
+    mmt_arg = f"-mmt{cpu_cores}"  # Set number of CPU threads
+
     process = subprocess.Popen(
         [
             command,
@@ -153,6 +156,7 @@ def _extract_with_seven_zip(
             archive_arg,
             output_arg,
             "-y",  # Yes to all prompts
+            mmt_arg,  # Number of CPU threads
             "-bsp1",  # Show progress percentage
             "-bso1",  # Stdout messages
             "-bb1",  # Basic output
@@ -165,7 +169,7 @@ def _extract_with_seven_zip(
         errors="replace",
         bufsize=1,
     )
-    
+
     # Parse progress from stdout
     if process.stdout is None:
         stdout_lines: list[str] = []
@@ -174,28 +178,33 @@ def _extract_with_seven_zip(
         last_percent: int = -1
         for line in process.stdout:
             stdout_lines.append(line)
-            if progress is not None and logger is not None:
-                text = line.strip()
-                # Parse percentage from 7z output (e.g., " 12%")
-                m = re.search(r"(\d{1,3})%", text)
-                if m:
-                    if progress.total > 0:
-                        percent = max(0, min(100, int(m.group(1))))
-                        if percent != last_percent:
-                            last_percent = percent
+            text = line.strip()
+            # Parse percentage from 7z output (e.g., " 12%")
+            m = re.search(r"(\d{1,3})%", text)
+            if m:
+                percent = max(0, min(100, int(m.group(1))))
+                if percent != last_percent:
+                    last_percent = percent
+                    # Update progress tracker if available
+                    if progress is not None and logger is not None:
+                        if progress.total > 0:
                             current = int(round((percent / 100) * progress.total))
                             progress.advance(
                                 logger,
-                                f'Extracting with 7-Zip: "{archive.name}"',
+                                f"Extracting {archive.name}",
                                 absolute=current,
                             )
-    
+
     process.wait()
-    
+
+    # Complete the progress tracker after extraction finishes successfully
+    if process.returncode == 0 and progress is not None and logger is not None:
+        progress.complete(logger, f"Extracted {archive.name}")
+
     # Handle extraction failure with temp directory fallback
     if process.returncode != 0:
         stderr = "".join(stdout_lines).strip()
-        
+
         # Fallback: extract to temporary short path, then move to target
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -208,6 +217,7 @@ def _extract_with_seven_zip(
                         archive_arg,
                         tmp_arg,
                         "-y",
+                        mmt_arg,  # Use same CPU cores for fallback
                         "-bsp1",
                         "-bso1",
                         "-bb1",
@@ -222,7 +232,7 @@ def _extract_with_seven_zip(
                 if retry.returncode == 0:
                     # Move contents from tmp to target
                     target_dir.mkdir(parents=True, exist_ok=True)
-                    
+
                     # Remove unwanted files before moving
                     for unwanted in UNWANTED_EXTRACTED_SUFFIXES:
                         try:
@@ -233,7 +243,7 @@ def _extract_with_seven_zip(
                                     pass
                         except OSError:
                             pass
-                    
+
                     # Move all files from temp to target
                     for item in tmp_out.iterdir():
                         dest = target_dir / item.name
@@ -244,7 +254,7 @@ def _extract_with_seven_zip(
                     return
         except Exception:
             pass
-        
+
         raise RuntimeError(
             f"7-Zip extraction failed (exit code {process.returncode})"
             + (f": {stderr}" if stderr else "")
@@ -256,30 +266,39 @@ def extract_archive(
     target_dir: Path,
     *,
     seven_zip_path: Path | None,
+    cpu_cores: int = 2,
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
 ) -> None:
     """Extract an archive to the target directory.
-    
+
     Args:
         archive: Archive file to extract
         target_dir: Target directory for extraction
         seven_zip_path: Path to 7-Zip executable (for RAR files)
+        cpu_cores: Number of CPU cores to use for extraction (default: 2)
         progress: Optional progress tracker
         logger: Optional logger for progress updates
-        
+
     Raises:
         RuntimeError: If extraction fails
     """
     format_name = detect_archive_format(archive)
-    
+
     if format_name == "rar":
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
             raise RuntimeError(
                 "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
             )
-        _extract_with_seven_zip(command, archive, target_dir, progress=progress, logger=logger)
+        _extract_with_seven_zip(
+            command,
+            archive,
+            target_dir,
+            cpu_cores=cpu_cores,
+            progress=progress,
+            logger=logger,
+        )
     else:
         # Use shutil for other formats
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -294,4 +313,3 @@ __all__ = [
     "can_extract_archive",
     "extract_archive",
 ]
-

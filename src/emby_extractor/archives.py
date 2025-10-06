@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -225,6 +226,7 @@ def process_downloads(
     demo_mode: bool,
     seven_zip_path: Path | None,
     subfolders: SubfolderPolicy,
+    cpu_cores: int = 2,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -239,6 +241,7 @@ def process_downloads(
         demo_mode: If True, don't actually extract/move files
         seven_zip_path: Path to 7-Zip executable (for RAR files)
         subfolders: Policy for which subfolders to process
+        cpu_cores: Number of CPU cores to use for extraction (default: 2)
 
     Returns:
         ProcessResult with counts and failed archives
@@ -263,8 +266,9 @@ def process_downloads(
             release_failed = False
             is_main_context = False
 
-            # Use consistent color for entire release
-            release_color = next_progress_color()
+            # Track current context color (changes per episode/film)
+            context_color = next_progress_color()
+            last_episode_name: str | None = None
 
             for context_index, (
                 current_dir,
@@ -273,6 +277,25 @@ def process_downloads(
             ) in enumerate(contexts):
                 # Last context is always the main release directory
                 is_main_context = context_index == len(contexts) - 1
+
+                # Determine the episode/film directory (not subfolders like Subs)
+                # If current_dir is a subfolder (Subs, Sample), use parent as episode
+                episode_dir = current_dir
+                if current_dir.parent != release_dir and current_dir.name in (
+                    "Subs",
+                    "Sample",
+                    "Sonstige",
+                    "Proof",
+                ):
+                    episode_dir = current_dir.parent
+
+                # Change color only when we encounter a new episode/film
+                episode_name = episode_dir.name
+                if context_index > 0 and episode_name != last_episode_name:
+                    context_color = next_progress_color()
+
+                # Remember the episode name for next iteration
+                last_episode_name = episode_name
 
                 archives, unsupported_entries = split_directory_entries(current_dir)
                 unsupported.extend(unsupported_entries)
@@ -296,7 +319,7 @@ def process_downloads(
                                 copy_tracker = ProgressTracker(
                                     len(files_to_copy),
                                     single_line=True,
-                                    color=release_color,
+                                    color=context_color,
                                 )
                                 copy_tracker.log(
                                     _logger,
@@ -340,7 +363,31 @@ def process_downloads(
                 target_dir = paths.extracted_root / relative_parent
                 finished_relative_parent = current_dir.relative_to(download_root)
 
+                # Calculate total parts across all groups for unified progress tracking
+                total_parts = sum(group.part_count for group in groups)
                 total_groups = len(groups)
+
+                # Initial announcement - complete immediately
+                announce_tracker = ProgressTracker(
+                    1, single_line=True, color=context_color
+                )
+                announce_tracker.complete(
+                    _logger,
+                    f"Processing {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                )
+
+                # Create trackers for actual work
+                read_tracker = ProgressTracker(
+                    total_parts, single_line=True, color=context_color
+                )
+                # For extraction, track by number of archives (not parts)
+                extract_tracker = ProgressTracker(
+                    total_groups, single_line=True, color=context_color
+                )
+
+                parts_processed = 0
+                extractions_done = 0
+
                 for index, group in enumerate(groups, 1):
                     progress_before = format_progress(index - 1, total_groups)
 
@@ -352,32 +399,15 @@ def process_downloads(
                         failed.append(group.primary)
                         continue
 
-                    part_count = max(group.part_count, 1)
-                    read_tracker = ProgressTracker(
-                        part_count, single_line=True, color=release_color
-                    )
-                    extract_tracker = ProgressTracker(
-                        100, single_line=True, color=release_color
-                    )
-
-                    read_tracker.log(
-                        _logger,
-                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                    )
-                    read_tracker.advance(
-                        _logger,
-                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                        absolute=part_count,
-                    )
-
                     extracted_ok = False
                     if should_extract:
                         if demo_mode:
                             for idx, member in enumerate(group.members, 1):
+                                parts_processed += 1
                                 read_tracker.advance(
                                     _logger,
                                     f"Demo: would read {member.name}",
-                                    absolute=idx,
+                                    absolute=parts_processed,
                                 )
                             extracted_ok = True
                         else:
@@ -394,30 +424,53 @@ def process_downloads(
                                 failed.append(group.primary)
                                 continue
 
-                            for idx, member in enumerate(group.members, 1):
+                            for member in group.members:
                                 try:
                                     member.stat()
                                 except OSError:
                                     pass
+                                parts_processed += 1
                                 read_tracker.advance(
                                     _logger,
                                     f"Reading {member.name}",
-                                    absolute=idx,
+                                    absolute=parts_processed,
                                 )
+
+                            # Force a newline after reading to allow extraction progress to start on new line
+                            if read_tracker._inline:
+                                try:
+                                    sys.stdout.write("\n")
+                                    sys.stdout.flush()
+                                except OSError:
+                                    pass
 
                             pre_existing_target = target_dir.exists()
                             try:
                                 # Copy companion files
                                 copy_non_archives_to_extracted(current_dir, target_dir)
 
-                                # Extract archive
+                                # Create a progress tracker for this specific extraction (0-100%)
+                                extraction_progress = ProgressTracker(
+                                    100, single_line=True, color=context_color
+                                )
+                                extraction_progress.log(
+                                    _logger,
+                                    f"Extracting {group.primary.name}",
+                                )
+
+                                # Extract archive with progress tracking
                                 extract_archive(
                                     group.primary,
                                     target_dir,
                                     seven_zip_path=seven_zip_path,
-                                    progress=extract_tracker,
+                                    cpu_cores=cpu_cores,
+                                    progress=extraction_progress,
                                     logger=_logger,
                                 )
+
+                                # Count extraction as done
+                                extractions_done += 1
+
                             except (shutil.ReadError, RuntimeError) as exc:
                                 _logger.error(
                                     "Extract failed for %s: %s", group.primary, exc
@@ -454,16 +507,15 @@ def process_downloads(
                             else:
                                 # Flatten if needed
                                 flatten_single_subdir(target_dir)
-                                extract_tracker.complete(
-                                    _logger,
-                                    f"Finished extracting {group.primary.name}",
-                                )
                                 extracted_ok = True
                                 extracted_targets.append(target_dir)
                     else:
-                        read_tracker.complete(
+                        # Skip extraction but still count parts as processed
+                        parts_processed += group.part_count
+                        read_tracker.advance(
                             _logger,
                             f"Skipping extraction for {group.primary.name} (disabled in configuration)",
+                            absolute=parts_processed,
                         )
 
                     # Collect for later move to finished
@@ -472,6 +524,17 @@ def process_downloads(
                             (group, finished_relative_parent, current_dir)
                         )
                         processed += 1
+
+                # Complete the trackers after all groups are processed
+                read_tracker.complete(
+                    _logger,
+                    f"Processed {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                )
+                if extractions_done > 0:
+                    extract_tracker.complete(
+                        _logger,
+                        f"Extracted {extractions_done} archive(s) for {current_dir.name}",
+                    )
 
                 # Break if release failed
                 if release_failed:
@@ -495,8 +558,10 @@ def process_downloads(
                 )
 
                 # Create a single tracker for all moves in this release
+                # Use a new color for the move phase
+                move_color = next_progress_color()
                 move_tracker = ProgressTracker(
-                    total_files_to_move, single_line=True, color=release_color
+                    total_files_to_move, single_line=True, color=move_color
                 )
 
                 if demo_mode:
