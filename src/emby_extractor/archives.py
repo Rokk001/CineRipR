@@ -348,14 +348,14 @@ def process_downloads(
                 read_tracker = ProgressTracker(
                     total_parts, single_line=True, color=release_color
                 )
-                # For extraction, we'll track by group (each group is one extraction operation)
+                # For extraction, track by number of archives (not parts)
                 extract_tracker = ProgressTracker(
-                    total_groups * 100, single_line=True, color=release_color
+                    total_groups, single_line=True, color=release_color
                 )
 
                 read_tracker.log(
                     _logger,
-                    f"Processing {total_groups} archive(s) with {total_parts} file(s) total for {current_dir.name}",
+                    f"Processing {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
                 )
 
                 parts_processed = 0
@@ -414,13 +414,6 @@ def process_downloads(
                                 # Copy companion files
                                 copy_non_archives_to_extracted(current_dir, target_dir)
 
-                                # Update progress before extraction
-                                extract_tracker.advance(
-                                    _logger,
-                                    f"Extracting {group.primary.name}",
-                                    absolute=extractions_done * 100,
-                                )
-
                                 # Extract archive (pass None for progress to avoid nested progress bars)
                                 extract_archive(
                                     group.primary,
@@ -430,12 +423,12 @@ def process_downloads(
                                     logger=None,
                                 )
 
-                                # Update progress after extraction
+                                # Update progress after successful extraction
                                 extractions_done += 1
                                 extract_tracker.advance(
                                     _logger,
                                     f"Extracted {group.primary.name}",
-                                    absolute=extractions_done * 100,
+                                    absolute=extractions_done,
                                 )
 
                             except (shutil.ReadError, RuntimeError) as exc:
