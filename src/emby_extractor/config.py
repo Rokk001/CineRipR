@@ -18,7 +18,13 @@ class ConfigurationError(RuntimeError):
 
 @dataclass(frozen=True)
 class Paths:
-    """Container holding all directory paths used by the extractor."""
+    """Container holding all directory paths used by the extractor.
+
+    Attributes:
+        download_roots: Tuple of directories to scan for archives to extract
+        extracted_root: Directory where extracted content will be placed
+        finished_root: Directory where original archives are moved after successful extraction
+    """
 
     download_roots: tuple[Path, ...]
     extracted_root: Path
@@ -35,10 +41,26 @@ class Paths:
         for target in (self.extracted_root, self.finished_root):
             target.mkdir(parents=True, exist_ok=True)
 
+    # Backwards compatibility: expose first download root as download_root
+    @property
+    def download_root(self) -> Path:  # pragma: no cover - compatibility shim
+        if not self.download_roots:
+            raise FileNotFoundError("No download directories configured")
+        return self.download_roots[0]
+
 
 @dataclass(frozen=True)
 class SubfolderPolicy:
-    """Controls which named subdirectories inside a release are processed."""
+    """Controls which named subdirectories inside a release are processed.
+
+    Attributes:
+        include_sample: If True, process 'Sample' directories
+        include_sub: If True, process 'Subs'/'Sub' directories
+        include_other: If True, process other non-standard subdirectories
+
+    Note:
+        Subdirectories containing archives are always processed regardless of these settings.
+    """
 
     include_sample: bool = False
     include_sub: bool = False
@@ -46,6 +68,7 @@ class SubfolderPolicy:
 
     @property
     def include_any(self) -> bool:
+        """Returns True if any subfolder policy is enabled."""
         return self.include_sample or self.include_sub or self.include_other
 
 

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
-from .archives import ProcessResult, process_downloads, resolve_seven_zip_command
+from .archives import ProcessResult, process_downloads
+from .archive_extraction import resolve_seven_zip_command
 from .cleanup import cleanup_finished
 from .config import ConfigurationError, Paths, Settings, SubfolderPolicy, load_settings
 
