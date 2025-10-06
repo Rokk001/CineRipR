@@ -19,7 +19,6 @@ from .file_operations import (
     copy_non_archives_to_extracted,
     flatten_single_subdir,
     handle_extraction_failure,
-    move_archive_group,
     move_remaining_to_finished,
     ensure_unique_destination,
 )
@@ -490,44 +489,53 @@ def process_downloads(
                     len(archive_groups_to_move),
                 )
 
-                for group, finished_rel_parent, source_dir in archive_groups_to_move:
-                    move_tracker = ProgressTracker(
-                        group.part_count, single_line=True, color=release_color
+                # Calculate total files to move across all groups
+                total_files_to_move = sum(
+                    group.part_count for group, _, _ in archive_groups_to_move
+                )
+
+                # Create a single tracker for all moves in this release
+                move_tracker = ProgressTracker(
+                    total_files_to_move, single_line=True, color=release_color
+                )
+
+                if demo_mode:
+                    move_tracker.log(
+                        _logger,
+                        f"Demo: Would move {total_files_to_move} file(s) for release {release_dir.name}",
                     )
+                else:
+                    move_tracker.log(
+                        _logger,
+                        f"Moving {total_files_to_move} file(s) for release {release_dir.name}",
+                    )
+
+                files_moved = 0
+                for group, finished_rel_parent, source_dir in archive_groups_to_move:
                     destination_dir = paths.finished_root / finished_rel_parent
 
                     if demo_mode:
-                        move_tracker.log(
-                            _logger,
-                            f"Demo: Would move {group.part_count} file(s) to {destination_dir}",
-                        )
                         for idx, member in enumerate(group.members, 1):
+                            files_moved += 1
                             move_tracker.advance(
                                 _logger,
                                 f"Demo: would move {member.name}",
-                                absolute=idx,
+                                absolute=files_moved,
                             )
-                        move_tracker.complete(
-                            _logger,
-                            f"Demo: Finished moving {group.part_count} file(s)",
-                        )
                     else:
-                        move_tracker.log(
-                            _logger,
-                            f"Moving {group.part_count} file(s) to {destination_dir}",
-                        )
                         try:
-                            move_archive_group(
-                                group.members,
-                                paths.finished_root,
-                                finished_rel_parent,
-                                tracker=move_tracker,
-                                logger=_logger,
-                            )
-                            move_tracker.complete(
-                                _logger,
-                                f"Finished moving {group.part_count} file(s) to {destination_dir}",
-                            )
+                            for member in group.members:
+                                destination = ensure_unique_destination(
+                                    destination_dir / member.name
+                                )
+                                destination_dir.mkdir(parents=True, exist_ok=True)
+                                shutil.move(str(member), str(destination))
+                                files_moved += 1
+                                move_tracker.advance(
+                                    _logger,
+                                    f"Moved {member.name}",
+                                    absolute=files_moved,
+                                )
                         except OSError:
                             _logger.exception(
                                 "Failed to move archive %s to the finished directory",
@@ -535,6 +543,12 @@ def process_downloads(
                             )
                             failed.append(group.primary)
                             continue
+
+                # Complete the move tracker once for all files
+                move_tracker.complete(
+                    _logger,
+                    f"Finished moving {total_files_to_move} file(s) for release {release_dir.name}",
+                )
 
                 # Move remaining companion files
                 if not demo_mode:
