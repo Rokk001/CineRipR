@@ -741,6 +741,9 @@ def process_downloads(
             release_failed = False
             is_main_context = False
 
+            # Pick one color for this entire release (all subdirs and main dir)
+            release_color = next_progress_color()
+
             for context_index, (
                 current_dir,
                 relative_parent,
@@ -758,20 +761,47 @@ def process_downloads(
                             target_dir = paths.extracted_root / relative_parent
                             target_dir.mkdir(parents=True, exist_ok=True)
                             extracted_targets.append(target_dir)
-                            for entry in sorted(
-                                current_dir.iterdir(), key=lambda p: p.name.lower()
-                            ):
-                                if not entry.is_file():
-                                    continue
-                                # copy to extracted
-                                try:
-                                    # Only copy desired companions to extracted; skip .sfv files
-                                    if entry.suffix.lower() != ".sfv":
+
+                            # Count files to copy for progress tracking
+                            files_to_copy = [
+                                entry
+                                for entry in current_dir.iterdir()
+                                if entry.is_file() and entry.suffix.lower() != ".sfv"
+                            ]
+
+                            if files_to_copy:
+                                # Create progress tracker for copying files
+                                copy_tracker = ProgressTracker(
+                                    len(files_to_copy),
+                                    single_line=False,
+                                    color=release_color,
+                                )
+                                copy_tracker.log(
+                                    _logger,
+                                    f"Copying {len(files_to_copy)} file(s) from {current_dir.name}",
+                                )
+
+                                for idx, entry in enumerate(
+                                    sorted(files_to_copy, key=lambda p: p.name.lower()),
+                                    1,
+                                ):
+                                    try:
                                         # Copy and overwrite existing files
                                         dest_path = target_dir / entry.name
                                         shutil.copy2(str(entry), str(dest_path))
-                                except OSError:
-                                    pass
+                                        copy_tracker.advance(
+                                            _logger,
+                                            f"Copied {entry.name}",
+                                            absolute=idx,
+                                        )
+                                    except OSError:
+                                        pass
+
+                                copy_tracker.complete(
+                                    _logger,
+                                    f"Finished copying {len(files_to_copy)} file(s) from {current_dir.name}",
+                                )
+
                             # Mark this directory for moving to finished later
                             finished_relative_parent = current_dir.relative_to(
                                 download_root
@@ -802,16 +832,15 @@ def process_downloads(
                         continue
 
                     part_count = max(group.part_count, 1)
-                    # Pick one color for this archive, apply to all trackers of this archive
-                    color = next_progress_color()
+                    # Use the release color for all trackers (consistent color per episode/movie)
                     read_tracker = ProgressTracker(
-                        part_count, single_line=True, color=color
+                        part_count, single_line=False, color=release_color
                     )
                     extract_tracker = ProgressTracker(
-                        100, single_line=True, color=color
+                        100, single_line=False, color=release_color
                     )
                     move_tracker = ProgressTracker(
-                        part_count, single_line=True, color=color
+                        part_count, single_line=False, color=release_color
                     )
                     read_tracker.log(
                         _logger,
@@ -959,9 +988,9 @@ def process_downloads(
                 )
 
                 for group, finished_rel_parent, source_dir in archive_groups_to_move:
-                    color = next_progress_color()
+                    # Use the same release color for consistency
                     move_tracker = ProgressTracker(
-                        group.part_count, single_line=True, color=color
+                        group.part_count, single_line=False, color=release_color
                     )
                     destination_dir = paths.finished_root / finished_rel_parent
 
