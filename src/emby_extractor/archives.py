@@ -162,8 +162,13 @@ def _iter_release_directories(
 
     base_prefix = Path("TV-Shows") if _looks_like_tv(base_dir) else Path("Movies")
 
-    # Always consider the release root itself, prefixed by category
-    _append(base_dir, base_prefix / base_dir.relative_to(download_root), True)
+    # First, process all subdirectories (Subs, Sample, etc.) before the main release
+    # Store the main release directory to add it last
+    main_release_context = (
+        base_dir,
+        base_prefix / base_dir.relative_to(download_root),
+        True,
+    )
 
     for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
         if not child.is_dir():
@@ -202,6 +207,9 @@ def _iter_release_directories(
 
         # Default: mirror structure
         _append(child, base_prefix / child.relative_to(download_root), should_extract)
+
+    # Add the main release directory last, after all subdirectories
+    contexts.append(main_release_context)
 
     return contexts
 
@@ -702,181 +710,256 @@ def process_downloads(
     for download_root in paths.download_roots:
         for release_dir in iter_download_subdirs(download_root):
             contexts = _iter_release_directories(release_dir, download_root, subfolders)
-            for current_dir, relative_parent, should_extract in contexts:
+
+            # Track all extracted targets and archive groups for this release
+            extracted_targets: list[Path] = []
+            archive_groups_to_move: list[tuple[ArchiveGroup, Path, Path]] = []
+            files_to_move: list[tuple[Path, Path]] = (
+                []
+            )  # (source_dir, finished_relative_parent)
+            release_failed = False
+            is_main_context = False
+
+            for context_index, (
+                current_dir,
+                relative_parent,
+                should_extract,
+            ) in enumerate(contexts):
+                # The last context is always the main release directory
+                is_main_context = context_index == len(contexts) - 1
                 archives, unsupported_entries = split_directory_entries(current_dir)
-            unsupported.extend(unsupported_entries)
-            if not archives:
-                # Handle already-extracted content: copy files to extracted and move to finished
-                try:
-                    target_dir = paths.extracted_root / relative_parent
-                    finished_dir = paths.finished_root / current_dir.relative_to(
-                        download_root
-                    )
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    finished_dir.mkdir(parents=True, exist_ok=True)
-                    for entry in sorted(
-                        current_dir.iterdir(), key=lambda p: p.name.lower()
-                    ):
-                        if not entry.is_file():
-                            continue
-                        # copy to extracted
+                unsupported.extend(unsupported_entries)
+                if not archives:
+                    # Handle already-extracted content: copy files to extracted
+                    # Don't move to finished yet - wait until all contexts are processed
+                    if not demo_mode:
                         try:
-                            # Only copy desired companions to extracted; skip .sfv files
-                            if entry.suffix.lower() != ".sfv":
-                                shutil.copy2(
-                                    str(entry),
-                                    str(
-                                        ensure_unique_destination(
-                                            target_dir / entry.name
+                            target_dir = paths.extracted_root / relative_parent
+                            target_dir.mkdir(parents=True, exist_ok=True)
+                            extracted_targets.append(target_dir)
+                            for entry in sorted(
+                                current_dir.iterdir(), key=lambda p: p.name.lower()
+                            ):
+                                if not entry.is_file():
+                                    continue
+                                # copy to extracted
+                                try:
+                                    # Only copy desired companions to extracted; skip .sfv files
+                                    if entry.suffix.lower() != ".sfv":
+                                        shutil.copy2(
+                                            str(entry),
+                                            str(
+                                                ensure_unique_destination(
+                                                    target_dir / entry.name
+                                                )
+                                            ),
                                         )
-                                    ),
-                                )
-                        except OSError:
-                            pass
-                        # move to finished
-                        try:
-                            destination = ensure_unique_destination(
-                                finished_dir / entry.name
+                                except OSError:
+                                    pass
+                            # Mark this directory for moving to finished later
+                            finished_relative_parent = current_dir.relative_to(
+                                download_root
                             )
-                            shutil.move(str(entry), str(destination))
+                            files_to_move.append(
+                                (current_dir, finished_relative_parent)
+                            )
                         except OSError:
                             pass
-                except OSError:
-                    pass
-                _logger.debug("No supported archives found in %s", current_dir)
-                continue
-
-            groups = build_archive_groups(archives)
-            target_dir = paths.extracted_root / relative_parent
-            finished_relative_parent = current_dir.relative_to(download_root)
-            destination_dir = paths.finished_root / finished_relative_parent
-
-            total_groups = len(groups)
-            for index, group in enumerate(groups, 1):
-                progress_before = format_progress(index - 1, total_groups)
-
-                complete, reason = validate_archive_group(group)
-                if not complete:
-                    _logger.warning(
-                        "%s Skipping %s: %s", progress_before, group.primary, reason
-                    )
-                    failed.append(group.primary)
+                    _logger.debug("No supported archives found in %s", current_dir)
                     continue
 
-                part_count = max(group.part_count, 1)
-                # Pick one color for this archive, apply to all trackers of this archive
-                color = next_progress_color()
-                read_tracker = ProgressTracker(
-                    part_count, single_line=True, color=color
-                )
-                extract_tracker = ProgressTracker(100, single_line=True, color=color)
-                move_tracker = ProgressTracker(
-                    part_count, single_line=True, color=color
-                )
-                read_tracker.log(
-                    _logger,
-                    f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                )
-                # Mark preparation step complete at 100%
-                read_tracker.advance(
-                    _logger,
-                    f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                    absolute=part_count,
-                )
+                groups = build_archive_groups(archives)
+                target_dir = paths.extracted_root / relative_parent
+                finished_relative_parent = current_dir.relative_to(download_root)
+                destination_dir = paths.finished_root / finished_relative_parent
 
-                extracted_ok = False
-                if should_extract:
-                    if demo_mode:
-                        for idx, member in enumerate(group.members, 1):
-                            read_tracker.advance(
-                                _logger,
-                                f"Demo: would read {member.name}",
-                                absolute=idx,
-                            )
-                        # In demo, pretend extraction would succeed
-                        extracted_ok = True
-                    else:
-                        can_extract, reason = can_extract_archive(
-                            group.primary, seven_zip_path=seven_zip_path
+                total_groups = len(groups)
+                for index, group in enumerate(groups, 1):
+                    progress_before = format_progress(index - 1, total_groups)
+
+                    complete, reason = validate_archive_group(group)
+                    if not complete:
+                        _logger.warning(
+                            "%s Skipping %s: %s", progress_before, group.primary, reason
                         )
-                        if not can_extract:
-                            _logger.error(
-                                "%s Pre-extraction check failed for %s: %s",
-                                progress_before,
-                                group.primary,
-                                reason,
-                            )
-                            failed.append(group.primary)
-                            continue
+                        failed.append(group.primary)
+                        continue
 
-                        for idx, member in enumerate(group.members, 1):
-                            try:
-                                member.stat()
-                            except OSError:
-                                pass
-                            read_tracker.advance(
-                                _logger,
-                                f"Reading {member.name}",
-                                absolute=idx,
-                            )
-                        # Do not emit an extra completion line; the last loop advance hits 100%
+                    part_count = max(group.part_count, 1)
+                    # Pick one color for this archive, apply to all trackers of this archive
+                    color = next_progress_color()
+                    read_tracker = ProgressTracker(
+                        part_count, single_line=True, color=color
+                    )
+                    extract_tracker = ProgressTracker(
+                        100, single_line=True, color=color
+                    )
+                    move_tracker = ProgressTracker(
+                        part_count, single_line=True, color=color
+                    )
+                    read_tracker.log(
+                        _logger,
+                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
+                    )
+                    # Mark preparation step complete at 100%
+                    read_tracker.advance(
+                        _logger,
+                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
+                        absolute=part_count,
+                    )
 
-                        pre_existing_target = target_dir.exists()
-                        try:
-                            # copy .nfo and other non-archives alongside extracted media
-                            _copy_non_archives_to_extracted(current_dir, target_dir)
-                            extract_archive(
-                                group.primary,
-                                target_dir,
-                                seven_zip_path=seven_zip_path,
-                                progress=extract_tracker,
-                            )
-                        except (shutil.ReadError, RuntimeError) as exc:
-                            _logger.error(
-                                "Extract failed for %s: %s", group.primary, exc
-                            )
-                            _cleanup_failed_extraction_dir(
-                                target_dir, pre_existing=pre_existing_target
-                            )
-                            failed.append(group.primary)
-                            continue
-                        except OSError:
-                            _logger.exception(
-                                "Unexpected error while extracting %s", group.primary
-                            )
-                            _cleanup_failed_extraction_dir(
-                                target_dir, pre_existing=pre_existing_target
-                            )
-                            failed.append(group.primary)
-                            continue
-                        else:
-                            # Flatten single nested dir after extraction (common in some releases)
-                            _flatten_single_subdir(target_dir)
-                            extract_tracker.complete(
-                                _logger,
-                                f"Finished extracting {group.primary.name}",
-                            )
+                    extracted_ok = False
+                    if should_extract:
+                        if demo_mode:
+                            for idx, member in enumerate(group.members, 1):
+                                read_tracker.advance(
+                                    _logger,
+                                    f"Demo: would read {member.name}",
+                                    absolute=idx,
+                                )
+                            # In demo, pretend extraction would succeed
                             extracted_ok = True
-                else:
-                    read_tracker.complete(
-                        _logger,
-                        f"Skipping extraction for {group.primary.name} (disabled in configuration)",
-                    )
+                        else:
+                            can_extract, reason = can_extract_archive(
+                                group.primary, seven_zip_path=seven_zip_path
+                            )
+                            if not can_extract:
+                                _logger.error(
+                                    "%s Pre-extraction check failed for %s: %s",
+                                    progress_before,
+                                    group.primary,
+                                    reason,
+                                )
+                                failed.append(group.primary)
+                                continue
 
-                # Ensure standard subfolders exist under the parent target directory
-                try:
-                    _ensure_standard_subdirs(
-                        paths.extracted_root, relative_parent, subfolders
-                    )
-                except OSError:
-                    pass
+                            for idx, member in enumerate(group.members, 1):
+                                try:
+                                    member.stat()
+                                except OSError:
+                                    pass
+                                read_tracker.advance(
+                                    _logger,
+                                    f"Reading {member.name}",
+                                    absolute=idx,
+                                )
+                            # Do not emit an extra completion line; the last loop advance hits 100%
 
-                if demo_mode:
-                    move_tracker.log(
-                        _logger,
-                        f"Preparing to move {group.part_count} file(s) for {group.primary.name}",
-                    )
+                            pre_existing_target = target_dir.exists()
+                            try:
+                                # copy .nfo and other non-archives alongside extracted media
+                                _copy_non_archives_to_extracted(current_dir, target_dir)
+                                extract_archive(
+                                    group.primary,
+                                    target_dir,
+                                    seven_zip_path=seven_zip_path,
+                                    progress=extract_tracker,
+                                )
+                            except (shutil.ReadError, RuntimeError) as exc:
+                                _logger.error(
+                                    "Extract failed for %s: %s", group.primary, exc
+                                )
+                                _cleanup_failed_extraction_dir(
+                                    target_dir, pre_existing=pre_existing_target
+                                )
+                                failed.append(group.primary)
+
+                                # If main archive fails, cleanup all extracted content for this release
+                                if is_main_context:
+                                    _logger.error(
+                                        "Main archive extraction failed - cleaning up all extracted content for this release"
+                                    )
+                                    for extracted_path in extracted_targets:
+                                        try:
+                                            if extracted_path.exists():
+                                                shutil.rmtree(str(extracted_path))
+                                        except OSError:
+                                            pass
+                                    release_failed = True
+                                    break
+                                continue
+                            except OSError:
+                                _logger.exception(
+                                    "Unexpected error while extracting %s",
+                                    group.primary,
+                                )
+                                _cleanup_failed_extraction_dir(
+                                    target_dir, pre_existing=pre_existing_target
+                                )
+                                failed.append(group.primary)
+
+                                # If main archive fails, cleanup all extracted content for this release
+                                if is_main_context:
+                                    _logger.error(
+                                        "Main archive extraction failed - cleaning up all extracted content for this release"
+                                    )
+                                    for extracted_path in extracted_targets:
+                                        try:
+                                            if extracted_path.exists():
+                                                shutil.rmtree(str(extracted_path))
+                                        except OSError:
+                                            pass
+                                    release_failed = True
+                                    break
+                                continue
+                            else:
+                                # Flatten single nested dir after extraction (common in some releases)
+                                _flatten_single_subdir(target_dir)
+                                extract_tracker.complete(
+                                    _logger,
+                                    f"Finished extracting {group.primary.name}",
+                                )
+                                extracted_ok = True
+                                extracted_targets.append(target_dir)
+                    else:
+                        read_tracker.complete(
+                            _logger,
+                            f"Skipping extraction for {group.primary.name} (disabled in configuration)",
+                        )
+
+                    # Ensure standard subfolders exist under the parent target directory
+                    try:
+                        _ensure_standard_subdirs(
+                            paths.extracted_root, relative_parent, subfolders
+                        )
+                    except OSError:
+                        pass
+
+                    # Collect successfully extracted archives for later move to finished
                     if extracted_ok:
+                        archive_groups_to_move.append(
+                            (group, finished_relative_parent, current_dir)
+                        )
+                        processed += 1
+
+                # Break out of archive group loop if release failed
+                if release_failed:
+                    break
+
+            # Break out of context loop if release failed
+            if release_failed:
+                continue
+
+            # Now that all extractions are complete, move all archives to finished
+            if archive_groups_to_move and not release_failed:
+                _logger.info(
+                    "All extractions complete for release %s - moving %d archive group(s) to finished",
+                    release_dir.name,
+                    len(archive_groups_to_move),
+                )
+
+                for group, finished_rel_parent, source_dir in archive_groups_to_move:
+                    color = next_progress_color()
+                    move_tracker = ProgressTracker(
+                        group.part_count, single_line=True, color=color
+                    )
+                    destination_dir = paths.finished_root / finished_rel_parent
+
+                    if demo_mode:
+                        move_tracker.log(
+                            _logger,
+                            f"Demo: Would move {group.part_count} file(s) to {destination_dir}",
+                        )
                         for idx, member in enumerate(group.members, 1):
                             move_tracker.advance(
                                 _logger,
@@ -885,15 +968,9 @@ def process_downloads(
                             )
                         move_tracker.complete(
                             _logger,
-                            f"Finished (demo) moving {group.part_count} file(s) for {group.primary.name}",
+                            f"Demo: Finished moving {group.part_count} file(s)",
                         )
                     else:
-                        move_tracker.complete(
-                            _logger,
-                            "Skipping move: extraction not completed",
-                        )
-                else:
-                    if extracted_ok:
                         move_tracker.log(
                             _logger,
                             f"Moving {group.part_count} file(s) to {destination_dir}",
@@ -902,9 +979,13 @@ def process_downloads(
                             move_archive_group(
                                 group.members,
                                 paths.finished_root,
-                                finished_relative_parent,
+                                finished_rel_parent,
                                 tracker=move_tracker,
                                 logger=_logger,
+                            )
+                            move_tracker.complete(
+                                _logger,
+                                f"Finished moving {group.part_count} file(s) to {destination_dir}",
                             )
                         except OSError:
                             _logger.exception(
@@ -913,39 +994,51 @@ def process_downloads(
                             )
                             failed.append(group.primary)
                             continue
-                        else:
-                            move_tracker.complete(
-                                _logger,
-                                f"Finished moving {group.part_count} file(s) to {destination_dir}",
-                            )
-                    else:
-                        move_tracker.complete(
-                            _logger,
-                            "Skipping move: extraction not completed",
+
+                # After moving archives, move remaining companion files to finished
+                if not demo_mode:
+                    for (
+                        group,
+                        finished_rel_parent,
+                        source_dir,
+                    ) in archive_groups_to_move:
+                        _move_remaining_to_finished(
+                            source_dir,
+                            finished_root=paths.finished_root,
+                            download_root=download_root,
                         )
+                        # Remove any now-empty subdirectories
+                        _remove_empty_subdirs(source_dir)
+                        _remove_empty_tree(source_dir, stop=download_root)
 
-                # After extracting/moving archives, move remaining files and selected subfolders
-                if not demo_mode and extracted_ok:
-                    _move_remaining_to_finished(
-                        current_dir,
-                        finished_root=paths.finished_root,
-                        download_root=download_root,
-                    )
-                    # Remove any now-empty subdirectories under this context and collapse the chain up to download_root
-                    _remove_empty_subdirs(current_dir)
-                    _remove_empty_tree(current_dir, stop=download_root)
+            # Also move files that had no archives
+            if files_to_move and not release_failed:
+                if not demo_mode:
+                    for source_dir, finished_rel_parent in files_to_move:
+                        try:
+                            finished_dir = paths.finished_root / finished_rel_parent
+                            finished_dir.mkdir(parents=True, exist_ok=True)
+                            for entry in sorted(
+                                source_dir.iterdir(), key=lambda p: p.name.lower()
+                            ):
+                                if not entry.is_file():
+                                    continue
+                                try:
+                                    destination = ensure_unique_destination(
+                                        finished_dir / entry.name
+                                    )
+                                    shutil.move(str(entry), str(destination))
+                                except OSError:
+                                    pass
+                            # Remove any now-empty subdirectories
+                            _remove_empty_subdirs(source_dir)
+                            _remove_empty_tree(source_dir, stop=download_root)
+                        except OSError:
+                            pass
 
-                processed += 1
-
-                if not demo_mode and not should_extract:
-                    _remove_empty_tree(target_dir, stop=paths.extracted_root)
-
-            if not demo_mode and should_extract:
-                _remove_empty_tree(target_dir, stop=paths.extracted_root)
-
-        # After finishing this release, remove empty directories under the download root
-        if not demo_mode:
-            _remove_empty_tree(release_dir, stop=download_root)
+            # After finishing this release, remove empty directories under the download root
+            if not demo_mode:
+                _remove_empty_tree(release_dir, stop=download_root)
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 
