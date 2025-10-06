@@ -344,18 +344,22 @@ def process_downloads(
                 total_parts = sum(group.part_count for group in groups)
                 total_groups = len(groups)
 
-                # Create single trackers for all groups in this context
+                # Initial announcement - complete immediately
+                announce_tracker = ProgressTracker(
+                    1, single_line=True, color=release_color
+                )
+                announce_tracker.complete(
+                    _logger,
+                    f"Processing {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                )
+
+                # Create trackers for actual work
                 read_tracker = ProgressTracker(
                     total_parts, single_line=True, color=release_color
                 )
                 # For extraction, track by number of archives (not parts)
                 extract_tracker = ProgressTracker(
                     total_groups, single_line=True, color=release_color
-                )
-
-                read_tracker.log(
-                    _logger,
-                    f"Processing {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
                 )
 
                 parts_processed = 0
