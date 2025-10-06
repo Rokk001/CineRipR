@@ -28,11 +28,17 @@ def _build_supported_suffixes() -> tuple[str, ...]:
     return tuple(sorted(suffixes, key=len, reverse=True))
 
 
+# Constants
 SUPPORTED_ARCHIVE_SUFFIXES: tuple[str, ...] = _build_supported_suffixes()
-# File types that must never remain in extracted output
 _UNWANTED_EXTRACTED_SUFFIXES = {".sfv"}
-# TV tag detection: S01E01 or just S01
+_TV_CATEGORY = "TV-Shows"
+_MOVIES_CATEGORY = "Movies"
+
+# Regular expressions for pattern matching
 _TV_TAG_RE = re.compile(r"s\d{2}(?:e\d{2})?", re.IGNORECASE)
+_SEASON_DIR_RE = re.compile(r"^season\s*(\d+)$", re.IGNORECASE)
+_SEASON_TAG_RE = re.compile(r"\.S(\d+)", re.IGNORECASE)
+_SEASON_TAG_ALT_RE = re.compile(r"S(\d+)", re.IGNORECASE)
 _PART_VOLUME_RE = re.compile(
     r"^(?P<base>.+?)\.part(?P<index>\d+)(?P<ext>(?:\.[^.]+)+)$", re.IGNORECASE
 )
@@ -126,13 +132,14 @@ def _iter_release_directories(
         return False
 
     def _is_season_dir(path: Path) -> bool:
+        """Check if directory name follows 'Season XX' pattern."""
         name = path.name.strip().lower()
-        return bool(re.match(r"^season\s*\d+$", name))
+        return bool(_SEASON_DIR_RE.match(name))
 
     def _normalize_season_dir(path: Path) -> str | None:
         """Extract season number and return normalized 'Season XX' format."""
         name = path.name.strip().lower()
-        match = re.match(r"^season\s*(\d+)$", name)
+        match = _SEASON_DIR_RE.match(name)
         if match:
             season_num = int(match.group(1))
             return f"Season {season_num:02d}"
@@ -173,10 +180,10 @@ def _iter_release_directories(
         first_part = parts[0]
 
         # Try to extract season number from the directory name
-        season_match = re.search(r"\.S(\d+)", first_part, flags=re.IGNORECASE)
+        season_match = _SEASON_TAG_RE.search(first_part)
         if not season_match:
-            # Try without dot
-            season_match = re.search(r"S(\d+)", first_part, flags=re.IGNORECASE)
+            # Try without dot prefix
+            season_match = _SEASON_TAG_ALT_RE.search(first_part)
 
         if season_match:
             season_num = int(season_match.group(1))
@@ -224,7 +231,9 @@ def _iter_release_directories(
             pass
         return False
 
-    base_prefix = Path("TV-Shows") if _looks_like_tv(base_dir) else Path("Movies")
+    base_prefix = (
+        Path(_TV_CATEGORY) if _looks_like_tv(base_dir) else Path(_MOVIES_CATEGORY)
+    )
 
     # Process all subdirectories first
     # We'll add the main release directory at the end only if it has archives
@@ -258,7 +267,7 @@ def _iter_release_directories(
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
         if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
             if should_extract:
-                if base_prefix.name == "TV-Shows":
+                if base_prefix.name == _TV_CATEGORY:
                     season_rel = _build_tv_show_path(
                         base_dir, download_root, base_prefix
                     )
@@ -271,7 +280,7 @@ def _iter_release_directories(
         # Only add as context if it should be extracted or contains archives
         if normalized is not None:
             if should_extract:
-                if base_prefix.name == "TV-Shows":
+                if base_prefix.name == _TV_CATEGORY:
                     rel = (
                         _build_tv_show_path(base_dir, download_root, base_prefix)
                         / normalized
@@ -293,7 +302,7 @@ def _iter_release_directories(
         # Default: mirror structure
         # Only add as context if it should be extracted
         if should_extract:
-            if base_prefix.name == "TV-Shows":
+            if base_prefix.name == _TV_CATEGORY:
                 child_rel = _build_tv_show_path(child, download_root, base_prefix)
             else:
                 child_rel = base_prefix / child.relative_to(download_root)
@@ -302,7 +311,7 @@ def _iter_release_directories(
     # Add the main release directory last, but only if it contains its own archives
     # If it only contains subdirectories (like episode dirs), don't add it as a context
     if _contains_supported_archives(base_dir):
-        if base_prefix.name == "TV-Shows":
+        if base_prefix.name == _TV_CATEGORY:
             main_rel = _build_tv_show_path(base_dir, download_root, base_prefix)
         else:
             main_rel = base_prefix / base_dir.relative_to(download_root)
@@ -493,6 +502,7 @@ def ensure_unique_destination(destination: Path) -> Path:
 
 
 def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> None:
+    """Remove empty extraction directory if it was created by this extraction attempt."""
     if pre_existing:
         return
     try:
@@ -504,6 +514,34 @@ def _cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> N
             target_dir.rmdir()
     except OSError:
         pass
+
+
+def _handle_extraction_failure(
+    logger: logging.Logger,
+    target_dir: Path,
+    extracted_targets: list[Path],
+    is_main_context: bool,
+    *,
+    pre_existing: bool,
+) -> bool:
+    """Handle extraction failure, cleanup if main context failed.
+
+    Returns True if the entire release should be marked as failed, False otherwise.
+    """
+    _cleanup_failed_extraction_dir(target_dir, pre_existing=pre_existing)
+
+    if is_main_context:
+        logger.error(
+            "Main archive extraction failed - cleaning up all extracted content for this release"
+        )
+        for extracted_path in extracted_targets:
+            try:
+                if extracted_path.exists():
+                    shutil.rmtree(str(extracted_path))
+            except OSError:
+                pass
+        return True  # Mark release as failed
+    return False
 
 
 def _remove_empty_tree(directory: Path, *, stop: Path) -> None:
@@ -987,22 +1025,15 @@ def process_downloads(
                                 _logger.error(
                                     "Extract failed for %s: %s", group.primary, exc
                                 )
-                                _cleanup_failed_extraction_dir(
-                                    target_dir, pre_existing=pre_existing_target
-                                )
                                 failed.append(group.primary)
 
-                                # If main archive fails, cleanup all extracted content for this release
-                                if is_main_context:
-                                    _logger.error(
-                                        "Main archive extraction failed - cleaning up all extracted content for this release"
-                                    )
-                                    for extracted_path in extracted_targets:
-                                        try:
-                                            if extracted_path.exists():
-                                                shutil.rmtree(str(extracted_path))
-                                        except OSError:
-                                            pass
+                                if _handle_extraction_failure(
+                                    _logger,
+                                    target_dir,
+                                    extracted_targets,
+                                    is_main_context,
+                                    pre_existing=pre_existing_target,
+                                ):
                                     release_failed = True
                                     break
                                 continue
@@ -1011,22 +1042,15 @@ def process_downloads(
                                     "Unexpected error while extracting %s",
                                     group.primary,
                                 )
-                                _cleanup_failed_extraction_dir(
-                                    target_dir, pre_existing=pre_existing_target
-                                )
                                 failed.append(group.primary)
 
-                                # If main archive fails, cleanup all extracted content for this release
-                                if is_main_context:
-                                    _logger.error(
-                                        "Main archive extraction failed - cleaning up all extracted content for this release"
-                                    )
-                                    for extracted_path in extracted_targets:
-                                        try:
-                                            if extracted_path.exists():
-                                                shutil.rmtree(str(extracted_path))
-                                        except OSError:
-                                            pass
+                                if _handle_extraction_failure(
+                                    _logger,
+                                    target_dir,
+                                    extracted_targets,
+                                    is_main_context,
+                                    pre_existing=pre_existing_target,
+                                ):
                                     release_failed = True
                                     break
                                 continue
