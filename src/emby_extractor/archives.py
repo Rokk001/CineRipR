@@ -634,6 +634,7 @@ def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None
     """Copy non-archive companion files (e.g. .nfo, .srt) from source to extracted.
 
     Source files remain in place and will be moved to finished later if extraction succeeds.
+    Files are overwritten if they already exist.
     """
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -643,10 +644,9 @@ def _copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None
                 if entry.suffix.lower() == ".sfv":
                     continue
                 try:
-                    shutil.copy2(
-                        str(entry),
-                        str(ensure_unique_destination(target_dir / entry.name)),
-                    )
+                    # Copy and overwrite existing files
+                    dest_path = target_dir / entry.name
+                    shutil.copy2(str(entry), str(dest_path))
                 except OSError:
                     pass
     except OSError:
@@ -756,14 +756,9 @@ def process_downloads(
                                 try:
                                     # Only copy desired companions to extracted; skip .sfv files
                                     if entry.suffix.lower() != ".sfv":
-                                        shutil.copy2(
-                                            str(entry),
-                                            str(
-                                                ensure_unique_destination(
-                                                    target_dir / entry.name
-                                                )
-                                            ),
-                                        )
+                                        # Copy and overwrite existing files
+                                        dest_path = target_dir / entry.name
+                                        shutil.copy2(str(entry), str(dest_path))
                                 except OSError:
                                     pass
                             # Mark this directory for moving to finished later
@@ -927,13 +922,7 @@ def process_downloads(
                             f"Skipping extraction for {group.primary.name} (disabled in configuration)",
                         )
 
-                    # Ensure standard subfolders exist under the parent target directory
-                    try:
-                        _ensure_standard_subdirs(
-                            paths.extracted_root, relative_parent, subfolders
-                        )
-                    except OSError:
-                        pass
+                    # Don't create standard subdirs anymore - they are now handled as separate contexts
 
                     # Collect successfully extracted archives for later move to finished
                     if extracted_ok:
