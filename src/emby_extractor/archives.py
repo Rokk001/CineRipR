@@ -40,12 +40,13 @@ _logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ProcessResult:
     """Result of processing downloads.
-    
+
     Attributes:
         processed: Number of successfully processed archives
         failed: List of archives that failed to process
         unsupported: List of unsupported files encountered
     """
+
     processed: int
     failed: list[Path]
     unsupported: list[Path]
@@ -53,10 +54,10 @@ class ProcessResult:
 
 def iter_download_subdirs(download_root: Path) -> list[Path]:
     """Yield immediate subdirectories under the download root.
-    
+
     Args:
         download_root: Root directory containing downloads
-        
+
     Returns:
         List of subdirectories representing releases
     """
@@ -71,10 +72,10 @@ def iter_download_subdirs(download_root: Path) -> list[Path]:
 
 def _contains_supported_archives(directory: Path) -> bool:
     """Check if a directory contains any supported archive files.
-    
+
     Args:
         directory: Directory to check
-        
+
     Returns:
         True if directory contains archives
     """
@@ -92,12 +93,12 @@ def _iter_release_directories(
 
     Process subdirectories first (Subs, Sample, etc.), then the main directory.
     For TV shows with nested episode directories, recursively process them.
-    
+
     Args:
         base_dir: Release root directory
         download_root: Download root path
         policy: Subfolder extraction policy
-        
+
     Returns:
         List of tuples (source_dir, target_relative_path, should_extract)
     """
@@ -136,7 +137,9 @@ def _iter_release_directories(
         if is_season_directory(base_dir) and (contains_archives or contains_any_files):
             if should_extract:
                 if looks_like_tv_show(base_dir):
-                    season_rel = build_tv_show_path(base_dir, download_root, base_prefix)
+                    season_rel = build_tv_show_path(
+                        base_dir, download_root, base_prefix
+                    )
                 else:
                     season_rel = base_prefix / base_dir.relative_to(download_root)
                 contexts.append((child, season_rel, should_extract))
@@ -146,7 +149,10 @@ def _iter_release_directories(
         if normalized is not None:
             if should_extract:
                 if looks_like_tv_show(base_dir):
-                    rel = build_tv_show_path(base_dir, download_root, base_prefix) / normalized
+                    rel = (
+                        build_tv_show_path(base_dir, download_root, base_prefix)
+                        / normalized
+                    )
                 else:
                     rel = base_prefix / base_dir.relative_to(download_root) / normalized
                 contexts.append((child, rel, should_extract))
@@ -222,19 +228,19 @@ def process_downloads(
     subfolders: SubfolderPolicy,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
-    
+
     Main workflow:
     1. For each release, process subdirectories first (Subs, Sample, etc.)
     2. Then process main archive last
     3. On success, move all archives to finished
     4. On main archive failure, cleanup all extracted content
-    
+
     Args:
         paths: Configuration paths (downloads, extracted, finished)
         demo_mode: If True, don't actually extract/move files
         seven_zip_path: Path to 7-Zip executable (for RAR files)
         subfolders: Policy for which subfolders to process
-        
+
     Returns:
         ProcessResult with counts and failed archives
     """
@@ -261,13 +267,17 @@ def process_downloads(
             # Use consistent color for entire release
             release_color = next_progress_color()
 
-            for context_index, (current_dir, relative_parent, should_extract) in enumerate(contexts):
+            for context_index, (
+                current_dir,
+                relative_parent,
+                should_extract,
+            ) in enumerate(contexts):
                 # Last context is always the main release directory
                 is_main_context = context_index == len(contexts) - 1
-                
+
                 archives, unsupported_entries = split_directory_entries(current_dir)
                 unsupported.extend(unsupported_entries)
-                
+
                 if not archives:
                     # Handle directories without archives: copy files to extracted
                     if not demo_mode:
@@ -294,7 +304,10 @@ def process_downloads(
                                     f"Copying {len(files_to_copy)} file(s) from {current_dir.name}",
                                 )
 
-                                for idx, entry in enumerate(sorted(files_to_copy, key=lambda p: p.name.lower()), 1):
+                                for idx, entry in enumerate(
+                                    sorted(files_to_copy, key=lambda p: p.name.lower()),
+                                    1,
+                                ):
                                     try:
                                         dest_path = target_dir / entry.name
                                         shutil.copy2(str(entry), str(dest_path))
@@ -312,8 +325,12 @@ def process_downloads(
                                 )
 
                             # Mark for moving to finished later
-                            finished_relative_parent = current_dir.relative_to(download_root)
-                            files_to_move.append((current_dir, finished_relative_parent))
+                            finished_relative_parent = current_dir.relative_to(
+                                download_root
+                            )
+                            files_to_move.append(
+                                (current_dir, finished_relative_parent)
+                            )
                         except OSError:
                             pass
                     _logger.debug("No supported archives found in %s", current_dir)
@@ -330,14 +347,20 @@ def process_downloads(
 
                     complete, reason = validate_archive_group(group)
                     if not complete:
-                        _logger.warning("%s Skipping %s: %s", progress_before, group.primary, reason)
+                        _logger.warning(
+                            "%s Skipping %s: %s", progress_before, group.primary, reason
+                        )
                         failed.append(group.primary)
                         continue
 
                     part_count = max(group.part_count, 1)
-                    read_tracker = ProgressTracker(part_count, single_line=True, color=release_color)
-                    extract_tracker = ProgressTracker(100, single_line=True, color=release_color)
-                    
+                    read_tracker = ProgressTracker(
+                        part_count, single_line=True, color=release_color
+                    )
+                    extract_tracker = ProgressTracker(
+                        100, single_line=True, color=release_color
+                    )
+
                     read_tracker.log(
                         _logger,
                         f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
@@ -387,7 +410,7 @@ def process_downloads(
                             try:
                                 # Copy companion files
                                 copy_non_archives_to_extracted(current_dir, target_dir)
-                                
+
                                 # Extract archive
                                 extract_archive(
                                     group.primary,
@@ -397,7 +420,9 @@ def process_downloads(
                                     logger=_logger,
                                 )
                             except (shutil.ReadError, RuntimeError) as exc:
-                                _logger.error("Extract failed for %s: %s", group.primary, exc)
+                                _logger.error(
+                                    "Extract failed for %s: %s", group.primary, exc
+                                )
                                 failed.append(group.primary)
 
                                 if handle_extraction_failure(
@@ -411,7 +436,10 @@ def process_downloads(
                                     break
                                 continue
                             except OSError:
-                                _logger.exception("Unexpected error while extracting %s", group.primary)
+                                _logger.exception(
+                                    "Unexpected error while extracting %s",
+                                    group.primary,
+                                )
                                 failed.append(group.primary)
 
                                 if handle_extraction_failure(
@@ -441,7 +469,9 @@ def process_downloads(
 
                     # Collect for later move to finished
                     if extracted_ok:
-                        archive_groups_to_move.append((group, finished_relative_parent, current_dir))
+                        archive_groups_to_move.append(
+                            (group, finished_relative_parent, current_dir)
+                        )
                         processed += 1
 
                 # Break if release failed
@@ -461,7 +491,9 @@ def process_downloads(
                 )
 
                 for group, finished_rel_parent, source_dir in archive_groups_to_move:
-                    move_tracker = ProgressTracker(group.part_count, single_line=True, color=release_color)
+                    move_tracker = ProgressTracker(
+                        group.part_count, single_line=True, color=release_color
+                    )
                     destination_dir = paths.finished_root / finished_rel_parent
 
                     if demo_mode:
@@ -506,7 +538,11 @@ def process_downloads(
 
                 # Move remaining companion files
                 if not demo_mode:
-                    for group, finished_rel_parent, source_dir in archive_groups_to_move:
+                    for (
+                        group,
+                        finished_rel_parent,
+                        source_dir,
+                    ) in archive_groups_to_move:
                         move_remaining_to_finished(
                             source_dir,
                             finished_root=paths.finished_root,
@@ -522,11 +558,15 @@ def process_downloads(
                         try:
                             finished_dir = paths.finished_root / finished_rel_parent
                             finished_dir.mkdir(parents=True, exist_ok=True)
-                            for entry in sorted(source_dir.iterdir(), key=lambda p: p.name.lower()):
+                            for entry in sorted(
+                                source_dir.iterdir(), key=lambda p: p.name.lower()
+                            ):
                                 if not entry.is_file():
                                     continue
                                 try:
-                                    destination = ensure_unique_destination(finished_dir / entry.name)
+                                    destination = ensure_unique_destination(
+                                        finished_dir / entry.name
+                                    )
                                     shutil.move(str(entry), str(destination))
                                 except OSError:
                                     pass

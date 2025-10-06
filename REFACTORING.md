@@ -159,18 +159,18 @@ However, the main entry point (`process_downloads`) remains in `archives.py`, so
 
 ## File Size Comparison
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| **Before** | | |
-| `archives.py` | 1204 | Everything |
-| **After** | | |
-| `archive_constants.py` | 62 | Constants & regex |
-| `archive_detection.py` | 217 | Archive discovery |
-| `archive_extraction.py` | 317 | Extraction logic |
-| `path_utils.py` | 178 | Path handling |
-| `file_operations.py` | 207 | File operations |
-| `archives.py` | 505 | Main orchestration |
-| **Total** | 1486 | (includes docs) |
+| File                    | Lines | Purpose            |
+| ----------------------- | ----- | ------------------ |
+| **Before**              |       |                    |
+| `archives.py`           | 1204  | Everything         |
+| **After**               |       |                    |
+| `archive_constants.py`  | 62    | Constants & regex  |
+| `archive_detection.py`  | 217   | Archive discovery  |
+| `archive_extraction.py` | 317   | Extraction logic   |
+| `path_utils.py`         | 178   | Path handling      |
+| `file_operations.py`    | 207   | File operations    |
+| `archives.py`           | 505   | Main orchestration |
+| **Total**               | 1486  | (includes docs)    |
 
 *Note: Line count increased slightly due to comprehensive docstrings and module headers.*
 
