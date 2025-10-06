@@ -162,14 +162,8 @@ def _iter_release_directories(
 
     base_prefix = Path("TV-Shows") if _looks_like_tv(base_dir) else Path("Movies")
 
-    # First, process all subdirectories (Subs, Sample, etc.) before the main release
-    # Store the main release directory to add it last
-    main_release_context = (
-        base_dir,
-        base_prefix / base_dir.relative_to(download_root),
-        True,
-    )
-
+    # Process all subdirectories first
+    # We'll add the main release directory at the end only if it has archives
     for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
         if not child.is_dir():
             continue
@@ -205,11 +199,27 @@ def _iter_release_directories(
             _append(child, rel, should_extract)
             continue
 
+        # If this child looks like an episode directory (has TV tags) and contains files,
+        # recursively process it to handle its subdirectories (Subs, Sample, etc.) correctly
+        if _TV_TAG_RE.search(child.name) and (contains_archives or contains_any_files):
+            # Recursively get contexts for this episode directory
+            child_contexts = _iter_release_directories(child, download_root, policy)
+            # Add all child contexts to our list
+            contexts.extend(child_contexts)
+            continue
+
         # Default: mirror structure
         _append(child, base_prefix / child.relative_to(download_root), should_extract)
 
-    # Add the main release directory last, after all subdirectories
-    contexts.append(main_release_context)
+    # Add the main release directory last, but only if it contains its own archives
+    # If it only contains subdirectories (like episode dirs), don't add it as a context
+    if _contains_supported_archives(base_dir):
+        main_release_context = (
+            base_dir,
+            base_prefix / base_dir.relative_to(download_root),
+            True,
+        )
+        contexts.append(main_release_context)
 
     return contexts
 
