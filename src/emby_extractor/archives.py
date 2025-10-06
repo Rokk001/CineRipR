@@ -129,6 +129,70 @@ def _iter_release_directories(
         name = path.name.strip().lower()
         return bool(re.match(r"^season\s*\d+$", name))
 
+    def _normalize_season_dir(path: Path) -> str | None:
+        """Extract season number and return normalized 'Season XX' format."""
+        name = path.name.strip().lower()
+        match = re.match(r"^season\s*(\d+)$", name)
+        if match:
+            season_num = int(match.group(1))
+            return f"Season {season_num:02d}"
+        return None
+
+    def _extract_season_from_episode(name: str) -> str | None:
+        """Extract season number from episode directory name like 'Show.S01E01'."""
+        match = _TV_TAG_RE.search(name)
+        if match:
+            tag = match.group(0).upper()
+            # Extract season number from S01 or S01E01 format
+            season_match = re.match(r"S(\d+)", tag)
+            if season_match:
+                season_num = int(season_match.group(1))
+                return f"Season {season_num:02d}"
+        return None
+
+    def _build_tv_show_path(
+        base_dir: Path, download_root: Path, base_prefix: Path
+    ) -> Path:
+        """Build a normalized TV show path with 'Season XX' format.
+
+        Converts paths like:
+            12.Monkeys.S01.German.../12.Monkeys.S01E01...
+        To:
+            TV-Shows/12 Monkeys/Season 01/
+
+        Flattens episode directories - extracts directly into Season folder.
+        """
+        rel_path = base_dir.relative_to(download_root)
+        parts = list(rel_path.parts)
+
+        if not parts:
+            return base_prefix / rel_path
+
+        # Extract show name and season from the first directory part
+        # This should be the season pack directory like "12.Monkeys.S01.German..."
+        first_part = parts[0]
+
+        # Try to extract season number from the directory name
+        season_match = re.search(r"\.S(\d+)", first_part, flags=re.IGNORECASE)
+        if not season_match:
+            # Try without dot
+            season_match = re.search(r"S(\d+)", first_part, flags=re.IGNORECASE)
+
+        if season_match:
+            season_num = int(season_match.group(1))
+            season_normalized = f"Season {season_num:02d}"
+
+            # Extract show name (everything before .SXX)
+            show_name = re.sub(r"\.S\d+.*", "", first_part, flags=re.IGNORECASE)
+            show_name = show_name.replace(".", " ").strip()
+
+            # Flatten: extract directly to Season folder
+            # TV-Shows/ShowName/Season XX/
+            return base_prefix / show_name / season_normalized
+
+        # No season info found, return as-is
+        return base_prefix / rel_path
+
     def _normalize_special_subdir(name: str) -> str | None:
         lower = name.strip().lower()
         if lower in {"sub", "subs", "untertitel"}:
@@ -194,7 +258,12 @@ def _iter_release_directories(
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
         if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
             if should_extract:
-                season_rel = base_prefix / base_dir.relative_to(download_root)
+                if base_prefix.name == "TV-Shows":
+                    season_rel = _build_tv_show_path(
+                        base_dir, download_root, base_prefix
+                    )
+                else:
+                    season_rel = base_prefix / base_dir.relative_to(download_root)
                 _append(child, season_rel, should_extract)
             continue
 
@@ -202,7 +271,13 @@ def _iter_release_directories(
         # Only add as context if it should be extracted or contains archives
         if normalized is not None:
             if should_extract:
-                rel = base_prefix / base_dir.relative_to(download_root) / normalized
+                if base_prefix.name == "TV-Shows":
+                    rel = (
+                        _build_tv_show_path(base_dir, download_root, base_prefix)
+                        / normalized
+                    )
+                else:
+                    rel = base_prefix / base_dir.relative_to(download_root) / normalized
                 _append(child, rel, should_extract)
             continue
 
@@ -218,16 +293,23 @@ def _iter_release_directories(
         # Default: mirror structure
         # Only add as context if it should be extracted
         if should_extract:
-            _append(
-                child, base_prefix / child.relative_to(download_root), should_extract
-            )
+            if base_prefix.name == "TV-Shows":
+                child_rel = _build_tv_show_path(child, download_root, base_prefix)
+            else:
+                child_rel = base_prefix / child.relative_to(download_root)
+            _append(child, child_rel, should_extract)
 
     # Add the main release directory last, but only if it contains its own archives
     # If it only contains subdirectories (like episode dirs), don't add it as a context
     if _contains_supported_archives(base_dir):
+        if base_prefix.name == "TV-Shows":
+            main_rel = _build_tv_show_path(base_dir, download_root, base_prefix)
+        else:
+            main_rel = base_prefix / base_dir.relative_to(download_root)
+
         main_release_context = (
             base_dir,
-            base_prefix / base_dir.relative_to(download_root),
+            main_rel,
             True,
         )
         contexts.append(main_release_context)
