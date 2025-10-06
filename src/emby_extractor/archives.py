@@ -178,6 +178,9 @@ def _iter_release_directories(
             contains_any_files = any(p.is_file() for p in child.iterdir())
         except OSError:
             contains_any_files = False
+
+        # For normalized subdirs, respect the policy but always extract if archives present
+        # For other subdirs, only respect the include_other policy
         if normalized == "Sample":
             should_extract = policy.include_sample or contains_archives
         elif normalized == "Subs":
@@ -185,18 +188,22 @@ def _iter_release_directories(
         elif normalized == "Sonstige":
             should_extract = policy.include_other or contains_archives
         else:
-            should_extract = policy.include_other or contains_archives
+            # For non-normalized subdirs (like Proof), only extract if include_other is enabled
+            should_extract = policy.include_other
 
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into the Season folder
         if _is_season_dir(base_dir) and (contains_archives or contains_any_files):
-            season_rel = base_prefix / base_dir.relative_to(download_root)
-            _append(child, season_rel, should_extract)
+            if should_extract:
+                season_rel = base_prefix / base_dir.relative_to(download_root)
+                _append(child, season_rel, should_extract)
             continue
 
         # For normalized special subdirs, map the relative parent to the normalized name
+        # Only add as context if it should be extracted or contains archives
         if normalized is not None:
-            rel = base_prefix / base_dir.relative_to(download_root) / normalized
-            _append(child, rel, should_extract)
+            if should_extract:
+                rel = base_prefix / base_dir.relative_to(download_root) / normalized
+                _append(child, rel, should_extract)
             continue
 
         # If this child looks like an episode directory (has TV tags) and contains files,
@@ -209,7 +216,11 @@ def _iter_release_directories(
             continue
 
         # Default: mirror structure
-        _append(child, base_prefix / child.relative_to(download_root), should_extract)
+        # Only add as context if it should be extracted
+        if should_extract:
+            _append(
+                child, base_prefix / child.relative_to(download_root), should_extract
+            )
 
     # Add the main release directory last, but only if it contains its own archives
     # If it only contains subdirectories (like episode dirs), don't add it as a context
