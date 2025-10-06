@@ -838,9 +838,9 @@ def process_downloads(
                     read_tracker = ProgressTracker(
                         part_count, single_line=True, color=release_color
                     )
-                    # extract_tracker uses single_line=False to show completed extraction on its own line
+                    # extract_tracker uses single_line=True so extraction progress updates the same line
                     extract_tracker = ProgressTracker(
-                        100, single_line=False, color=release_color
+                        100, single_line=True, color=release_color
                     )
                     # Note: move_tracker is created later when actually moving files
                     read_tracker.log(
