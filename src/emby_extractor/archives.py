@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -225,6 +226,7 @@ def process_downloads(
     demo_mode: bool,
     seven_zip_path: Path | None,
     subfolders: SubfolderPolicy,
+    cpu_cores: int = 2,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -239,6 +241,7 @@ def process_downloads(
         demo_mode: If True, don't actually extract/move files
         seven_zip_path: Path to 7-Zip executable (for RAR files)
         subfolders: Policy for which subfolders to process
+        cpu_cores: Number of CPU cores to use for extraction (default: 2)
 
     Returns:
         ProcessResult with counts and failed archives
@@ -413,27 +416,40 @@ def process_downloads(
                                     absolute=parts_processed,
                                 )
 
+                            # Force a newline after reading to allow extraction progress to start on new line
+                            if read_tracker._inline:
+                                try:
+                                    sys.stdout.write("\n")
+                                    sys.stdout.flush()
+                                except OSError:
+                                    pass
+
                             pre_existing_target = target_dir.exists()
                             try:
                                 # Copy companion files
                                 copy_non_archives_to_extracted(current_dir, target_dir)
 
-                                # Extract archive (pass None for progress to avoid nested progress bars)
+                                # Create a progress tracker for this specific extraction (0-100%)
+                                extraction_progress = ProgressTracker(
+                                    100, single_line=True, color=release_color
+                                )
+                                extraction_progress.log(
+                                    _logger,
+                                    f"Extracting {group.primary.name}",
+                                )
+
+                                # Extract archive with progress tracking
                                 extract_archive(
                                     group.primary,
                                     target_dir,
                                     seven_zip_path=seven_zip_path,
-                                    progress=None,
-                                    logger=None,
+                                    cpu_cores=cpu_cores,
+                                    progress=extraction_progress,
+                                    logger=_logger,
                                 )
 
-                                # Update progress after successful extraction
+                                # Count extraction as done
                                 extractions_done += 1
-                                extract_tracker.advance(
-                                    _logger,
-                                    f"Extracted {group.primary.name}",
-                                    absolute=extractions_done,
-                                )
 
                             except (shutil.ReadError, RuntimeError) as exc:
                                 _logger.error(
