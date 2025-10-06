@@ -340,7 +340,27 @@ def process_downloads(
                 target_dir = paths.extracted_root / relative_parent
                 finished_relative_parent = current_dir.relative_to(download_root)
 
+                # Calculate total parts across all groups for unified progress tracking
+                total_parts = sum(group.part_count for group in groups)
                 total_groups = len(groups)
+
+                # Create single trackers for all groups in this context
+                read_tracker = ProgressTracker(
+                    total_parts, single_line=True, color=release_color
+                )
+                # For extraction, we'll track by group (each group is one extraction operation)
+                extract_tracker = ProgressTracker(
+                    total_groups * 100, single_line=True, color=release_color
+                )
+
+                read_tracker.log(
+                    _logger,
+                    f"Processing {total_groups} archive(s) with {total_parts} file(s) total for {current_dir.name}",
+                )
+
+                parts_processed = 0
+                extractions_done = 0
+
                 for index, group in enumerate(groups, 1):
                     progress_before = format_progress(index - 1, total_groups)
 
@@ -352,32 +372,15 @@ def process_downloads(
                         failed.append(group.primary)
                         continue
 
-                    part_count = max(group.part_count, 1)
-                    read_tracker = ProgressTracker(
-                        part_count, single_line=True, color=release_color
-                    )
-                    extract_tracker = ProgressTracker(
-                        100, single_line=True, color=release_color
-                    )
-
-                    read_tracker.log(
-                        _logger,
-                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                    )
-                    read_tracker.advance(
-                        _logger,
-                        f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
-                        absolute=part_count,
-                    )
-
                     extracted_ok = False
                     if should_extract:
                         if demo_mode:
                             for idx, member in enumerate(group.members, 1):
+                                parts_processed += 1
                                 read_tracker.advance(
                                     _logger,
                                     f"Demo: would read {member.name}",
-                                    absolute=idx,
+                                    absolute=parts_processed,
                                 )
                             extracted_ok = True
                         else:
@@ -394,15 +397,16 @@ def process_downloads(
                                 failed.append(group.primary)
                                 continue
 
-                            for idx, member in enumerate(group.members, 1):
+                            for member in group.members:
                                 try:
                                     member.stat()
                                 except OSError:
                                     pass
+                                parts_processed += 1
                                 read_tracker.advance(
                                     _logger,
                                     f"Reading {member.name}",
-                                    absolute=idx,
+                                    absolute=parts_processed,
                                 )
 
                             pre_existing_target = target_dir.exists()
@@ -410,14 +414,30 @@ def process_downloads(
                                 # Copy companion files
                                 copy_non_archives_to_extracted(current_dir, target_dir)
 
-                                # Extract archive
+                                # Update progress before extraction
+                                extract_tracker.advance(
+                                    _logger,
+                                    f"Extracting {group.primary.name}",
+                                    absolute=extractions_done * 100,
+                                )
+
+                                # Extract archive (pass None for progress to avoid nested progress bars)
                                 extract_archive(
                                     group.primary,
                                     target_dir,
                                     seven_zip_path=seven_zip_path,
-                                    progress=extract_tracker,
-                                    logger=_logger,
+                                    progress=None,
+                                    logger=None,
                                 )
+
+                                # Update progress after extraction
+                                extractions_done += 1
+                                extract_tracker.advance(
+                                    _logger,
+                                    f"Extracted {group.primary.name}",
+                                    absolute=extractions_done * 100,
+                                )
+
                             except (shutil.ReadError, RuntimeError) as exc:
                                 _logger.error(
                                     "Extract failed for %s: %s", group.primary, exc
@@ -454,16 +474,15 @@ def process_downloads(
                             else:
                                 # Flatten if needed
                                 flatten_single_subdir(target_dir)
-                                extract_tracker.complete(
-                                    _logger,
-                                    f"Finished extracting {group.primary.name}",
-                                )
                                 extracted_ok = True
                                 extracted_targets.append(target_dir)
                     else:
-                        read_tracker.complete(
+                        # Skip extraction but still count parts as processed
+                        parts_processed += group.part_count
+                        read_tracker.advance(
                             _logger,
                             f"Skipping extraction for {group.primary.name} (disabled in configuration)",
+                            absolute=parts_processed,
                         )
 
                     # Collect for later move to finished
@@ -472,6 +491,17 @@ def process_downloads(
                             (group, finished_relative_parent, current_dir)
                         )
                         processed += 1
+
+                # Complete the trackers after all groups are processed
+                read_tracker.complete(
+                    _logger,
+                    f"Processed {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                )
+                if extractions_done > 0:
+                    extract_tracker.complete(
+                        _logger,
+                        f"Extracted {extractions_done} archive(s) for {current_dir.name}",
+                    )
 
                 # Break if release failed
                 if release_failed:
