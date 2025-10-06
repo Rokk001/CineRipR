@@ -1,0 +1,47 @@
+# Example configuration for emby_extractor
+# Copy this file to 'emby_extractor.toml' and adjust the paths to match your environment.
+
+[paths]
+# Multiple download roots are supported.
+# The tool will scan all specified directories for archives to extract.
+download_roots = ["C:/Media/Download"]
+
+# Directory where extracted content will be placed.
+# TV Shows will be organized as: TV-Shows/ShowName/Season XX/
+# Movies will be organized as: Movies/MovieName/
+extracted_root = "C:/Media/Extracted"
+
+# Directory where original archive files are moved after successful extraction.
+finished_root = "C:/Media/Finished"
+
+[options]
+# Number of days to keep files in the finished directory before deletion.
+finished_retention_days = 15
+
+# Enable automatic deletion of old files in the finished directory.
+# Set to true to enable cleanup, false to keep all files.
+enable_delete = false
+
+# Demo mode: if true, no files will be extracted, moved, or deleted.
+# Useful for testing configuration without making changes.
+demo_mode = false
+
+[subfolders]
+# Controls which subdirectories within releases are processed.
+# Subdirectories with archives are always processed regardless of these settings.
+
+# Process 'Sample' directories (usually contain preview videos)
+include_sample = false
+
+# Process 'Subs'/'Sub' directories (subtitle files)
+include_sub = true
+
+# Process other subdirectories (like 'Proof', custom folders)
+include_other = false
+
+[tools]
+# Path to 7-Zip executable for extracting RAR archives.
+# On Windows, typically: "C:/Program Files/7-Zip/7z.exe"
+# On Linux/Mac, usually just "7z" if installed via package manager.
+seven_zip = "C:/Program Files/7-Zip/7z.exe"
+

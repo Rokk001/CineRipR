@@ -3,10 +3,14 @@
 Utility for extracting multi-part archives downloaded for Emby (or any media server) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
 
 ## Features
-- Understands multi-part archives (e.g. `*.part01.rar`, `*.r00`, `*.zip.001`) and processes each set only once.
-- Optional demo mode to dry-run the workflow without touching the filesystem.
-- Configurable automatic cleanup of the finished directory based on file age.
-- CLI overrides for every runtime setting and structured logging with progress indicators.
+- **Multi-part archive support**: Understands multi-part archives (e.g. `*.part01.rar`, `*.r00`, `*.zip.001`) and processes each set only once.
+- **Smart TV Show organization**: Automatically organizes TV shows into `ShowName/Season XX/` structure with proper flattening of episode directories.
+- **Subfolder management**: Handles `Subs`, `Sample`, and other subfolders with configurable policies.
+- **Progress tracking**: Real-time progress bars for extraction, copying, and moving operations with consistent color coding per release.
+- **Demo mode**: Dry-run the workflow without touching the filesystem to preview changes.
+- **Automatic cleanup**: Configurable automatic cleanup of the finished directory based on file age.
+- **Comprehensive logging**: Structured logging with detailed progress indicators for all operations.
+- **CLI overrides**: Override any configuration setting via command-line arguments.
 
 ## Requirements
 - Python 3.11 or newer (Python 3.12 recommended).
@@ -60,6 +64,38 @@ Common flags:
 - `--seven-zip PATH` — point to a custom 7-Zip executable for RAR extraction.
 
 Use `emby-extractor --help` to list all available options.
+
+## TV Show Organization
+
+The tool automatically detects TV shows and organizes them with normalized season folders:
+
+**Input structure:**
+```
+Download/
+  12.Monkeys.S01.German.DL.1080p.BluRay.x264-LIM/
+    12.Monkeys.S01E01.German.DL.1080p.BluRay.x264-LIM/
+      lim-12monkeys-s01e01-1080p.rar
+      Subs/
+        lim-12monkeys-s01e01-1080p-subs.rar
+```
+
+**Output structure:**
+```
+Extracted/
+  TV-Shows/
+    12 Monkeys/
+      Season 01/
+        12.Monkeys.S01E01.German.DL.1080p.BluRay.x264-LIM.mkv
+        Subs/
+          German.srt
+          English.srt
+```
+
+The tool:
+- Extracts the show name from the release directory
+- Normalizes season folders to `Season XX` format (e.g., `Season 01`, `Season 02`)
+- Flattens episode directories - content is extracted directly into the season folder
+- Preserves subfolder structure (Subs, Sample) according to your policy settings
 
 ## Development
 Run formatting and static checks as needed (example commands shown with `uv`/`pip`):
