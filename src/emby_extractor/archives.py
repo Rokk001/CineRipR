@@ -771,9 +771,10 @@ def process_downloads(
 
                             if files_to_copy:
                                 # Create progress tracker for copying files
+                                # single_line=True so individual file copies update the same line
                                 copy_tracker = ProgressTracker(
                                     len(files_to_copy),
-                                    single_line=False,
+                                    single_line=True,
                                     color=release_color,
                                 )
                                 copy_tracker.log(
@@ -833,15 +834,15 @@ def process_downloads(
 
                     part_count = max(group.part_count, 1)
                     # Use the release color for all trackers (consistent color per episode/movie)
+                    # read_tracker uses single_line=True because multi-part archives should update the same line
                     read_tracker = ProgressTracker(
-                        part_count, single_line=False, color=release_color
+                        part_count, single_line=True, color=release_color
                     )
+                    # extract_tracker uses single_line=False to show completed extraction on its own line
                     extract_tracker = ProgressTracker(
                         100, single_line=False, color=release_color
                     )
-                    move_tracker = ProgressTracker(
-                        part_count, single_line=False, color=release_color
-                    )
+                    # Note: move_tracker is created later when actually moving files
                     read_tracker.log(
                         _logger,
                         f"Preparing archive {group.primary.name} ({group.part_count} file(s))",
@@ -989,8 +990,9 @@ def process_downloads(
 
                 for group, finished_rel_parent, source_dir in archive_groups_to_move:
                     # Use the same release color for consistency
+                    # single_line=True so moving individual archive parts updates the same line
                     move_tracker = ProgressTracker(
-                        group.part_count, single_line=False, color=release_color
+                        group.part_count, single_line=True, color=release_color
                     )
                     destination_dir = paths.finished_root / finished_rel_parent
 
