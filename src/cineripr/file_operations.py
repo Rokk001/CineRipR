@@ -243,22 +243,28 @@ def flatten_episode_like_dirs(target_dir: Path) -> None:
         except OSError:
             continue
 
-        looks_like_episode = EPISODE_ONLY_TAG_RE.search(name) is not None or any(
-            _is_video_file(c) for c in children if c.is_file()
+        # Consider as episode-like if name has episode tag OR contains any video file
+        # either directly or nested deeper (some archives add extra subfolders).
+        direct_video = any(_is_video_file(c) for c in children if c.is_file())
+        nested_video = False
+        if not direct_video:
+            try:
+                for root, _dirs, files in os.walk(candidate):
+                    if any(_is_video_file(Path(root) / f) for f in files):
+                        nested_video = True
+                        break
+            except OSError:
+                nested_video = False
+        looks_like_episode = (
+            EPISODE_ONLY_TAG_RE.search(name) is not None or direct_video or nested_video
         )
         if not looks_like_episode:
             continue
-
-        # Move all files from candidate (recursively) to target_dir, but keep well-known special
-        # subfolders like Subs/Sample intact.
-        skip = {"subs", "sub", "sample", "sonstige"}
 
         def _move_up_recursive(current: Path) -> None:
             try:
                 for entry in list(current.iterdir()):
                     if entry.is_dir():
-                        if entry.name.strip().lower() in skip:
-                            continue
                         _move_up_recursive(entry)
                         # Try to remove if empty after recursion
                         try:

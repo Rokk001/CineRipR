@@ -155,14 +155,22 @@ def _iter_release_directories(
 
         # Determine if we should extract this child dir
         if normalized == "Sample":
-            should_extract = policy.include_sample or contains_archives
+            should_extract = (
+                policy.include_sample or contains_archives or contains_any_files
+            )
         elif normalized == "Subs":
-            should_extract = policy.include_sub or contains_archives
+            should_extract = (
+                policy.include_sub or contains_archives or contains_any_files
+            )
         elif normalized == "Sonstige":
-            should_extract = policy.include_other or contains_archives
+            should_extract = (
+                policy.include_other or contains_archives or contains_any_files
+            )
         else:
-            # For episode directories inside Season folders, always extract if they have archives
-            if is_season_directory(base_dir) and contains_archives:
+            # For episode directories inside Season folders, extract even if they only contain files
+            if is_season_directory(base_dir) and (
+                contains_archives or contains_any_files
+            ):
                 should_extract = True
             else:
                 # For other non-normalized subdirs, only extract if include_other is enabled
@@ -236,7 +244,8 @@ def _iter_release_directories(
             _logger.info(
                 "DEBUG:   TV_TAG match for '%s': %s", child.name[:50], has_tv_tag
             )
-        if has_tv_tag and (contains_archives or contains_any_files):
+        # Recurse into TV-tagged directories regardless; content may be nested deeper
+        if has_tv_tag and (contains_archives or contains_any_files or True):
             if debug:
                 _logger.info(
                     "DEBUG: Found episode directory: %s, recursing...", child.name
@@ -267,8 +276,14 @@ def _iter_release_directories(
                     "DEBUG:   Added to contexts: %s -> %s", child.name, child_rel
                 )
 
-    # Add the main release directory last, but only if it contains archives
-    if _contains_supported_archives(base_dir):
+    # Add the main release directory last if it contains archives OR any files
+    base_has_archives = _contains_supported_archives(base_dir)
+    base_has_files = False
+    try:
+        base_has_files = any(p.is_file() for p in base_dir.iterdir())
+    except OSError:
+        base_has_files = False
+    if base_has_archives or base_has_files:
         if looks_like_tv_show(base_dir):
             main_rel = build_tv_show_path(base_dir, download_root, base_prefix)
         else:
@@ -497,6 +512,7 @@ def process_downloads(
                                     len(files_to_copy),
                                     single_line=True,
                                     color=context_color,
+                                    indent=2,
                                 )
                                 copy_tracker.log(
                                     _logger,
@@ -546,7 +562,7 @@ def process_downloads(
 
                 # Initial announcement - complete immediately
                 announce_tracker = ProgressTracker(
-                    1, single_line=True, color=context_color
+                    1, single_line=True, color=context_color, indent=2
                 )
                 announce_tracker.complete(
                     _logger,
@@ -555,7 +571,7 @@ def process_downloads(
 
                 # Tracker for extraction phase
                 extract_tracker = ProgressTracker(
-                    total_groups, single_line=True, color=context_color
+                    total_groups, single_line=True, color=context_color, indent=2
                 )
 
                 parts_processed = 0
@@ -661,7 +677,10 @@ def process_downloads(
 
                         # Create a progress tracker for this specific extraction
                         extraction_progress = ProgressTracker(
-                            group.part_count, single_line=True, color=context_color
+                            group.part_count,
+                            single_line=True,
+                            color=context_color,
+                            indent=2,
                         )
 
                         # Extract archive with progress tracking
@@ -773,7 +792,7 @@ def process_downloads(
                 # Use a new color for the move phase
                 move_color = next_progress_color()
                 move_tracker = ProgressTracker(
-                    total_files_to_move, single_line=True, color=move_color
+                    total_files_to_move, single_line=True, color=move_color, indent=2
                 )
 
                 if demo_mode:

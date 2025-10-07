@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+import os
 
 from .archive_constants import (
     TV_CATEGORY,
@@ -11,6 +12,7 @@ from .archive_constants import (
     TV_TAG_RE,
     EPISODE_ONLY_TAG_RE,
     SEASON_DIR_RE,
+    SEASON_SHORT_DIR_RE,
     STAFFEL_DIR_RE,
     SEASON_TAG_RE,
     SEASON_TAG_ALT_RE,
@@ -29,7 +31,9 @@ def is_season_directory(directory: Path) -> bool:
     """
     name = directory.name
     return (
-        SEASON_DIR_RE.match(name) is not None or STAFFEL_DIR_RE.match(name) is not None
+        SEASON_DIR_RE.match(name) is not None
+        or STAFFEL_DIR_RE.match(name) is not None
+        or SEASON_SHORT_DIR_RE.match(name) is not None
     )
 
 
@@ -155,6 +159,7 @@ def looks_like_tv_show(root: Path) -> bool:
     if TV_TAG_RE.search(root.name) or EPISODE_ONLY_TAG_RE.search(root.name):
         return True
 
+    # Shallow scan immediate children first
     try:
         for child in root.iterdir():
             if child.is_dir() and (
@@ -167,6 +172,31 @@ def looks_like_tv_show(root: Path) -> bool:
                 TV_TAG_RE.search(child.name) or EPISODE_ONLY_TAG_RE.search(child.name)
             ):
                 return True
+    except OSError:
+        pass
+
+    # Recursive scan (limited depth) to robustly classify nested structures
+    max_depth = 3
+    try:
+        root_parts = len(root.parts)
+        for dirpath, dirnames, filenames in os.walk(root):
+            depth = len(Path(dirpath).parts) - root_parts
+            if depth > max_depth:
+                # Prune deep traversal
+                dirnames[:] = []
+                continue
+            # Season folders anywhere below
+            for d in dirnames:
+                if (
+                    is_season_directory(Path(d))
+                    or TV_TAG_RE.search(d)
+                    or EPISODE_ONLY_TAG_RE.search(d)
+                ):
+                    return True
+            # Files with TV tags anywhere below
+            for f in filenames:
+                if TV_TAG_RE.search(f) or EPISODE_ONLY_TAG_RE.search(f):
+                    return True
     except OSError:
         pass
 
