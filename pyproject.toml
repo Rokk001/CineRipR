@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cineripr"
-version = "1.0.5"
+version = "1.0.6"
 description = "Automate extraction of multi-part downloads and finished-folder cleanup for media libraries"
 readme = "README.md"
 license = { file = "LICENSE" }

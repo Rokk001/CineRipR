@@ -100,6 +100,16 @@ All notable changes to this project will be documented in this file.
 - Improved testability with focused module boundaries
 
 ## [1.0.5] - 2025-10-07
+## [1.0.6] - 2025-10-07
+
+### Fixed
+- No-season TV shows: derive series folder strictly from the prefix before the episode tag (e.g., `Dragonball.Z.Kai.E001...` -> `Dragonball Z Kai`).
+- Ensure Sample folders follow policy strictly (no extraction when disabled).
+- TV-tagged parent folders (e.g., `Show.S02...`) correctly recurse and extract nested episode dirs.
+
+### UX
+- Tree-style progress: align sibling lines (Processing/Finished/Extracting) on the same level; keep child phases indented.
+
 
 ### Added
 - Tree-style progress formatting with visual hierarchy (├─, └──) and consistent indentation.
