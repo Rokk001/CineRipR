@@ -88,6 +88,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Enable detailed debug output for directory processing",
     )
+    # Overrides for repeat mode
+    parser.add_argument(
+        "--repeat-forever",
+        dest="repeat_forever",
+        action=argparse.BooleanOptionalAction,
+        help="Repeat the whole scan/extract loop indefinitely",
+    )
+    parser.add_argument(
+        "--repeat-after-minutes",
+        dest="repeat_after_minutes",
+        type=int,
+        help="Sleep minutes before repeating when repeat-forever is enabled",
+    )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
@@ -157,6 +170,17 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     if args.seven_zip is not None:
         seven_zip_path = args.seven_zip
 
+    # Repeat overrides from CLI
+    repeat_forever = settings.repeat_forever
+    if getattr(args, "repeat_forever", None) is not None:
+        repeat_forever = bool(args.repeat_forever)
+
+    repeat_after_minutes = settings.repeat_after_minutes
+    if getattr(args, "repeat_after_minutes", None) is not None:
+        if args.repeat_after_minutes < 0:
+            raise ConfigurationError("repeat-after-minutes cannot be negative")
+        repeat_after_minutes = int(args.repeat_after_minutes)
+
     return Settings(
         paths=paths,
         retention_days=retention_days,
@@ -164,6 +188,8 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         demo_mode=demo_mode,
         subfolders=subfolders,
         seven_zip_path=seven_zip_path,
+        repeat_forever=repeat_forever,
+        repeat_after_minutes=repeat_after_minutes,
     )
 
 
@@ -190,6 +216,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (ConfigurationError, FileNotFoundError) as exc:
         _LOGGER.error("Configuration error: %s", exc)
         return 1
+
+    # Helpful startup log to verify which config was loaded and key options
+    _LOGGER.info(
+        "Using config: %s | repeat_forever=%s, repeat_after_minutes=%s, demo=%s, delete=%s",
+        args.config,
+        settings.repeat_forever,
+        settings.repeat_after_minutes,
+        settings.demo_mode,
+        settings.enable_delete,
+    )
 
     if resolve_seven_zip_command(settings.seven_zip_path) is None:
         _LOGGER.error(
@@ -224,45 +260,59 @@ def main(argv: Sequence[str] | None = None) -> int:
             _LOGGER.error("Processing error: %s", exc)
             return 1, None
 
+    _LOGGER.info(
+        "Repeat mode: %s, delay: %s minute(s)",
+        settings.repeat_forever,
+        settings.repeat_after_minutes,
+    )
+
     exit_code = 0
     while True:
-        code, result = run_once()
-        exit_code = max(exit_code, code)
+        try:
+            code, result = run_once()
+            exit_code = max(exit_code, code)
 
-        deleted: list[Path]
-        cleanup_failed: list[Path]
-        skipped_cleanup: list[Path]
+            deleted: list[Path]
+            cleanup_failed: list[Path]
+            skipped_cleanup: list[Path]
 
-        if result is not None:
-            if settings.enable_delete or settings.demo_mode:
-                deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
-                    settings.paths.finished_root,
-                    settings.retention_days,
-                    enable_delete=settings.enable_delete,
-                    demo_mode=settings.demo_mode,
+            if result is not None:
+                if settings.enable_delete or settings.demo_mode:
+                    deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
+                        settings.paths.finished_root,
+                        settings.retention_days,
+                        enable_delete=settings.enable_delete,
+                        demo_mode=settings.demo_mode,
+                    )
+                else:
+                    _LOGGER.info(
+                        "Delete disabled and demo mode off: skipping finished cleanup scan."
+                    )
+                    deleted = []
+                    cleanup_failed = []
+                    skipped_cleanup = []
+
+                _LOGGER.info("Processed archives: %s", result.processed)
+                if settings.demo_mode:
+                    _LOGGER.info("Demo mode: all actions were simulated only.")
+
+                _log_path_summary(_LOGGER.error, "Failed archives", result.failed)
+                _log_path_summary(
+                    _LOGGER.warning, "Unsupported files", result.unsupported
                 )
-            else:
-                _LOGGER.info(
-                    "Delete disabled and demo mode off: skipping finished cleanup scan."
+                _log_path_summary(_LOGGER.info, "Deleted finished files", deleted)
+                _log_path_summary(
+                    _LOGGER.info, "Skipped finished files", skipped_cleanup
                 )
-                deleted = []
-                cleanup_failed = []
-                skipped_cleanup = []
+                _log_path_summary(
+                    _LOGGER.error, "Failed to clean finished directory", cleanup_failed
+                )
 
-            _LOGGER.info("Processed archives: %s", result.processed)
-            if settings.demo_mode:
-                _LOGGER.info("Demo mode: all actions were simulated only.")
+                if result.failed or cleanup_failed:
+                    exit_code = max(exit_code, 2)
 
-            _log_path_summary(_LOGGER.error, "Failed archives", result.failed)
-            _log_path_summary(_LOGGER.warning, "Unsupported files", result.unsupported)
-            _log_path_summary(_LOGGER.info, "Deleted finished files", deleted)
-            _log_path_summary(_LOGGER.info, "Skipped finished files", skipped_cleanup)
-            _log_path_summary(
-                _LOGGER.error, "Failed to clean finished directory", cleanup_failed
-            )
-
-            if result.failed or cleanup_failed:
-                exit_code = max(exit_code, 2)
+        except Exception as exc:
+            _LOGGER.error("Unexpected error in main loop: %s", exc)
 
         if not settings.repeat_forever:
             break
@@ -287,5 +337,3 @@ if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())
 
 __all__ = ["main"]
-
-

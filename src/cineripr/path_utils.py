@@ -10,6 +10,7 @@ from .archive_constants import (
     MOVIES_CATEGORY,
     TV_TAG_RE,
     SEASON_DIR_RE,
+    STAFFEL_DIR_RE,
     SEASON_TAG_RE,
     SEASON_TAG_ALT_RE,
 )
@@ -17,23 +18,26 @@ from .archive_constants import (
 
 def is_season_directory(directory: Path) -> bool:
     """Check if a directory name represents a season folder.
-    
+
     Examples:
         - "Season 1", "Season 01"
         - "season 2", "SEASON 02"
-        
+
     Returns:
         True if directory matches season pattern
     """
-    return SEASON_DIR_RE.match(directory.name) is not None
+    name = directory.name
+    return (
+        SEASON_DIR_RE.match(name) is not None or STAFFEL_DIR_RE.match(name) is not None
+    )
 
 
 def extract_season_from_tag(name: str) -> str | None:
     """Extract season directory name from TV show tag.
-    
+
     Args:
         name: Directory or file name containing TV tag (e.g., "S01", "S01E01")
-        
+
     Returns:
         Season directory name (e.g., "Season 01") or None if not found
     """
@@ -48,23 +52,21 @@ def extract_season_from_tag(name: str) -> str | None:
     return None
 
 
-def build_tv_show_path(
-    base_dir: Path, download_root: Path, base_prefix: Path
-) -> Path:
+def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -> Path:
     """Build a normalized TV show path with 'Season XX' format.
-    
+
     Converts paths like:
         12.Monkeys.S01.German.../12.Monkeys.S01E01...
     To:
         TV-Shows/12 Monkeys/Season 01/
-    
+
     Flattens episode directories - extracts directly into Season folder.
-    
+
     Args:
         base_dir: Directory to build path for
         download_root: Root of downloads directory
         base_prefix: Category prefix (TV-Shows or Movies)
-        
+
     Returns:
         Normalized output path
     """
@@ -102,15 +104,15 @@ def build_tv_show_path(
 
 def normalize_special_subdir(name: str) -> str | None:
     """Normalize special subdirectory names.
-    
+
     Maps various names to standard names:
     - "sub", "subs", "untertitel" -> "Subs"
     - "sample" -> "Sample"
     - "sonstige", "other", "misc" -> "Sonstige"
-    
+
     Args:
         name: Directory name to normalize
-        
+
     Returns:
         Normalized name or None if not a special subdirectory
     """
@@ -126,14 +128,14 @@ def normalize_special_subdir(name: str) -> str | None:
 
 def looks_like_tv_show(root: Path) -> bool:
     """Determine if a directory contains TV show content.
-    
+
     Checks for:
     - Season directories
     - TV tags in directory/file names (S01, S01E01, etc.)
-    
+
     Args:
         root: Directory to check
-        
+
     Returns:
         True if directory appears to contain TV shows
     """
@@ -141,7 +143,7 @@ def looks_like_tv_show(root: Path) -> bool:
         return True
     if TV_TAG_RE.search(root.name):
         return True
-    
+
     try:
         for child in root.iterdir():
             if child.is_dir() and (
@@ -152,16 +154,16 @@ def looks_like_tv_show(root: Path) -> bool:
                 return True
     except OSError:
         pass
-    
+
     return False
 
 
 def get_category_prefix(directory: Path) -> Path:
     """Determine the category prefix (TV-Shows or Movies) for a directory.
-    
+
     Args:
         directory: Directory to categorize
-        
+
     Returns:
         Path object for TV_CATEGORY or MOVIES_CATEGORY
     """
@@ -176,6 +178,3 @@ __all__ = [
     "looks_like_tv_show",
     "get_category_prefix",
 ]
-
-
-

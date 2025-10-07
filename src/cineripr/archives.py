@@ -110,7 +110,14 @@ def _iter_release_directories(
     base_prefix = get_category_prefix(base_dir)
 
     # Process all subdirectories first
-    for child in sorted(base_dir.iterdir(), key=lambda path: path.name.lower()):
+    try:
+        children = sorted(base_dir.iterdir(), key=lambda path: path.name.lower())
+    except OSError as exc:
+        # Do not abort the whole run if a directory disappears or is inaccessible
+        _logger.error("Unable to list directory %s: %s - skipping", base_dir, exc)
+        return contexts
+
+    for child in children:
         if not child.is_dir():
             continue
 
@@ -332,10 +339,30 @@ def process_downloads(
     unsupported: list[Path] = []
 
     for download_root in paths.download_roots:
-        for release_dir in iter_download_subdirs(download_root):
-            contexts = _iter_release_directories(
-                release_dir, download_root, subfolders, debug=debug
+        release_dirs = iter_download_subdirs(download_root)
+        if debug:
+            _logger.info(
+                "DEBUG: Found %d release directories under %s",
+                len(release_dirs),
+                download_root,
             )
+            for rd in release_dirs:
+                _logger.info("DEBUG:   Release: %s", rd.name)
+
+        for release_dir in release_dirs:
+            try:
+                if debug:
+                    _logger.info("DEBUG: Processing release: %s", release_dir)
+                contexts = _iter_release_directories(
+                    release_dir, download_root, subfolders, debug=debug
+                )
+            except Exception as exc:
+                _logger.error(
+                    "Failed to enumerate contexts for release %s: %s - skipping",
+                    release_dir,
+                    exc,
+                )
+                continue
 
             # Track all extracted targets and archive groups for this release
             extracted_targets: list[Path] = []
@@ -472,74 +499,84 @@ def process_downloads(
                 groups_to_extract: list[tuple[int, ArchiveGroup]] = []
 
                 for index, group in enumerate(groups, 1):
-                    progress_before = format_progress(index - 1, total_groups)
+                    try:
+                        progress_before = format_progress(index - 1, total_groups)
 
-                    complete, reason = validate_archive_group(group)
-                    if not complete:
-                        _logger.warning(
-                            "%s Skipping %s: %s", progress_before, group.primary, reason
+                        complete, reason = validate_archive_group(group)
+                        if not complete:
+                            _logger.warning(
+                                "%s Skipping %s: %s",
+                                progress_before,
+                                group.primary,
+                                reason,
+                            )
+                            failed.append(group.primary)
+                            continue
+
+                        if should_extract:
+                            if demo_mode:
+                                # Read all parts silently (no progress updates)
+                                for member in group.members:
+                                    parts_processed += 1
+
+                                # Show completion message only
+                                _logger.info(
+                                    "%s Demo: Finished reading %s",
+                                    format_progress(
+                                        group.part_count,
+                                        group.part_count,
+                                        color=context_color,
+                                    ),
+                                    group.primary.name,
+                                )
+                                groups_to_extract.append((index, group))
+                            else:
+                                can_extract, reason = can_extract_archive(
+                                    group.primary, seven_zip_path=seven_zip_path
+                                )
+                                if not can_extract:
+                                    _logger.error(
+                                        "%s Pre-extraction check failed for %s: %s",
+                                        progress_before,
+                                        group.primary,
+                                        reason,
+                                    )
+                                    failed.append(group.primary)
+                                    continue
+
+                                # Read all parts silently (no progress updates)
+                                for member in group.members:
+                                    try:
+                                        member.stat()
+                                    except OSError:
+                                        pass
+                                    parts_processed += 1
+
+                                # Show completion message only
+                                _logger.info(
+                                    "%s Finished reading %s",
+                                    format_progress(
+                                        group.part_count,
+                                        group.part_count,
+                                        color=context_color,
+                                    ),
+                                    group.primary.name,
+                                )
+
+                                groups_to_extract.append((index, group))
+                        else:
+                            # Skip extraction but still count parts as processed
+                            parts_processed += group.part_count
+                            _logger.info(
+                                "Skipping extraction for %s (disabled in configuration)",
+                                group.primary.name,
+                            )
+                    except Exception as exc:
+                        _logger.error(
+                            "Unexpected error with group %s: %s", group.primary, exc
                         )
                         failed.append(group.primary)
                         continue
-
-                    if should_extract:
-                        if demo_mode:
-                            # Read all parts silently (no progress updates)
-                            for member in group.members:
-                                parts_processed += 1
-
-                            # Show completion message only
-                            _logger.info(
-                                "%s Demo: Finished reading %s",
-                                format_progress(
-                                    group.part_count,
-                                    group.part_count,
-                                    color=context_color,
-                                ),
-                                group.primary.name,
-                            )
-                            groups_to_extract.append((index, group))
-                        else:
-                            can_extract, reason = can_extract_archive(
-                                group.primary, seven_zip_path=seven_zip_path
-                            )
-                            if not can_extract:
-                                _logger.error(
-                                    "%s Pre-extraction check failed for %s: %s",
-                                    progress_before,
-                                    group.primary,
-                                    reason,
-                                )
-                                failed.append(group.primary)
-                                continue
-
-                            # Read all parts silently (no progress updates)
-                            for member in group.members:
-                                try:
-                                    member.stat()
-                                except OSError:
-                                    pass
-                                parts_processed += 1
-
-                            # Show completion message only
-                            _logger.info(
-                                "%s Finished reading %s",
-                                format_progress(
-                                    group.part_count,
-                                    group.part_count,
-                                    color=context_color,
-                                ),
-                                group.primary.name,
-                            )
-
-                            groups_to_extract.append((index, group))
-                    else:
-                        # Skip extraction but still count parts as processed
-                        parts_processed += group.part_count
-                        _logger.info(
-                            "Skipping extraction for %s (disabled in configuration)",
-                            group.primary.name,
-                        )
 
                 # Phase 2: Extract all groups
                 for index, group in groups_to_extract:
@@ -588,10 +625,11 @@ def process_downloads(
                             release_failed = True
                             break
                         continue
-                    except OSError:
-                        _logger.exception(
-                            "Unexpected error while extracting %s",
+                    except OSError as exc:
+                        _logger.error(
+                            "Unexpected OS error while extracting %s: %s",
                             group.primary,
+                            exc,
                         )
                         failed.append(group.primary)
 
@@ -629,6 +667,10 @@ def process_downloads(
 
             # Skip to next release if failed
             if release_failed:
+                if debug:
+                    _logger.info(
+                        "DEBUG: Release marked as failed, moving to next release"
+                    )
                 continue
 
             # Move all archives to finished
@@ -743,7 +785,10 @@ def process_downloads(
 
             # Cleanup empty directories
             if not demo_mode:
-                _remove_empty_tree(release_dir, stop=download_root)
+                try:
+                    _remove_empty_tree(release_dir, stop=download_root)
+                except OSError:
+                    pass
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 

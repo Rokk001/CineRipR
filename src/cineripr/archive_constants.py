@@ -31,6 +31,8 @@ SUBFOLDER_OTHER = "Sonstige"
 # Regular expressions for pattern matching
 TV_TAG_RE = re.compile(r"s\d{2}(?:e\d{2})?", re.IGNORECASE)
 SEASON_DIR_RE = re.compile(r"^season\s*(\d+)$", re.IGNORECASE)
+# German variant: "Staffel 1", "Staffel 01"
+STAFFEL_DIR_RE = re.compile(r"^staffel\s*(\d+)$", re.IGNORECASE)
 SEASON_TAG_RE = re.compile(r"\.S(\d+)", re.IGNORECASE)
 SEASON_TAG_ALT_RE = re.compile(r"S(\d+)", re.IGNORECASE)
 
@@ -59,7 +61,5 @@ __all__ = [
     "PART_VOLUME_RE",
     "R_VOLUME_RE",
     "SPLIT_EXT_RE",
+    "STAFFEL_DIR_RE",
 ]
-
-
-
