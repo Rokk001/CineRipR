@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "emby-extractor"
+name = "cineripr"
 version = "1.0.0"
-description = "Automate extraction of multi-part downloads and finished-folder cleanup for Emby"
+description = "Automate extraction of multi-part downloads and finished-folder cleanup for media libraries"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
@@ -32,9 +32,11 @@ dependencies = []
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/Rokk001/emby-extractor"
-Source = "https://github.com/Rokk001/emby-extractor"
-Issues = "https://github.com/Rokk001/emby-extractor/issues"
+Homepage = "https://github.com/Rokk001/CineRipR"
+Source = "https://github.com/Rokk001/CineRipR"
+Issues = "https://github.com/Rokk001/CineRipR/issues"
 
 [project.scripts]
+# Backwards-compatible CLI plus new name
 emby-extractor = "emby_extractor.cli:main"
+cineripr = "cineripr.cli:main"

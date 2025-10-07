@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+.env
+.env.local
+.cache/
+.tests/
+tests/
+**/.DS_Store
+**/Thumbs.db

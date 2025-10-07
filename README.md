@@ -1,8 +1,8 @@
-# Emby Extractor
+# CineRipR
 
-![CI](https://github.com/Rokk001/emby-extractor/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Rokk001/CineRipR/actions/workflows/ci.yml/badge.svg)
 
-Utility for extracting multi-part archives downloaded for Emby (or any media server) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
+Utility for extracting multi-part archives downloaded for media libraries (Emby/Jellyfin/Plex) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
 
 ## Features
 - **Multi-part archive support**: Understands multi-part archives (e.g. `*.part01.rar`, `*.r00`, `*.zip.001`) and processes each set only once.
@@ -22,7 +22,7 @@ Utility for extracting multi-part archives downloaded for Emby (or any media ser
 ```bash
 pip install .
 ```
-This installs the package with the console entry point named `emby-extractor`.
+This installs the package with the console entry points `cineripr` and `emby-extractor` (legacy). Internally, the code remains under the `emby_extractor` namespace for backward compatibility while `cineripr` forwards to it.
 
 For local development without installation, add the `src/` directory to `PYTHONPATH` or use `pip install -e .`.
 
@@ -55,7 +55,7 @@ The CLI allows you to override any of these values at runtime.
 
 ## Usage
 ```bash
-emby-extractor --config C:/path/to/emby_extractor.toml
+cineripr --config C:/path/to/emby_extractor.toml
 ```
 
 Common flags:
@@ -66,7 +66,29 @@ Common flags:
 - `--seven-zip PATH` — point to a custom 7-Zip executable for RAR extraction.
 - `--debug` — enable detailed directory processing logs (off by default).
 
-Use `emby-extractor --help` to list all available options.
+Use `cineripr --help` to list all available options.
+
+## Run in Docker
+
+Build locally:
+```bash
+docker build -t ghcr.io/<user-or-org>/emby-extractor:1.0.0 .
+```
+
+Run with volumes (paths anpassen):
+```bash
+docker run --rm \
+  -v /pfad/zu/downloads:/data/downloads:ro \
+  -v /pfad/zu/extracted:/data/extracted \
+  -v /pfad/zu/finished:/data/finished \
+  -v /pfad/zu/emby_extractor.toml:/config/emby_extractor.toml:ro \
+  ghcr.io/<user-or-org>/cineripr:1.0.0 \
+  --config /config/emby_extractor.toml
+```
+
+Hinweise:
+- In der TOML Container-Pfade verwenden (z. B. `/data/*`).
+- 7-Zip ist vorinstalliert (`/usr/bin/7z`).
 
 ## TV Show Organization
 
