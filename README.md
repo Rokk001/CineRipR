@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/Rokk001/CineRipR/actions/workflows/ci.yml/badge.svg)
 
-Utility for extracting multi-part archives downloaded for media libraries (Emby/Jellyfin/Plex) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
+Utility for extracting multi-part archives downloaded for media libraries (Jellyfin/Plex) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
 
 ## Features
 - **Multi-part archive support**: Understands multi-part archives (e.g. `*.part01.rar`, `*.r00`, `*.zip.001`) and processes each set only once.
