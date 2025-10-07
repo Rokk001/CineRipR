@@ -1,12 +1,12 @@
 # Code Quality & Optimizations
 
-This document describes the code quality improvements and optimizations applied to the Emby Extractor project.
+This document describes code quality practices for the CineRipR project.
 
 ## Code Organization
 
 ### Module Structure
 ```
-src/emby_extractor/
+src/cineripr/
 ├── __init__.py         # Package metadata
 ├── archives.py         # Core archive processing logic
 ├── cleanup.py          # Finished directory cleanup

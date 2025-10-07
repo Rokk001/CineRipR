@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from emby_extractor.config import ConfigurationError, Settings, load_settings
+from cineripr.config import ConfigurationError, Settings, load_settings
 
 
 def write_config(tmp_path: Path, content: str) -> Path:

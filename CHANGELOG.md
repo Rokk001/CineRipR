@@ -37,7 +37,7 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0] - 2025-01-06
 
 ### Added
-- Initial release of Emby Extractor
+- Initial release
 - Multi-part archive extraction support (RAR, ZIP, TAR formats)
 - Smart TV show organization with Season normalization
 - Configurable subfolder policies (Subs, Sample, Other)

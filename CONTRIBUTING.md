@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in improving Emby Extractor!
+Thanks for your interest in improving CineRipR!
 
 ## Development setup
 - Python 3.11+
