@@ -372,21 +372,19 @@ def process_downloads(
                 )
                 announce_tracker.complete(
                     _logger,
-                    f"Processing {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                    f"Processing {total_groups} archive(s) with {total_parts} file(s)...",
                 )
 
-                # Create trackers for actual work
-                read_tracker = ProgressTracker(
-                    total_parts, single_line=True, color=context_color
-                )
-                # For extraction, track by number of archives (not parts)
+                # Tracker for extraction phase
                 extract_tracker = ProgressTracker(
                     total_groups, single_line=True, color=context_color
                 )
 
                 parts_processed = 0
                 extractions_done = 0
-                reading_completed = False  # Track if we've shown 100% reading progress
+
+                # Phase 1: Validate and read all groups first
+                groups_to_extract: list[tuple[int, ArchiveGroup]] = []
 
                 for index, group in enumerate(groups, 1):
                     progress_before = format_progress(index - 1, total_groups)
@@ -399,17 +397,23 @@ def process_downloads(
                         failed.append(group.primary)
                         continue
 
-                    extracted_ok = False
                     if should_extract:
                         if demo_mode:
-                            for idx, member in enumerate(group.members, 1):
+                            # Read all parts silently (no progress updates)
+                            for member in group.members:
                                 parts_processed += 1
-                                read_tracker.advance(
-                                    _logger,
-                                    f"Demo: would read {member.name}",
-                                    absolute=parts_processed,
-                                )
-                            extracted_ok = True
+
+                            # Show completion message only
+                            _logger.info(
+                                "%s Demo: Finished reading %s",
+                                format_progress(
+                                    group.part_count,
+                                    group.part_count,
+                                    color=context_color,
+                                ),
+                                group.primary.name,
+                            )
+                            groups_to_extract.append((index, group))
                         else:
                             can_extract, reason = can_extract_archive(
                                 group.primary, seven_zip_path=seven_zip_path
@@ -424,95 +428,98 @@ def process_downloads(
                                 failed.append(group.primary)
                                 continue
 
+                            # Read all parts silently (no progress updates)
                             for member in group.members:
                                 try:
                                     member.stat()
                                 except OSError:
                                     pass
                                 parts_processed += 1
-                                read_tracker.advance(
-                                    _logger,
-                                    f"Reading {member.name}",
-                                    absolute=parts_processed,
-                                )
 
-                            # Complete read tracker once before first extraction (when all parts read)
-                            if not reading_completed and parts_processed >= total_parts:
-                                read_tracker.complete(
-                                    _logger,
-                                    f"Finished reading {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
-                                )
-                                reading_completed = True
+                            # Show completion message only
+                            _logger.info(
+                                "%s Finished reading %s",
+                                format_progress(
+                                    group.part_count,
+                                    group.part_count,
+                                    color=context_color,
+                                ),
+                                group.primary.name,
+                            )
 
-                            pre_existing_target = target_dir.exists()
-                            try:
-                                # Copy companion files
-                                copy_non_archives_to_extracted(current_dir, target_dir)
-
-                                # Create a progress tracker for this specific extraction (0-100%)
-                                extraction_progress = ProgressTracker(
-                                    100, single_line=True, color=context_color
-                                )
-
-                                # Extract archive with progress tracking
-                                extract_archive(
-                                    group.primary,
-                                    target_dir,
-                                    seven_zip_path=seven_zip_path,
-                                    cpu_cores=cpu_cores,
-                                    progress=extraction_progress,
-                                    logger=_logger,
-                                )
-
-                                # Count extraction as done
-                                extractions_done += 1
-
-                            except (shutil.ReadError, RuntimeError) as exc:
-                                _logger.error(
-                                    "Extract failed for %s: %s", group.primary, exc
-                                )
-                                failed.append(group.primary)
-
-                                if handle_extraction_failure(
-                                    _logger,
-                                    target_dir,
-                                    extracted_targets,
-                                    is_main_context,
-                                    pre_existing=pre_existing_target,
-                                ):
-                                    release_failed = True
-                                    break
-                                continue
-                            except OSError:
-                                _logger.exception(
-                                    "Unexpected error while extracting %s",
-                                    group.primary,
-                                )
-                                failed.append(group.primary)
-
-                                if handle_extraction_failure(
-                                    _logger,
-                                    target_dir,
-                                    extracted_targets,
-                                    is_main_context,
-                                    pre_existing=pre_existing_target,
-                                ):
-                                    release_failed = True
-                                    break
-                                continue
-                            else:
-                                # Flatten if needed
-                                flatten_single_subdir(target_dir)
-                                extracted_ok = True
-                                extracted_targets.append(target_dir)
+                            groups_to_extract.append((index, group))
                     else:
                         # Skip extraction but still count parts as processed
                         parts_processed += group.part_count
-                        read_tracker.advance(
-                            _logger,
-                            f"Skipping extraction for {group.primary.name} (disabled in configuration)",
-                            absolute=parts_processed,
+                        _logger.info(
+                            "Skipping extraction for %s (disabled in configuration)",
+                            group.primary.name,
                         )
+
+                # Phase 2: Extract all groups
+                for index, group in groups_to_extract:
+                    pre_existing_target = target_dir.exists()
+                    extracted_ok = False
+
+                    try:
+                        # Copy companion files
+                        copy_non_archives_to_extracted(current_dir, target_dir)
+
+                        # Create a progress tracker for this specific extraction
+                        extraction_progress = ProgressTracker(
+                            group.part_count, single_line=True, color=context_color
+                        )
+
+                        # Extract archive with progress tracking
+                        extract_archive(
+                            group.primary,
+                            target_dir,
+                            seven_zip_path=seven_zip_path,
+                            cpu_cores=cpu_cores,
+                            progress=extraction_progress,
+                            logger=_logger,
+                            part_count=group.part_count,
+                        )
+
+                        # Count extraction as done
+                        extractions_done += 1
+
+                        # Flatten if needed
+                        flatten_single_subdir(target_dir)
+                        extracted_ok = True
+                        extracted_targets.append(target_dir)
+
+                    except (shutil.ReadError, RuntimeError) as exc:
+                        _logger.error("Extract failed for %s: %s", group.primary, exc)
+                        failed.append(group.primary)
+
+                        if handle_extraction_failure(
+                            _logger,
+                            target_dir,
+                            extracted_targets,
+                            is_main_context,
+                            pre_existing=pre_existing_target,
+                        ):
+                            release_failed = True
+                            break
+                        continue
+                    except OSError:
+                        _logger.exception(
+                            "Unexpected error while extracting %s",
+                            group.primary,
+                        )
+                        failed.append(group.primary)
+
+                        if handle_extraction_failure(
+                            _logger,
+                            target_dir,
+                            extracted_targets,
+                            is_main_context,
+                            pre_existing=pre_existing_target,
+                        ):
+                            release_failed = True
+                            break
+                        continue
 
                     # Collect for later move to finished
                     if extracted_ok:
@@ -521,12 +528,7 @@ def process_downloads(
                         )
                         processed += 1
 
-                # Complete the trackers after all groups are processed (if not already done)
-                if not reading_completed and parts_processed > 0:
-                    read_tracker.complete(
-                        _logger,
-                        f"Processed {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
-                    )
+                # Complete extraction phase
                 if extractions_done > 0:
                     extract_tracker.complete(
                         _logger,

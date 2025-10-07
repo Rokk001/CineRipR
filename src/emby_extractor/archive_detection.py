@@ -17,7 +17,7 @@ from .archive_constants import (
 @dataclass(frozen=True)
 class ArchiveGroup:
     """Represents a collection of files belonging to the same archive.
-    
+
     Attributes:
         key: Unique identifier for this archive group
         primary: Primary/first archive file
@@ -38,7 +38,7 @@ class ArchiveGroup:
 
 def is_supported_archive(entry: Path) -> bool:
     """Check if a file is a supported archive format.
-    
+
     Supports:
     - RAR archives (including multi-part: .rar, .r00, .r01, etc.)
     - ZIP archives (including split: .zip, .z01, .z02, etc.)
@@ -46,7 +46,7 @@ def is_supported_archive(entry: Path) -> bool:
     - Multi-part archives (.part01, .part02, etc.)
     """
     name = entry.name.lower()
-    
+
     # Direct format match
     if name.endswith(".rar"):
         return True
@@ -80,13 +80,13 @@ def is_supported_archive(entry: Path) -> bool:
 
 def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
     """Split directory contents into supported archives and other files.
-    
+
     Returns:
         Tuple of (supported_archives, unsupported_files)
     """
     supported: list[Path] = []
     unsupported: list[Path] = []
-    
+
     for entry in sorted(directory.iterdir(), key=lambda path: path.name.lower()):
         if not entry.is_file():
             continue
@@ -94,13 +94,13 @@ def split_directory_entries(directory: Path) -> tuple[list[Path], list[Path]]:
             supported.append(entry)
         else:
             unsupported.append(entry)
-    
+
     return supported, unsupported
 
 
 def compute_archive_group_key(archive: Path) -> tuple[str, int]:
     """Compute grouping key and order index for an archive file.
-    
+
     Returns:
         Tuple of (group_key, part_index)
         - group_key: Identifier shared by all parts of the same archive
@@ -108,11 +108,7 @@ def compute_archive_group_key(archive: Path) -> tuple[str, int]:
     """
     lower_name = archive.name.lower()
 
-    # Single RAR file
-    if lower_name.endswith(".rar"):
-        return lower_name, -1
-
-    # Multi-part pattern: file.part01.rar
+    # Multi-part pattern: file.part01.rar (CHECK THIS FIRST!)
     part_match = PART_VOLUME_RE.match(lower_name)
     if part_match:
         base = f"{part_match.group('base')}{part_match.group('ext')}"
@@ -133,21 +129,25 @@ def compute_archive_group_key(archive: Path) -> tuple[str, int]:
         part_index = int(split_match.group("index") or 0)
         return base, max(part_index, 0)
 
+    # Single RAR file (only if no other pattern matched)
+    if lower_name.endswith(".rar"):
+        return lower_name, -1
+
     # Unknown pattern - treat as single file
     return lower_name, -1
 
 
 def build_archive_groups(archives: Sequence[Path]) -> list[ArchiveGroup]:
     """Group related archive files together (multi-part archives).
-    
+
     Args:
         archives: List of archive files to group
-        
+
     Returns:
         List of ArchiveGroup objects, one per logical archive
     """
     grouped: dict[str, list[tuple[int, Path]]] = {}
-    
+
     for archive in archives:
         key, order = compute_archive_group_key(archive)
         grouped.setdefault(key, []).append((order, archive))
@@ -159,7 +159,7 @@ def build_archive_groups(archives: Sequence[Path]) -> list[ArchiveGroup]:
         ordered_paths = tuple(path for _order, path in items)
         order_map = {path: order for order, path in items}
         primary = ordered_paths[0]
-        
+
         groups.append(
             ArchiveGroup(
                 key=key,
@@ -176,7 +176,7 @@ def build_archive_groups(archives: Sequence[Path]) -> list[ArchiveGroup]:
 
 def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
     """Validate that an archive group is complete and ready for extraction.
-    
+
     Returns:
         Tuple of (is_valid, error_message)
         - is_valid: True if group can be extracted
@@ -184,12 +184,12 @@ def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
     """
     orders = group.order_map
     positives = sorted(order for order in orders.values() if order >= 0)
-    
+
     if positives:
         # Determine start index (0-based or 1-based)
         start = 0 if 0 in positives else 1 if 1 in positives else positives[0]
         expected = list(range(start, start + len(positives)))
-        
+
         # Check for missing parts
         if positives != expected:
             missing = sorted(set(expected) - set(positives))
@@ -197,12 +197,20 @@ def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
                 return False, "missing volume index(es): " + ", ".join(
                     str(value) for value in missing
                 )
-        
-        # RAR archives need base .rar file
+
+        # Old RAR volume format (.r00, .r01) needs base .rar file
+        # But modern .partXX.rar format does NOT need a base .rar file
         if group.key.endswith(".rar") and not any(
             order < 0 for order in orders.values()
         ):
-            return False, "missing base .rar volume"
+            # Check if this is old-style .rXX volumes (not modern .partXX.rar)
+            # Modern .partXX.rar files contain "part" in the filename
+            is_modern_part_format = any(
+                ".part" in member.name.lower() for member in group.members
+            )
+            # Only require base .rar file for old-style .rXX volumes
+            if not is_modern_part_format:
+                return False, "missing base .rar volume"
 
     # Check primary file exists
     if not group.primary.exists():
@@ -218,4 +226,3 @@ __all__ = [
     "build_archive_groups",
     "validate_archive_group",
 ]
-

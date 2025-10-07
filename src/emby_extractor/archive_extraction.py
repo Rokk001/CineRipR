@@ -7,13 +7,14 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
 
 from .archive_constants import UNWANTED_EXTRACTED_SUFFIXES
-from .progress import ProgressTracker
+from .progress import ProgressTracker, format_progress
 
 
 def detect_archive_format(archive: Path) -> str | None:
@@ -131,6 +132,7 @@ def _extract_with_seven_zip(
     cpu_cores: int = 2,
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
+    part_count: int = 1,
 ) -> None:
     """Extract RAR archive using 7-Zip with progress tracking.
 
@@ -170,12 +172,12 @@ def _extract_with_seven_zip(
         bufsize=1,
     )
 
-    # Parse progress from stdout
+    # Parse progress from stdout and update using ProgressTracker
     if process.stdout is None:
         stdout_lines: list[str] = []
     else:
         stdout_lines = []
-        last_percent: int = -1
+        last_percent = -1
         for line in process.stdout:
             stdout_lines.append(line)
             text = line.strip()
@@ -183,23 +185,30 @@ def _extract_with_seven_zip(
             m = re.search(r"(\d{1,3})%", text)
             if m:
                 percent = max(0, min(100, int(m.group(1))))
-                if percent != last_percent:
+
+                # Update progress tracker when percent changes
+                if (
+                    percent != last_percent
+                    and progress is not None
+                    and logger is not None
+                ):
                     last_percent = percent
-                    # Update progress tracker if available
-                    if progress is not None and logger is not None:
-                        if progress.total > 0:
-                            current = int(round((percent / 100) * progress.total))
-                            progress.advance(
-                                logger,
-                                f"Extracting {archive.name}",
-                                absolute=current,
-                            )
+
+                    # Calculate current part being processed based on percent
+                    # At 99% with 66 parts, we want to show 65/66 (not 64/66)
+                    current_part = max(1, int(round((percent / 100) * part_count)))
+                    # Cap at part_count
+                    current_part = min(current_part, part_count)
+
+                    message = f"Extracting {archive.name}"
+                    progress.advance(logger, message, absolute=current_part)
 
     process.wait()
 
-    # Complete the progress tracker after extraction finishes successfully
+    # Complete the progress tracker
     if process.returncode == 0 and progress is not None and logger is not None:
-        progress.complete(logger, f"Extracted {archive.name}")
+        message = f"Extracting {archive.name}"
+        progress.complete(logger, message)
 
     # Handle extraction failure with temp directory fallback
     if process.returncode != 0:
@@ -269,6 +278,7 @@ def extract_archive(
     cpu_cores: int = 2,
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
+    part_count: int = 1,
 ) -> None:
     """Extract an archive to the target directory.
 
@@ -298,13 +308,14 @@ def extract_archive(
             cpu_cores=cpu_cores,
             progress=progress,
             logger=logger,
+            part_count=part_count,
         )
     else:
         # Use shutil for other formats
         target_dir.mkdir(parents=True, exist_ok=True)
         shutil.unpack_archive(str(archive), str(target_dir))
         if progress is not None and logger is not None:
-            progress.complete(logger, "Finished extracting archive")
+            logger.info("Extracted %s", archive.name)
 
 
 __all__ = [

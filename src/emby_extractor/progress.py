@@ -4,7 +4,35 @@ from __future__ import annotations
 
 import os
 import random
+import shutil
 import sys
+
+# Windows Console API setup
+_WINDOWS_CONSOLE = None
+_CTYPES_AVAILABLE = False
+
+if sys.platform == "win32":
+    try:
+        import ctypes
+
+        _CTYPES_AVAILABLE = True
+
+        kernel32 = ctypes.windll.kernel32
+        # Get stdout handle
+        stdout_handle = kernel32.GetStdHandle(-11)
+        # Enable virtual terminal processing
+        mode = ctypes.c_ulong()
+        kernel32.GetConsoleMode(stdout_handle, ctypes.byref(mode))
+        mode.value |= 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        kernel32.SetConsoleMode(stdout_handle, mode)
+
+        # Store for direct cursor control
+        _WINDOWS_CONSOLE = {
+            "kernel32": kernel32,
+            "handle": stdout_handle,
+        }
+    except Exception:
+        pass  # Silently fail if we can't enable it
 
 _BLUE = "\033[34m"
 _RED = "\033[31m"
@@ -22,6 +50,48 @@ def _supports_color() -> bool:
 
 
 _COLOR_ENABLED = _supports_color()
+
+
+def _get_terminal_width() -> int:
+    """Get the current terminal width, with fallback to 100."""
+    try:
+        size = shutil.get_terminal_size(fallback=(100, 24))
+        return size.columns
+    except Exception:
+        return 100
+
+
+def _truncate_to_fit(text: str, max_width: int | None = None) -> str:
+    """Truncate text to fit terminal width.
+
+    Args:
+        text: Text to truncate
+        max_width: Maximum width (defaults to terminal width)
+
+    Returns:
+        Truncated text with '...' if too long
+    """
+    if max_width is None:
+        max_width = _get_terminal_width()
+
+    # Account for ANSI color codes which don't take visual space
+    # Simple approach: if text contains ANSI codes, be more generous with limit
+    if "\033[" in text:
+        # Add some buffer for color codes (rough estimate)
+        effective_length = len(text) - text.count("\033[") * 8
+    else:
+        effective_length = len(text)
+
+    if effective_length > max_width:
+        # Find where to cut (accounting for '...')
+        cut_at = max_width - 3
+        # Try to cut at a word boundary if possible
+        if cut_at > 20:  # Only if we have reasonable space
+            last_space = text[:cut_at].rfind(" ")
+            if last_space > cut_at - 20:  # Don't cut too early
+                cut_at = last_space
+        return text[:cut_at] + "..."
+    return text
 
 
 def _pick_color(previous: str | None) -> str:
@@ -85,21 +155,24 @@ class ProgressTracker:
             chosen = _pick_color(prev)
             setattr(ProgressTracker, "_last_color", chosen)
             self.color = chosen
-        self._inline = bool(single_line and sys.stdout.isatty())
+        self._inline = bool(single_line)
         self._last_len = 0
 
     def _emit(self, logger, message: str) -> None:
         text = f"{format_progress(self.current, self.total, width=self.width, color=self.color)} {message}"
+
+        # Always truncate to fit terminal width
+        text = _truncate_to_fit(text)
+
         if self._inline:
             try:
-                line = "\r" + text
-                padding = max(0, self._last_len - len(text))
-                if padding:
-                    line += " " * padding
+                # Use ANSI escape codes: \r (carriage return) + \033[K (clear to end of line)
+                # This works on Windows with Virtual Terminal Processing enabled
+                line = "\r\033[K" + text
                 sys.stdout.write(line)
                 sys.stdout.flush()
                 self._last_len = len(text)
-            except OSError:
+            except (OSError, Exception):
                 logger.info(text)
         else:
             logger.info(text)
@@ -119,12 +192,27 @@ class ProgressTracker:
     def complete(self, logger, message: str) -> None:
         self.current = self.total
         self._emit(logger, message)
+        # If we were updating inline, add a newline to move to next line
         if self._inline:
-            try:
-                sys.stdout.write("\n")
-                sys.stdout.flush()
-            except OSError:
-                pass
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
 
-__all__ = ["format_progress", "ProgressTracker", "next_progress_color"]
+__all__ = [
+    "format_progress",
+    "ProgressTracker",
+    "next_progress_color",
+    "truncate_for_terminal",
+]
+
+
+def truncate_for_terminal(text: str) -> str:
+    """Public wrapper for truncating text to terminal width.
+
+    Args:
+        text: Text to truncate
+
+    Returns:
+        Text truncated to fit terminal width
+    """
+    return _truncate_to_fit(text)

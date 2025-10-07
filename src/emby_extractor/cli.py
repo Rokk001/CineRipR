@@ -180,9 +180,7 @@ def _log_path_summary(
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(
-        level=getattr(logging, args.log_level), format="%(levelname)s: %(message)s"
-    )
+    logging.basicConfig(level=getattr(logging, args.log_level), format="%(message)s")
 
     try:
         settings = load_and_merge_settings(args)
