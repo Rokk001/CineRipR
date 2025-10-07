@@ -1,31 +1,26 @@
-# syntax=docker/dockerfile:1
-
-FROM python:3.11-slim AS base
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends p7zip-full \
-    && rm -rf /var/lib/apt/lists/*
-
+# ---- Builder ----
+FROM python:3.11-slim AS builder
+ENV PIP_NO_CACHE_DIR=1
 WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
+RUN python -m pip install --upgrade pip build \
+    && python -m build --wheel --outdir /dist
 
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -e .
-
+# ---- Runtime ----
 FROM python:3.11-slim
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
+# 7-Zip
 RUN apt-get update \
     && apt-get install -y --no-install-recommends p7zip-full \
     && rm -rf /var/lib/apt/lists/*
 
+# Wheels rüberkopieren und installieren
+COPY --from=builder /dist /tmp/dist
+# Shell-Form für Glob-Expansion:
+RUN python -m pip install --no-cache-dir /tmp/dist/*.whl \
+    && rm -rf /tmp/dist
+
 WORKDIR /work
-COPY --from=base /usr/local /usr/local
-
-ENTRYPOINT ["cineripr"]
-
+ENTRYPOINT ["python","-m","cineripr"]
