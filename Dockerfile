@@ -10,17 +10,10 @@ RUN python -m pip install --upgrade pip build \
 # ---- Runtime ----
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-
-# 7-Zip
 RUN apt-get update \
     && apt-get install -y --no-install-recommends p7zip-full \
     && rm -rf /var/lib/apt/lists/*
-
-# Wheels rüberkopieren und installieren
 COPY --from=builder /dist /tmp/dist
-# Shell-Form für Glob-Expansion:
-RUN python -m pip install --no-cache-dir /tmp/dist/*.whl \
-    && rm -rf /tmp/dist
-
+RUN python -m pip install --no-cache-dir /tmp/dist/*.whl && rm -rf /tmp/dist
 WORKDIR /work
-ENTRYPOINT ["python","-m","cineripr"]
+ENTRYPOINT ["python","-m","cineripr.cli"]
