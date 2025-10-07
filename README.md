@@ -1,5 +1,7 @@
 # Emby Extractor
 
+![CI](https://github.com/Rokk001/emby-extractor/actions/workflows/ci.yml/badge.svg)
+
 Utility for extracting multi-part archives downloaded for Emby (or any media server) and keeping the finished folder tidy. The tool scans a download directory, extracts supported archives into a mirrored folder structure, and moves successfully processed source files into a finished archive area where old files can be purged automatically.
 
 ## Features
