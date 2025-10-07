@@ -30,6 +30,8 @@ SUBFOLDER_OTHER = "Sonstige"
 
 # Regular expressions for pattern matching
 TV_TAG_RE = re.compile(r"s\d{2}(?:e\d{2})?", re.IGNORECASE)
+# Some releases contain only episode tags like E01/E001 without an Sxx season tag
+EPISODE_ONLY_TAG_RE = re.compile(r"(?<![a-z])e\d{2,3}(?![a-z])", re.IGNORECASE)
 SEASON_DIR_RE = re.compile(r"^season\s*(\d+)$", re.IGNORECASE)
 # German variant: "Staffel 1", "Staffel 01"
 STAFFEL_DIR_RE = re.compile(r"^staffel\s*(\d+)$", re.IGNORECASE)
@@ -55,6 +57,7 @@ __all__ = [
     "SUBFOLDER_SAMPLE",
     "SUBFOLDER_OTHER",
     "TV_TAG_RE",
+    "EPISODE_ONLY_TAG_RE",
     "SEASON_DIR_RE",
     "SEASON_TAG_RE",
     "SEASON_TAG_ALT_RE",

@@ -30,8 +30,10 @@ from .path_utils import (
     get_category_prefix,
 )
 from .config import Paths, SubfolderPolicy
+from typing import Callable, Optional
 from .cleanup import cleanup_finished  # re-export usage parity
 from .progress import ProgressTracker, format_progress, next_progress_color
+import os
 
 
 _logger = logging.getLogger(__name__)
@@ -87,7 +89,12 @@ def _contains_supported_archives(directory: Path) -> bool:
 
 
 def _iter_release_directories(
-    base_dir: Path, download_root: Path, policy: SubfolderPolicy, *, debug: bool = False
+    base_dir: Path,
+    download_root: Path,
+    policy: SubfolderPolicy,
+    *,
+    debug: bool = False,
+    on_dir: Optional[Callable[[Path], None]] = None,
 ) -> list[tuple[Path, Path, bool]]:
     """Iterate over all contexts (dirs with relative path + extract flag) for a release.
 
@@ -118,6 +125,11 @@ def _iter_release_directories(
         return contexts
 
     for child in children:
+        if on_dir is not None:
+            try:
+                on_dir(child)
+            except Exception:
+                pass
         if not child.is_dir():
             continue
 
@@ -201,7 +213,7 @@ def _iter_release_directories(
                     "DEBUG: Found Season directory: %s, recursing...", child.name
                 )
             child_contexts = _iter_release_directories(
-                child, download_root, policy, debug=debug
+                child, download_root, policy, debug=debug, on_dir=on_dir
             )
             if debug:
                 _logger.info(
@@ -213,7 +225,13 @@ def _iter_release_directories(
             continue
 
         # If this child looks like an episode directory, recursively process it
-        has_tv_tag = TV_TAG_RE.search(child.name) is not None
+        # Episode/TV tag can be Sxx or just Exx/Exxx
+        from .archive_constants import EPISODE_ONLY_TAG_RE
+
+        has_tv_tag = (
+            TV_TAG_RE.search(child.name) is not None
+            or EPISODE_ONLY_TAG_RE.search(child.name) is not None
+        )
         if debug:
             _logger.info(
                 "DEBUG:   TV_TAG match for '%s': %s", child.name[:50], has_tv_tag
@@ -224,7 +242,7 @@ def _iter_release_directories(
                     "DEBUG: Found episode directory: %s, recursing...", child.name
                 )
             child_contexts = _iter_release_directories(
-                child, download_root, policy, debug=debug
+                child, download_root, policy, debug=debug, on_dir=on_dir
             )
             if debug:
                 _logger.info(
@@ -353,9 +371,44 @@ def process_downloads(
             try:
                 if debug:
                     _logger.info("DEBUG: Processing release: %s", release_dir)
-                contexts = _iter_release_directories(
-                    release_dir, download_root, subfolders, debug=debug
+                # Indicate reading start (use a fresh color here; context_color comes later)
+                read_color = next_progress_color()
+                # Start with unknown total; increase dynamically so (k/N) is exact, not guessed
+                dir_read_tracker = ProgressTracker(
+                    1, single_line=True, color=read_color
                 )
+                dir_read_tracker.log(
+                    _logger, f"Reading directories for {release_dir.name}..."
+                )
+                dir_count = 0
+                last_percent = -1
+
+                def _on_dir(_p: Path) -> None:
+                    nonlocal dir_count
+                    nonlocal last_percent
+                    dir_count += 1
+                    # If the estimate was too small, grow the total so (k/N) stays correct
+                    if dir_count > dir_read_tracker.total:
+                        try:
+                            dir_read_tracker.total = dir_count
+                        except Exception:
+                            pass
+                    percent = int((dir_count / dir_read_tracker.total) * 100)
+                    if percent != last_percent or dir_count == dir_read_tracker.total:
+                        last_percent = percent
+                        dir_read_tracker.advance(
+                            _logger,
+                            f"Reading {_p.name}",
+                            absolute=dir_count,
+                        )
+
+                contexts = _iter_release_directories(
+                    release_dir, download_root, subfolders, debug=debug, on_dir=_on_dir
+                )
+                dir_read_tracker.complete(
+                    _logger, f"Found {dir_count} directorie(s) in {release_dir.name}"
+                )
+                # we already displayed incremental single-line progress above
             except Exception as exc:
                 _logger.error(
                     "Failed to enumerate contexts for release %s: %s - skipping",
@@ -375,11 +428,24 @@ def process_downloads(
             context_color = next_progress_color()
             last_episode_name: str | None = None
 
+            # Show progress while building contexts
+            _logger.info(
+                "%s Building contexts for %s",
+                format_progress(0, 1, color=context_color),
+                release_dir.name,
+            )
+
             for context_index, (
                 current_dir,
                 relative_parent,
                 should_extract,
             ) in enumerate(contexts):
+                # Update reading progress to reflect how many contexts have been seen
+                dir_read_tracker.advance(
+                    _logger,
+                    f"Reading {current_dir.name}",
+                    absolute=context_index + 1,
+                )
                 # Last context is always the main release directory
                 is_main_context = context_index == len(contexts) - 1
 
@@ -587,6 +653,12 @@ def process_downloads(
                         # Copy companion files
                         copy_non_archives_to_extracted(current_dir, target_dir)
 
+                        # Snapshot top-level entries before extraction for later flattening
+                        try:
+                            pre_names = {p.name for p in target_dir.iterdir()}
+                        except OSError:
+                            pre_names = set()
+
                         # Create a progress tracker for this specific extraction
                         extraction_progress = ProgressTracker(
                             group.part_count, single_line=True, color=context_color
@@ -609,6 +681,17 @@ def process_downloads(
                         # Flatten if needed
                         flatten_single_subdir(target_dir)
                         extracted_ok = True
+                        # Flatten any newly created episode-named top-level dirs (no-season shows)
+                        try:
+                            from .file_operations import (
+                                flatten_new_top_level_dirs,
+                                flatten_episode_like_dirs,
+                            )
+
+                            flatten_new_top_level_dirs(target_dir, pre_names)
+                            flatten_episode_like_dirs(target_dir)
+                        except Exception:
+                            pass
                         extracted_targets.append(target_dir)
 
                     except (shutil.ReadError, RuntimeError) as exc:

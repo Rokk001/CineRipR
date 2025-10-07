@@ -14,10 +14,10 @@ from .progress import ProgressTracker
 
 def ensure_unique_destination(destination: Path) -> Path:
     """Ensure a file doesn't overwrite existing files by appending a counter.
-    
+
     Args:
         destination: Desired destination path
-        
+
     Returns:
         Unique destination path (original or with _N suffix)
     """
@@ -36,14 +36,14 @@ def ensure_unique_destination(destination: Path) -> Path:
 
 def cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> None:
     """Remove empty extraction directory if it was created by this extraction attempt.
-    
+
     Args:
         target_dir: Directory that was created for extraction
         pre_existing: Whether the directory existed before extraction
     """
     if pre_existing:
         return
-    
+
     try:
         if (
             target_dir.exists()
@@ -66,14 +66,14 @@ def handle_extraction_failure(
     """Handle extraction failure, cleanup if main context failed.
 
     Returns True if the entire release should be marked as failed, False otherwise.
-    
+
     Args:
         logger: Logger for error messages
         target_dir: Directory that failed to extract
         extracted_targets: All directories extracted for this release
         is_main_context: Whether this was the main archive (vs subfolder)
         pre_existing: Whether target_dir existed before extraction
-        
+
     Returns:
         True if entire release should be marked as failed
     """
@@ -95,14 +95,14 @@ def handle_extraction_failure(
 
 def remove_empty_tree(directory: Path, *, stop: Path) -> None:
     """Remove empty directories walking up the tree.
-    
+
     Args:
         directory: Starting directory
         stop: Stop at this directory (don't remove it)
     """
     if not directory.exists():
         return
-    
+
     current = directory
     while current != stop and current.exists():
         try:
@@ -118,9 +118,9 @@ def remove_empty_tree(directory: Path, *, stop: Path) -> None:
 
 def flatten_single_subdir(directory: Path) -> None:
     """If directory contains exactly one subdirectory and no files, move its contents up one level.
-    
+
     This is useful for archives that extract to a nested directory structure.
-    
+
     Args:
         directory: Directory to flatten
     """
@@ -128,16 +128,16 @@ def flatten_single_subdir(directory: Path) -> None:
         entries = [p for p in directory.iterdir()]
     except OSError:
         return
-    
+
     files = [p for p in entries if p.is_file()]
     dirs = [p for p in entries if p.is_dir()]
-    
+
     # Only flatten if there are no files and exactly one subdirectory
     if files:
         return
     if len(dirs) != 1:
         return
-    
+
     only = dirs[0]
     try:
         children = list(only.iterdir())
@@ -149,8 +149,16 @@ def flatten_single_subdir(directory: Path) -> None:
                 if child.is_dir():
                     dest = directory / f"{dest_name}_{counter}"
                 else:
-                    stem, suffix = dest_name.rsplit(".", 1) if "." in dest_name else (dest_name, "")
-                    dest = directory / f"{stem}_{counter}.{suffix}" if suffix else directory / f"{stem}_{counter}"
+                    stem, suffix = (
+                        dest_name.rsplit(".", 1)
+                        if "." in dest_name
+                        else (dest_name, "")
+                    )
+                    dest = (
+                        directory / f"{stem}_{counter}.{suffix}"
+                        if suffix
+                        else directory / f"{stem}_{counter}"
+                    )
                 counter += 1
             shutil.move(str(child), str(dest))
         only.rmdir()
@@ -158,12 +166,136 @@ def flatten_single_subdir(directory: Path) -> None:
         pass
 
 
+def flatten_new_top_level_dirs(target_dir: Path, previous_names: set[str]) -> None:
+    """Flatten any newly created top-level directories in target_dir.
+
+    After extracting an episode archive, many release archives create a
+    subdirectory named like the archive and put the actual media files inside.
+    For single-season/no-season shows, we want files directly under the show
+    folder, not one subfolder per episode. This function compares the
+    pre-extraction top-level entries with the post-extraction ones, and for
+    any newly created directory, moves its contents up one level and removes
+    the now-empty directory.
+    """
+    try:
+        current_names = {p.name for p in target_dir.iterdir()}
+    except OSError:
+        return
+
+    from .archive_constants import EPISODE_ONLY_TAG_RE
+
+    # Prefer newly created directories, but also flatten episode-named folders that may already exist
+    candidates = set()
+    candidates.update(current_names - previous_names)
+    for name in current_names:
+        if EPISODE_ONLY_TAG_RE.search(name):
+            candidates.add(name)
+
+    for name in sorted(candidates):
+        candidate = target_dir / name
+        if not candidate.is_dir():
+            continue
+        # Skip known special folders
+        lower = name.lower()
+        if lower in {"subs", "sub", "sample", "sonstige"}:
+            continue
+        try:
+            # Move all children up one level
+            for child in list(candidate.iterdir()):
+                dest = ensure_unique_destination(target_dir / child.name)
+                try:
+                    shutil.move(str(child), str(dest))
+                except OSError:
+                    pass
+            # Remove the now-empty directory (ignore if not empty)
+            try:
+                candidate.rmdir()
+            except OSError:
+                pass
+        except OSError:
+            continue
+
+
+def _is_video_file(path: Path) -> bool:
+    return path.suffix.lower() in {".mkv", ".mp4", ".avi", ".mov", ".m4v"}
+
+
+def flatten_episode_like_dirs(target_dir: Path) -> None:
+    """Flatten any episode-like directories inside target_dir.
+
+    Heuristic: directory name contains episode tag (E01/E001) OR the directory
+    directly contains at least one video file. Moves files up and removes the
+    directory if it becomes empty.
+    """
+    from .archive_constants import EPISODE_ONLY_TAG_RE
+
+    try:
+        top = list(target_dir.iterdir())
+    except OSError:
+        return
+
+    for candidate in top:
+        if not candidate.is_dir():
+            continue
+        name = candidate.name
+        try:
+            children = list(candidate.iterdir())
+        except OSError:
+            continue
+
+        looks_like_episode = EPISODE_ONLY_TAG_RE.search(name) is not None or any(
+            _is_video_file(c) for c in children if c.is_file()
+        )
+        if not looks_like_episode:
+            continue
+
+        # Move all files from candidate (recursively) to target_dir, but keep well-known special
+        # subfolders like Subs/Sample intact.
+        skip = {"subs", "sub", "sample", "sonstige"}
+
+        def _move_up_recursive(current: Path) -> None:
+            try:
+                for entry in list(current.iterdir()):
+                    if entry.is_dir():
+                        if entry.name.strip().lower() in skip:
+                            continue
+                        _move_up_recursive(entry)
+                        # Try to remove if empty after recursion
+                        try:
+                            next(entry.iterdir())
+                        except StopIteration:
+                            try:
+                                entry.rmdir()
+                            except OSError:
+                                pass
+                        continue
+                    # File: move to top-level
+                    dest = ensure_unique_destination(target_dir / entry.name)
+                    try:
+                        shutil.move(str(entry), str(dest))
+                    except OSError:
+                        pass
+            except OSError:
+                return
+
+        _move_up_recursive(candidate)
+
+        # Attempt to remove top candidate dir if empty
+        try:
+            next(candidate.iterdir())
+        except StopIteration:
+            try:
+                candidate.rmdir()
+            except OSError:
+                pass
+
+
 def copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
     """Copy non-archive companion files (e.g. .nfo, .srt) from source to extracted.
 
     Source files remain in place and will be moved to finished later if extraction succeeds.
     Files are overwritten if they already exist.
-    
+
     Args:
         current_dir: Source directory
         target_dir: Target directory for copied files
@@ -194,28 +326,28 @@ def move_archive_group(
     logger: logging.Logger | None = None,
 ) -> list[Path]:
     """Move a group of archive files to the finished directory.
-    
+
     Args:
         files: Archive files to move
         finished_root: Root of finished directory
         relative_parent: Relative path within finished directory
         tracker: Optional progress tracker
         logger: Optional logger for progress updates
-        
+
     Returns:
         List of moved file paths
     """
     destination_dir = finished_root / relative_parent
     destination_dir.mkdir(parents=True, exist_ok=True)
     moved: list[Path] = []
-    
+
     for index, src in enumerate(files, 1):
         destination = ensure_unique_destination(destination_dir / src.name)
         moved_path = Path(shutil.move(str(src), str(destination)))
         moved.append(moved_path)
         if tracker is not None and logger is not None:
             tracker.advance(logger, f"Moved {src.name}", absolute=index)
-    
+
     return moved
 
 
@@ -226,10 +358,10 @@ def move_remaining_to_finished(
     download_root: Path,
 ) -> None:
     """Move all remaining files (any type) under current_dir to finished.
-    
+
     This is independent of extraction policy. The destination mirrors the
     original download structure beneath finished_root.
-    
+
     Args:
         current_dir: Source directory
         finished_root: Root of finished directory
@@ -265,6 +397,3 @@ __all__ = [
     "move_archive_group",
     "move_remaining_to_finished",
 ]
-
-
-

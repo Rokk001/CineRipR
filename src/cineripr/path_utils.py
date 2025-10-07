@@ -9,6 +9,7 @@ from .archive_constants import (
     TV_CATEGORY,
     MOVIES_CATEGORY,
     TV_TAG_RE,
+    EPISODE_ONLY_TAG_RE,
     SEASON_DIR_RE,
     STAFFEL_DIR_RE,
     SEASON_TAG_RE,
@@ -77,7 +78,7 @@ def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -
         return base_prefix / rel_path
 
     # Extract show name and season from the first directory part
-    # This should be the season pack directory like "12.Monkeys.S01.German..."
+    # This could be a season pack (Sxx) or an episode-only pack (Exx)
     first_part = parts[0]
 
     # Try to extract season number from the directory name
@@ -97,6 +98,16 @@ def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -
         # Flatten: extract directly to Season folder
         # TV-Shows/ShowName/Season XX/
         return base_prefix / show_name / season_normalized
+
+    # No explicit season info found. If the name contains only episode tags,
+    # treat it as a single-season show and extract directly under the show name
+    # (no Season subfolder).
+    if EPISODE_ONLY_TAG_RE.search(first_part):
+        show_name = EPISODE_ONLY_TAG_RE.sub("", first_part)
+        show_name = show_name.replace(".", " ").strip().strip("-")
+        if not show_name:
+            show_name = first_part.replace(".", " ").strip()
+        return base_prefix / show_name
 
     # No season info found, return as-is
     return base_prefix / rel_path
@@ -141,16 +152,20 @@ def looks_like_tv_show(root: Path) -> bool:
     """
     if is_season_directory(root):
         return True
-    if TV_TAG_RE.search(root.name):
+    if TV_TAG_RE.search(root.name) or EPISODE_ONLY_TAG_RE.search(root.name):
         return True
 
     try:
         for child in root.iterdir():
             if child.is_dir() and (
-                is_season_directory(child) or TV_TAG_RE.search(child.name)
+                is_season_directory(child)
+                or TV_TAG_RE.search(child.name)
+                or EPISODE_ONLY_TAG_RE.search(child.name)
             ):
                 return True
-            if child.is_file() and TV_TAG_RE.search(child.name):
+            if child.is_file() and (
+                TV_TAG_RE.search(child.name) or EPISODE_ONLY_TAG_RE.search(child.name)
+            ):
                 return True
     except OSError:
         pass
