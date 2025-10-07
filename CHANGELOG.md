@@ -99,3 +99,18 @@ All notable changes to this project will be documented in this file.
 - Clear separation of concerns
 - Improved testability with focused module boundaries
 
+## [1.0.5] - 2025-10-07
+
+### Added
+- Tree-style progress formatting with visual hierarchy (├─, └──) and consistent indentation.
+- Recursive TV-show detection (depth-limited) including short season folders like `S03`.
+
+### Changed
+- Reading/Processing/Extracting lines aligned to clear parent/child levels.
+
+### Fixed
+- TV shows without explicit season folders: reliably flatten episode folders; move files to series root.
+- Episode folders created by archives are flattened even when media is nested in subfolders.
+- Treat TV-tagged directories as episodes even if files/archives are one level deeper.
+- Include file-only episode directories in contexts.
+
