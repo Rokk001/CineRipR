@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 ## [1.0.1] - 2025-10-07
 ## [1.0.2] - 2025-10-07
 ## [1.0.3] - 2025-10-07
+## [1.0.4] - 2025-10-07
+
+### Added
+- Recognize German season folders "Staffel XX" in addition to "Season XX".
+
+### Fixed
+- Robust iteration across releases after failures; improved debug logs.
+- Repeat mode CLI overrides (`--repeat-forever`, `--repeat-after-minutes`).
+
 
 ### Fixed
 - Progress color now changes only between episodes/movies, not for subfolders like `Subs`.
