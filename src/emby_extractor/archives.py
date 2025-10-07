@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import shutil
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -387,6 +386,7 @@ def process_downloads(
 
                 parts_processed = 0
                 extractions_done = 0
+                reading_completed = False  # Track if we've shown 100% reading progress
 
                 for index, group in enumerate(groups, 1):
                     progress_before = format_progress(index - 1, total_groups)
@@ -436,13 +436,13 @@ def process_downloads(
                                     absolute=parts_processed,
                                 )
 
-                            # Force a newline after reading to allow extraction progress to start on new line
-                            if read_tracker._inline:
-                                try:
-                                    sys.stdout.write("\n")
-                                    sys.stdout.flush()
-                                except OSError:
-                                    pass
+                            # Complete read tracker once before first extraction (when all parts read)
+                            if not reading_completed and parts_processed >= total_parts:
+                                read_tracker.complete(
+                                    _logger,
+                                    f"Finished reading {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                                )
+                                reading_completed = True
 
                             pre_existing_target = target_dir.exists()
                             try:
@@ -452,10 +452,6 @@ def process_downloads(
                                 # Create a progress tracker for this specific extraction (0-100%)
                                 extraction_progress = ProgressTracker(
                                     100, single_line=True, color=context_color
-                                )
-                                extraction_progress.log(
-                                    _logger,
-                                    f"Extracting {group.primary.name}",
                                 )
 
                                 # Extract archive with progress tracking
@@ -525,11 +521,12 @@ def process_downloads(
                         )
                         processed += 1
 
-                # Complete the trackers after all groups are processed
-                read_tracker.complete(
-                    _logger,
-                    f"Processed {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
-                )
+                # Complete the trackers after all groups are processed (if not already done)
+                if not reading_completed and parts_processed > 0:
+                    read_tracker.complete(
+                        _logger,
+                        f"Processed {total_groups} archive(s) with {total_parts} file(s) for {current_dir.name}",
+                    )
                 if extractions_done > 0:
                     extract_tracker.complete(
                         _logger,
