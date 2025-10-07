@@ -13,8 +13,6 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = []
-
-[project]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
