@@ -26,6 +26,11 @@ enable_delete = false
 # Useful for testing configuration without making changes.
 demo_mode = false
 
+# Endless repeat mode
+repeat_forever = false
+# Sleep minutes before repeating when repeat_forever = true
+repeat_after_minutes = 0
+
 [subfolders]
 # Controls which subdirectories within releases are processed.
 # Subdirectories with archives are always processed regardless of these settings.

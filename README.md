@@ -41,6 +41,8 @@ finished_root = "C:/Media/Finished"
 finished_retention_days = 15
 enable_delete = false
 demo_mode = false
+repeat_forever = false
+repeat_after_minutes = 0
 
 [subfolders]
 include_sample = false

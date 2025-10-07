@@ -82,6 +82,9 @@ class Settings:
     demo_mode: bool = False
     subfolders: SubfolderPolicy = SubfolderPolicy()
     seven_zip_path: Path | None = None
+    # New: endless repeat options
+    repeat_forever: bool = False
+    repeat_after_minutes: int = 0
 
     @classmethod
     def from_mapping(
@@ -144,6 +147,8 @@ class Settings:
         )
         enable_delete = _read_bool(options, "enable_delete", default=False)
         demo_mode = _read_bool(options, "demo_mode", default=False)
+        repeat_forever = _read_bool(options, "repeat_forever", default=False)
+        repeat_after_minutes = _read_int(options, "repeat_after_minutes", default=0, minimum=0)
 
         subfolders_data = data.get("subfolders")
         if subfolders_data is None:
@@ -185,6 +190,8 @@ class Settings:
             demo_mode=demo_mode,
             subfolders=subfolder_policy,
             seven_zip_path=seven_zip_path,
+            repeat_forever=repeat_forever,
+            repeat_after_minutes=repeat_after_minutes,
         )
 
 

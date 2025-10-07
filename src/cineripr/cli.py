@@ -210,48 +210,77 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif not settings.enable_delete:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
-    try:
-        result: ProcessResult = process_downloads(
-            settings.paths,
-            demo_mode=settings.demo_mode,
-            seven_zip_path=settings.seven_zip_path,
-            subfolders=settings.subfolders,
-            debug=args.debug,
-        )
-    except RuntimeError as exc:
-        _LOGGER.error("Processing error: %s", exc)
-        return 1
+    def run_once() -> tuple[int, ProcessResult | None]:
+        try:
+            result: ProcessResult = process_downloads(
+                settings.paths,
+                demo_mode=settings.demo_mode,
+                seven_zip_path=settings.seven_zip_path,
+                subfolders=settings.subfolders,
+                debug=args.debug,
+            )
+            return 0, result
+        except RuntimeError as exc:
+            _LOGGER.error("Processing error: %s", exc)
+            return 1, None
 
-    if settings.enable_delete or settings.demo_mode:
-        deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
-            settings.paths.finished_root,
-            settings.retention_days,
-            enable_delete=settings.enable_delete,
-            demo_mode=settings.demo_mode,
-        )
-    else:
-        _LOGGER.info(
-            "Delete disabled and demo mode off: skipping finished cleanup scan."
-        )
-        deleted = []
-        cleanup_failed = []
-        skipped_cleanup = []
+    exit_code = 0
+    while True:
+        code, result = run_once()
+        exit_code = max(exit_code, code)
 
-    _LOGGER.info("Processed archives: %s", result.processed)
-    if settings.demo_mode:
-        _LOGGER.info("Demo mode: all actions were simulated only.")
+        deleted: list[Path]
+        cleanup_failed: list[Path]
+        skipped_cleanup: list[Path]
 
-    _log_path_summary(_LOGGER.error, "Failed archives", result.failed)
-    _log_path_summary(_LOGGER.warning, "Unsupported files", result.unsupported)
-    _log_path_summary(_LOGGER.info, "Deleted finished files", deleted)
-    _log_path_summary(_LOGGER.info, "Skipped finished files", skipped_cleanup)
-    _log_path_summary(
-        _LOGGER.error, "Failed to clean finished directory", cleanup_failed
-    )
+        if result is not None:
+            if settings.enable_delete or settings.demo_mode:
+                deleted, cleanup_failed, skipped_cleanup = cleanup_finished(
+                    settings.paths.finished_root,
+                    settings.retention_days,
+                    enable_delete=settings.enable_delete,
+                    demo_mode=settings.demo_mode,
+                )
+            else:
+                _LOGGER.info(
+                    "Delete disabled and demo mode off: skipping finished cleanup scan."
+                )
+                deleted = []
+                cleanup_failed = []
+                skipped_cleanup = []
 
-    if result.failed or cleanup_failed:
-        return 2
-    return 0
+            _LOGGER.info("Processed archives: %s", result.processed)
+            if settings.demo_mode:
+                _LOGGER.info("Demo mode: all actions were simulated only.")
+
+            _log_path_summary(_LOGGER.error, "Failed archives", result.failed)
+            _log_path_summary(_LOGGER.warning, "Unsupported files", result.unsupported)
+            _log_path_summary(_LOGGER.info, "Deleted finished files", deleted)
+            _log_path_summary(_LOGGER.info, "Skipped finished files", skipped_cleanup)
+            _log_path_summary(
+                _LOGGER.error, "Failed to clean finished directory", cleanup_failed
+            )
+
+            if result.failed or cleanup_failed:
+                exit_code = max(exit_code, 2)
+
+        if not settings.repeat_forever:
+            break
+
+        # sleep before next iteration
+        delay = max(0, int(settings.repeat_after_minutes))
+        if delay <= 0:
+            continue
+        try:
+            import time
+
+            _LOGGER.info("Sleeping for %s minute(s) before next run...", delay)
+            time.sleep(delay * 60)
+        except KeyboardInterrupt:
+            _LOGGER.info("Interrupted during sleep; exiting.")
+            break
+
+    return exit_code
 
 
 if __name__ == "__main__":  # pragma: no cover
