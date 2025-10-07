@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 ## [1.0.0] - 2025-10-07
+## [1.0.1] - 2025-10-07
+
+### Changed
+- Project/Distribution rebranded to CineRipR; added new `cineripr` CLI (legacy `emby-extractor` retained)
+- Docker support added (Dockerfile, .dockerignore)
+- GHCR workflow to build/push images on tags
+- README updated with Docker usage and new name
+
 
 ### Breaking/Stable
 - First stable release with robust movie and TV-show extraction flows
