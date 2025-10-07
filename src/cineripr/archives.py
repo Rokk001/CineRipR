@@ -154,21 +154,26 @@ def _iter_release_directories(
             )
 
         # Determine if we should extract this child dir
+        # Respect explicit subfolder policy strictly for well-known folders.
         if normalized == "Sample":
-            should_extract = (
-                policy.include_sample or contains_archives or contains_any_files
-            )
+            should_extract = policy.include_sample
         elif normalized == "Subs":
-            should_extract = (
-                policy.include_sub or contains_archives or contains_any_files
-            )
+            should_extract = policy.include_sub
         elif normalized == "Sonstige":
-            should_extract = (
-                policy.include_other or contains_archives or contains_any_files
-            )
+            should_extract = policy.include_other
         else:
-            # For episode directories inside Season folders, extract even if they only contain files
-            if is_season_directory(base_dir) and (
+            # For episode directories inside Season folders, extract even if they only contain files.
+            # Also treat children under a TV-tagged parent (e.g., The.Show.S02...) as episodes.
+            from .archive_constants import (
+                TV_TAG_RE as _TV_RE,
+                EPISODE_ONLY_TAG_RE as _E_RE,
+            )
+
+            parent_has_tv_tag = (
+                _TV_RE.search(base_dir.name) is not None
+                or _E_RE.search(base_dir.name) is not None
+            )
+            if (is_season_directory(base_dir) or parent_has_tv_tag) and (
                 contains_archives or contains_any_files
             ):
                 should_extract = True

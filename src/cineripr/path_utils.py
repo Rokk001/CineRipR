@@ -81,39 +81,41 @@ def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -
     if not parts:
         return base_prefix / rel_path
 
-    # Extract show name and season from the first directory part
-    # This could be a season pack (Sxx) or an episode-only pack (Exx)
-    first_part = parts[0]
+    # Find the first path segment that carries a season tag (e.g., Show.S02...)
+    tagged_part: str | None = None
+    for segment in parts:
+        if SEASON_TAG_RE.search(segment) or SEASON_TAG_ALT_RE.search(segment):
+            tagged_part = segment
+            break
 
-    # Try to extract season number from the directory name
-    season_match = SEASON_TAG_RE.search(first_part)
-    if not season_match:
-        # Try without dot prefix
-        season_match = SEASON_TAG_ALT_RE.search(first_part)
+    if tagged_part is not None:
+        season_match = SEASON_TAG_RE.search(tagged_part) or SEASON_TAG_ALT_RE.search(
+            tagged_part
+        )
+        if season_match:
+            season_num = int(season_match.group(1))
+            season_normalized = f"Season {season_num:02d}"
 
-    if season_match:
-        season_num = int(season_match.group(1))
-        season_normalized = f"Season {season_num:02d}"
+            # Extract show name from the tagged segment by stripping everything from .Sxx
+            show_name = re.sub(r"\.S\d+.*", "", tagged_part, flags=re.IGNORECASE)
+            show_name = show_name.replace(".", " ").strip()
+            if not show_name and parts:
+                # Fallback to the first component if we somehow stripped everything
+                show_name = parts[0].replace(".", " ").strip()
 
-        # Extract show name (everything before .SXX)
-        show_name = re.sub(r"\.S\d+.*", "", first_part, flags=re.IGNORECASE)
-        show_name = show_name.replace(".", " ").strip()
+            return base_prefix / show_name / season_normalized
 
-        # Flatten: extract directly to Season folder
-        # TV-Shows/ShowName/Season XX/
-        return base_prefix / show_name / season_normalized
+    # If no season tag anywhere, but an episode-only tag exists in any segment,
+    # treat it as a no-season show and place files directly under the show name.
+    for segment in parts:
+        if EPISODE_ONLY_TAG_RE.search(segment):
+            show_name = EPISODE_ONLY_TAG_RE.sub("", segment)
+            show_name = show_name.replace(".", " ").strip().strip("-")
+            if not show_name:
+                show_name = parts[0].replace(".", " ").strip()
+            return base_prefix / show_name
 
-    # No explicit season info found. If the name contains only episode tags,
-    # treat it as a single-season show and extract directly under the show name
-    # (no Season subfolder).
-    if EPISODE_ONLY_TAG_RE.search(first_part):
-        show_name = EPISODE_ONLY_TAG_RE.sub("", first_part)
-        show_name = show_name.replace(".", " ").strip().strip("-")
-        if not show_name:
-            show_name = first_part.replace(".", " ").strip()
-        return base_prefix / show_name
-
-    # No season info found, return as-is
+    # No season/episode information found; mirror relative path
     return base_prefix / rel_path
 
 
