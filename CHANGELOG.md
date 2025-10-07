@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0] - 2025-10-07
 ## [1.0.1] - 2025-10-07
 ## [1.0.2] - 2025-10-07
+## [1.0.3] - 2025-10-07
+
+### Fixed
+- Progress color now changes only between episodes/movies, not for subfolders like `Subs`.
+
+### CI
+- Docker workflow hardened with docker/metadata-action and fixed YAML.
+
 
 ### Added
 - Endless repeat mode via options: `repeat_forever` and `repeat_after_minutes`
