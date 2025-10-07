@@ -190,11 +190,17 @@ def _iter_release_directories(
         # If this child is a Season directory, recursively process its episode directories
         if is_season_directory(child):
             if debug:
-                _logger.info("DEBUG: Found Season directory: %s, recursing...", child.name)
-            child_contexts = _iter_release_directories(child, download_root, policy, debug=debug)
+                _logger.info(
+                    "DEBUG: Found Season directory: %s, recursing...", child.name
+                )
+            child_contexts = _iter_release_directories(
+                child, download_root, policy, debug=debug
+            )
             if debug:
                 _logger.info(
-                    "DEBUG: Season %s returned %d contexts", child.name, len(child_contexts)
+                    "DEBUG: Season %s returned %d contexts",
+                    child.name,
+                    len(child_contexts),
                 )
             contexts.extend(child_contexts)
             continue
@@ -202,11 +208,17 @@ def _iter_release_directories(
         # If this child looks like an episode directory, recursively process it
         has_tv_tag = TV_TAG_RE.search(child.name) is not None
         if debug:
-            _logger.info("DEBUG:   TV_TAG match for '%s': %s", child.name[:50], has_tv_tag)
+            _logger.info(
+                "DEBUG:   TV_TAG match for '%s': %s", child.name[:50], has_tv_tag
+            )
         if has_tv_tag and (contains_archives or contains_any_files):
             if debug:
-                _logger.info("DEBUG: Found episode directory: %s, recursing...", child.name)
-            child_contexts = _iter_release_directories(child, download_root, policy, debug=debug)
+                _logger.info(
+                    "DEBUG: Found episode directory: %s, recursing...", child.name
+                )
+            child_contexts = _iter_release_directories(
+                child, download_root, policy, debug=debug
+            )
             if debug:
                 _logger.info(
                     "DEBUG: Episode %s returned %d contexts",
@@ -226,7 +238,9 @@ def _iter_release_directories(
                 child_rel = base_prefix / child.relative_to(download_root)
             contexts.append((child, child_rel, should_extract))
             if debug:
-                _logger.info("DEBUG:   Added to contexts: %s -> %s", child.name, child_rel)
+                _logger.info(
+                    "DEBUG:   Added to contexts: %s -> %s", child.name, child_rel
+                )
 
     # Add the main release directory last, but only if it contains archives
     if _contains_supported_archives(base_dir):
@@ -237,7 +251,9 @@ def _iter_release_directories(
         contexts.append((base_dir, main_rel, True))
 
     if debug:
-        _logger.info("DEBUG: Returning %d contexts for %s", len(contexts), base_dir.name)
+        _logger.info(
+            "DEBUG: Returning %d contexts for %s", len(contexts), base_dir.name
+        )
     return contexts
 
 
@@ -353,8 +369,14 @@ def process_downloads(
 
                 # Change color only when we encounter a new episode/film
                 episode_name = episode_dir.name
-                if context_index > 0 and episode_name != last_episode_name:
-                    context_color = next_progress_color()
+                if episode_name != last_episode_name:
+                    # Only advance color if this is an actual episode/film boundary.
+                    # Keep same color for subfolders like Subs/Sample/Sonstige.
+                    context_color = (
+                        next_progress_color()
+                        if last_episode_name is not None
+                        else context_color
+                    )
 
                 # Remember the episode name for next iteration
                 last_episode_name = episode_name
@@ -597,9 +619,9 @@ def process_downloads(
                         _logger,
                         f"Extracted {extractions_done} archive(s) for {current_dir.name}",
                     )
-                    # Prepare a fresh color for the next film/episode context
-                    # so that subsequent progress bars switch color at boundaries
-                    context_color = next_progress_color()
+                    # Do NOT change color here; for TV shows, color should remain
+                    # stable across subfolders (e.g., Subs) and only change when
+                    # the episode directory actually changes.
 
                 # Break if release failed
                 if release_failed:
@@ -732,5 +754,3 @@ __all__ = [
     "SUPPORTED_ARCHIVE_SUFFIXES",
     "process_downloads",
 ]
-
-
