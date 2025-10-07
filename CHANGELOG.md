@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Project rebranded to CineRipR; primary CLI is now `cineripr`
-- Full namespace migration to `cineripr` (no legacy `emby_extractor` remains)
+- Full namespace migration to `cineripr` (legacy name removed)
 - Docker support added (Dockerfile, .dockerignore)
 - GHCR workflow to build/push images on tags
 - README updated with Docker usage and new name

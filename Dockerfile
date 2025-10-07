@@ -14,7 +14,7 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
 RUN pip install --upgrade pip \
- && pip install -e .
+    && pip install -e .
 
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \

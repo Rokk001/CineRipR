@@ -45,3 +45,4 @@ include_other = false
 # On Linux/Mac, usually just "7z" if installed via package manager.
 seven_zip = "C:/Program Files/7-Zip/7z.exe"
 
+
