@@ -96,26 +96,26 @@ Hinweise:
 
 The tool automatically detects TV shows and organizes them with normalized season folders:
 
-**Input structure:**
+**Input structure (example):**
 ```
 Download/
-  12.Monkeys.S01.German.DL.1080p.BluRay.x264-LIM/
-    12.Monkeys.S01E01.German.DL.1080p.BluRay.x264-LIM/
-      lim-12monkeys-s01e01-1080p.rar
+  Show.Name.S01.Language.Group/
+    Show.Name.S01E01.Language.Group/
+      episode-archive.part01.rar
       Subs/
-        lim-12monkeys-s01e01-1080p-subs.rar
+        episode-subs.rar
 ```
 
 **Output structure:**
 ```
 Extracted/
   TV-Shows/
-    12 Monkeys/
+    Show Name/
       Season 01/
-        12.Monkeys.S01E01.German.DL.1080p.BluRay.x264-LIM.mkv
+        Show.Name.S01E01.Language.Group.mkv
         Subs/
-          German.srt
-          English.srt
+          Language1.srt
+          Language2.srt
 ```
 
 The tool:
