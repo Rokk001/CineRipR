@@ -86,6 +86,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Set the root log level",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable detailed debug output for directory processing",
+    )
+    parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
     return parser.parse_args(argv)
@@ -213,6 +218,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             demo_mode=settings.demo_mode,
             seven_zip_path=settings.seven_zip_path,
             subfolders=settings.subfolders,
+            debug=args.debug,
         )
     except RuntimeError as exc:
         _LOGGER.error("Processing error: %s", exc)

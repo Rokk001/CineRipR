@@ -86,7 +86,7 @@ def _contains_supported_archives(directory: Path) -> bool:
 
 
 def _iter_release_directories(
-    base_dir: Path, download_root: Path, policy: SubfolderPolicy
+    base_dir: Path, download_root: Path, policy: SubfolderPolicy, *, debug: bool = False
 ) -> list[tuple[Path, Path, bool]]:
     """Iterate over all contexts (dirs with relative path + extract flag) for a release.
 
@@ -97,10 +97,13 @@ def _iter_release_directories(
         base_dir: Release root directory
         download_root: Download root path
         policy: Subfolder extraction policy
+        debug: If True, output detailed debug information
 
     Returns:
         List of tuples (source_dir, target_relative_path, should_extract)
     """
+    if debug:
+        _logger.info("DEBUG: Processing directory: %s", base_dir)
     contexts: list[tuple[Path, Path, bool]] = []
 
     base_prefix = get_category_prefix(base_dir)
@@ -121,6 +124,15 @@ def _iter_release_directories(
         except OSError:
             contains_any_files = False
 
+        if debug:
+            _logger.info(
+                "DEBUG:   Child: %s, archives=%s, files=%s, normalized=%s",
+                child.name[:50],
+                contains_archives,
+                contains_any_files,
+                normalized,
+            )
+
         # Determine if we should extract this child dir
         if normalized == "Sample":
             should_extract = policy.include_sample or contains_archives
@@ -129,11 +141,20 @@ def _iter_release_directories(
         elif normalized == "Sonstige":
             should_extract = policy.include_other or contains_archives
         else:
-            # For non-normalized subdirs, only extract if include_other is enabled
-            should_extract = policy.include_other
+            # For episode directories inside Season folders, always extract if they have archives
+            if is_season_directory(base_dir) and contains_archives:
+                should_extract = True
+            else:
+                # For other non-normalized subdirs, only extract if include_other is enabled
+                should_extract = policy.include_other
 
         # Series flattening: if this looks like Season/.../<episode_dir>, extract into Season folder
         if is_season_directory(base_dir) and (contains_archives or contains_any_files):
+            if debug:
+                _logger.info(
+                    "DEBUG:   In Season flattening branch, should_extract=%s",
+                    should_extract,
+                )
             if should_extract:
                 if looks_like_tv_show(base_dir):
                     season_rel = build_tv_show_path(
@@ -142,6 +163,14 @@ def _iter_release_directories(
                 else:
                     season_rel = base_prefix / base_dir.relative_to(download_root)
                 contexts.append((child, season_rel, should_extract))
+                if debug:
+                    _logger.info("DEBUG:   Added episode to contexts: %s", child.name)
+            else:
+                if debug:
+                    _logger.info(
+                        "DEBUG:   Skipped episode (should_extract=False): %s",
+                        child.name,
+                    )
             continue
 
         # For normalized special subdirs, map to normalized name
@@ -157,19 +186,60 @@ def _iter_release_directories(
                 contexts.append((child, rel, should_extract))
             continue
 
+        # If this child is a Season directory, recursively process its episode directories
+        if is_season_directory(child):
+            if debug:
+                _logger.info(
+                    "DEBUG: Found Season directory: %s, recursing...", child.name
+                )
+            child_contexts = _iter_release_directories(
+                child, download_root, policy, debug=debug
+            )
+            if debug:
+                _logger.info(
+                    "DEBUG: Season %s returned %d contexts",
+                    child.name,
+                    len(child_contexts),
+                )
+            contexts.extend(child_contexts)
+            continue
+
         # If this child looks like an episode directory, recursively process it
-        if TV_TAG_RE.search(child.name) and (contains_archives or contains_any_files):
-            child_contexts = _iter_release_directories(child, download_root, policy)
+        has_tv_tag = TV_TAG_RE.search(child.name) is not None
+        if debug:
+            _logger.info(
+                "DEBUG:   TV_TAG match for '%s': %s", child.name[:50], has_tv_tag
+            )
+        if has_tv_tag and (contains_archives or contains_any_files):
+            if debug:
+                _logger.info(
+                    "DEBUG: Found episode directory: %s, recursing...", child.name
+                )
+            child_contexts = _iter_release_directories(
+                child, download_root, policy, debug=debug
+            )
+            if debug:
+                _logger.info(
+                    "DEBUG: Episode %s returned %d contexts",
+                    child.name,
+                    len(child_contexts),
+                )
             contexts.extend(child_contexts)
             continue
 
         # Default: mirror structure
+        if debug:
+            _logger.info("DEBUG:   Default branch: should_extract=%s", should_extract)
         if should_extract:
             if looks_like_tv_show(base_dir):
                 child_rel = build_tv_show_path(child, download_root, base_prefix)
             else:
                 child_rel = base_prefix / child.relative_to(download_root)
             contexts.append((child, child_rel, should_extract))
+            if debug:
+                _logger.info(
+                    "DEBUG:   Added to contexts: %s -> %s", child.name, child_rel
+                )
 
     # Add the main release directory last, but only if it contains archives
     if _contains_supported_archives(base_dir):
@@ -179,6 +249,10 @@ def _iter_release_directories(
             main_rel = base_prefix / base_dir.relative_to(download_root)
         contexts.append((base_dir, main_rel, True))
 
+    if debug:
+        _logger.info(
+            "DEBUG: Returning %d contexts for %s", len(contexts), base_dir.name
+        )
     return contexts
 
 
@@ -226,6 +300,7 @@ def process_downloads(
     seven_zip_path: Path | None,
     subfolders: SubfolderPolicy,
     cpu_cores: int = 2,
+    debug: bool = False,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -241,6 +316,7 @@ def process_downloads(
         seven_zip_path: Path to 7-Zip executable (for RAR files)
         subfolders: Policy for which subfolders to process
         cpu_cores: Number of CPU cores to use for extraction (default: 2)
+        debug: If True, output detailed debug information (default: False)
 
     Returns:
         ProcessResult with counts and failed archives
@@ -256,7 +332,9 @@ def process_downloads(
 
     for download_root in paths.download_roots:
         for release_dir in iter_download_subdirs(download_root):
-            contexts = _iter_release_directories(release_dir, download_root, subfolders)
+            contexts = _iter_release_directories(
+                release_dir, download_root, subfolders, debug=debug
+            )
 
             # Track all extracted targets and archive groups for this release
             extracted_targets: list[Path] = []
