@@ -29,6 +29,6 @@ jobs:
                   context: .
                   push: true
                   platforms: linux/amd64
-          tags: |
-            ghcr.io/${{ github.repository }}/cineripr:latest
-            ghcr.io/${{ github.repository }}/cineripr:${{ github.ref_name }}
+                  tags: |
+                      ghcr.io/${{ github.repository }}/cineripr:latest
+                      ghcr.io/${{ github.repository }}/cineripr:${{ github.ref_name }}
