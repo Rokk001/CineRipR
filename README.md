@@ -124,6 +124,32 @@ The tool:
 - Flattens episode directories - content is extracted directly into the season folder
 - Preserves subfolder structure (Subs, Sample) according to your policy settings
 
+## Movie Organization
+
+The tool organizes movies into a normalized structure as well.
+
+**Input structure (example):**
+```
+Download/
+  Movie.Title.Year.Language.Group/
+    movie-archive.part01.rar
+    Proof/
+      screenshots.jpg
+```
+
+**Output structure:**
+```
+Extracted/
+  Movies/
+    Movie Title (Year)/
+      Movie.Title.Year.Language.Group.mkv
+```
+
+Notes:
+- Multi-part archives are grouped and extracted as one movie release.
+- Non-archive companions (e.g., .nfo, .srt) are copied alongside the extracted media.
+- After successful extraction, source archives are moved to the finished area.
+
 ## Project Structure
 
 The codebase is organized into focused, maintainable modules:
