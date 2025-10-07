@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2025-10-07
+
+### Breaking/Stable
+- First stable release with robust movie and TV-show extraction flows
+- Deterministic single-line progress bars for Reading and Extracting
+
+### Added
+- `--debug` flag for detailed directory processing logs (off by default)
+- Dynamic terminal-width truncation so progress lines never wrap
+- Correct handling of modern multi-part RARs (`.partXX.rar`) without base `.rar`
+- Windows-friendly inline updates (carriage return + clear line)
+
+### Fixed
+- Multi-part extraction shows correct part counters `(X/Y)`
+- Reading progress reaches 100% before extraction starts
+- Avoids printing repeated lines during extraction
+- Season directory recursion and episode extraction logic
+
+### Internal
+- Refined archive grouping and validation rules
+- Cleaner orchestration for two-phase processing (read then extract)
+- Logging format without level prefixes for end-user clarity
+
 ## [0.1.0] - 2025-01-06
 
 ### Added

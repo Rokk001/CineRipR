@@ -62,6 +62,7 @@ Common flags:
 - `--retention-days N` — override retention period.
 - `--download-root` (repeatable), `--extracted-root`, `--finished-root` — override individual paths.
 - `--seven-zip PATH` — point to a custom 7-Zip executable for RAR extraction.
+- `--debug` — enable detailed directory processing logs (off by default).
 
 Use `emby-extractor --help` to list all available options.
 
