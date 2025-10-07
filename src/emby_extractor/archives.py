@@ -612,6 +612,9 @@ def process_downloads(
                         _logger,
                         f"Extracted {extractions_done} archive(s) for {current_dir.name}",
                     )
+                    # Prepare a fresh color for the next film/episode context
+                    # so that subsequent progress bars switch color at boundaries
+                    context_color = next_progress_color()
 
                 # Break if release failed
                 if release_failed:
