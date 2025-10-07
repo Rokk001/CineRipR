@@ -108,9 +108,11 @@ def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -
     # If no season tag anywhere, but an episode-only tag exists in any segment,
     # treat it as a no-season show and place files directly under the show name.
     for segment in parts:
-        if EPISODE_ONLY_TAG_RE.search(segment):
-            show_name = EPISODE_ONLY_TAG_RE.sub("", segment)
-            show_name = show_name.replace(".", " ").strip().strip("-")
+        match = EPISODE_ONLY_TAG_RE.search(segment)
+        if match:
+            # Use only the portion before the episode tag as the show name
+            prefix = segment[: match.start()]
+            show_name = prefix.replace(".", " ").strip().strip("-")
             if not show_name:
                 show_name = parts[0].replace(".", " ").strip()
             return base_prefix / show_name
