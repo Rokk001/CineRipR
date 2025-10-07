@@ -144,6 +144,7 @@ class ProgressTracker:
         color: str | None = None,
         single_line: bool = False,
         indent: int = 0,
+        prefix: str = "",
     ) -> None:
         self.total = max(int(total), 1)
         self.width = width
@@ -159,10 +160,12 @@ class ProgressTracker:
         self._inline = bool(single_line)
         self._last_len = 0
         self._indent = max(0, int(indent))
+        self._prefix = prefix
 
     def _emit(self, logger, message: str) -> None:
-        prefix = " " * self._indent
-        text = f"{prefix}{format_progress(self.current, self.total, width=self.width, color=self.color)} {message}"
+        indent_spaces = " " * self._indent
+        tree = self._prefix if self._prefix else ""
+        text = f"{indent_spaces}{tree}{format_progress(self.current, self.total, width=self.width, color=self.color)} {message}"
 
         # Always truncate to fit terminal width
         text = _truncate_to_fit(text)

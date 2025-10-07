@@ -390,7 +390,7 @@ def process_downloads(
                 read_color = next_progress_color()
                 # Start with unknown total; increase dynamically so (k/N) is exact, not guessed
                 dir_read_tracker = ProgressTracker(
-                    1, single_line=True, color=read_color
+                    1, single_line=True, color=read_color, indent=2, prefix="├─ "
                 )
                 dir_read_tracker.log(
                     _logger, f"Reading directories for {release_dir.name}..."
@@ -443,9 +443,9 @@ def process_downloads(
             context_color = next_progress_color()
             last_episode_name: str | None = None
 
-            # Show progress while building contexts
+            # Show progress while building contexts (same level as reading summary)
             _logger.info(
-                "%s Building contexts for %s",
+                "  ├─ %s Building contexts for %s",
                 format_progress(0, 1, color=context_color),
                 release_dir.name,
             )
@@ -512,7 +512,7 @@ def process_downloads(
                                     len(files_to_copy),
                                     single_line=True,
                                     color=context_color,
-                                    indent=2,
+                                    indent=4,
                                 )
                                 copy_tracker.log(
                                     _logger,
@@ -562,7 +562,11 @@ def process_downloads(
 
                 # Initial announcement - complete immediately
                 announce_tracker = ProgressTracker(
-                    1, single_line=True, color=context_color, indent=2
+                    1,
+                    single_line=True,
+                    color=context_color,
+                    indent=4,
+                    prefix="├─ ",
                 )
                 announce_tracker.complete(
                     _logger,
@@ -571,7 +575,11 @@ def process_downloads(
 
                 # Tracker for extraction phase
                 extract_tracker = ProgressTracker(
-                    total_groups, single_line=True, color=context_color, indent=2
+                    total_groups,
+                    single_line=True,
+                    color=context_color,
+                    indent=4,
+                    prefix="└── ",
                 )
 
                 parts_processed = 0
@@ -603,7 +611,7 @@ def process_downloads(
 
                                 # Show completion message only
                                 _logger.info(
-                                    "%s Demo: Finished reading %s",
+                                    "    ├─ %s Demo: Finished reading %s",
                                     format_progress(
                                         group.part_count,
                                         group.part_count,
@@ -636,7 +644,7 @@ def process_downloads(
 
                                 # Show completion message only
                                 _logger.info(
-                                    "%s Finished reading %s",
+                                    "    ├─ %s Finished reading %s",
                                     format_progress(
                                         group.part_count,
                                         group.part_count,
@@ -680,7 +688,8 @@ def process_downloads(
                             group.part_count,
                             single_line=True,
                             color=context_color,
-                            indent=2,
+                            indent=4,
+                            prefix="└── ",
                         )
 
                         # Extract archive with progress tracking
@@ -792,7 +801,11 @@ def process_downloads(
                 # Use a new color for the move phase
                 move_color = next_progress_color()
                 move_tracker = ProgressTracker(
-                    total_files_to_move, single_line=True, color=move_color, indent=2
+                    total_files_to_move,
+                    single_line=True,
+                    color=move_color,
+                    indent=2,
+                    prefix="└── ",
                 )
 
                 if demo_mode:
