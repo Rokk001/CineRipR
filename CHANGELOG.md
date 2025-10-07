@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0] - 2025-10-07
 ## [1.0.1] - 2025-10-07
+## [1.0.2] - 2025-10-07
+
+### Added
+- Endless repeat mode via options: `repeat_forever` and `repeat_after_minutes`
+
+### Changed
+- CLI main loop supports periodic re-run based on configuration
+- Default configs and README updated accordingly
+
 
 ### Changed
 - Project rebranded to CineRipR; primary CLI is now `cineripr`
