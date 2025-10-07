@@ -1,5 +1,5 @@
-# Example configuration for emby_extractor
-# Copy this file to 'emby_extractor.toml' and adjust the paths to match your environment.
+# Example configuration for CineRipR (cineripr)
+# Copy this file to 'cineripr.toml' and adjust the paths to match your environment.
 
 [paths]
 # Multiple download roots are supported.

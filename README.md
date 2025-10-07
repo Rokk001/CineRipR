@@ -22,15 +22,15 @@ Utility for extracting multi-part archives downloaded for media libraries (Emby/
 ```bash
 pip install .
 ```
-This installs the package with the console entry points `cineripr` and `emby-extractor` (legacy). Internally, the code remains under the `emby_extractor` namespace for backward compatibility while `cineripr` forwards to it.
+This installs the package with the console entry point `cineripr`.
 
 For local development without installation, add the `src/` directory to `PYTHONPATH` or use `pip install -e .`.
 
 ## Configuration
-Create an `emby_extractor.toml` file (a starter version is included in the repository). Adjust the paths, retention settings, and optional tool overrides to match your environment:
+Create a `cineripr.toml` file (a starter version is included in the repository). Adjust the paths, retention settings, and optional tool overrides to match your environment:
 
 ```toml
-# emby_extractor.toml
+# cineripr.toml
 [paths]
 # Multiple download roots supported (repeat lines in CLI with --download-root):
 download_roots = ["C:/Media/Download", "D:/Torrents"]
@@ -55,7 +55,7 @@ The CLI allows you to override any of these values at runtime.
 
 ## Usage
 ```bash
-cineripr --config C:/path/to/emby_extractor.toml
+cineripr --config C:/path/to/cineripr.toml
 ```
 
 Common flags:
@@ -72,7 +72,7 @@ Use `cineripr --help` to list all available options.
 
 Build locally:
 ```bash
-docker build -t ghcr.io/<user-or-org>/emby-extractor:1.0.0 .
+docker build -t ghcr.io/<user-or-org>/cineripr:1.0.0 .
 ```
 
 Run with volumes (paths anpassen):
@@ -81,9 +81,9 @@ docker run --rm \
   -v /pfad/zu/downloads:/data/downloads:ro \
   -v /pfad/zu/extracted:/data/extracted \
   -v /pfad/zu/finished:/data/finished \
-  -v /pfad/zu/emby_extractor.toml:/config/emby_extractor.toml:ro \
+  -v /pfad/zu/cineripr.toml:/config/cineripr.toml:ro \
   ghcr.io/<user-or-org>/cineripr:1.0.0 \
-  --config /config/emby_extractor.toml
+  --config /config/cineripr.toml
 ```
 
 Hinweise:
@@ -127,18 +127,20 @@ The tool:
 The codebase is organized into focused, maintainable modules:
 
 ```
-src/emby_extractor/
+src/cineripr/
 ├── __init__.py              # Package version
-├── archive_constants.py     # Constants and regex patterns (62 lines)
-├── archive_detection.py     # Archive discovery and grouping (217 lines)
-├── archive_extraction.py    # Extraction logic with 7-Zip support (317 lines)
-├── path_utils.py            # TV show path organization (178 lines)
-├── file_operations.py       # File/directory management (207 lines)
-├── archives.py              # Main orchestration (505 lines)
+├── archive_constants.py     # Constants and regex patterns
+├── archive_detection.py     # Archive discovery and grouping
+├── archive_extraction.py    # Extraction logic with 7-Zip support
+├── path_utils.py            # TV show path organization
+├── file_operations.py       # File/directory management
+├── archives.py              # Main orchestration
 ├── cleanup.py               # Cleanup and retention logic
 ├── config.py                # Configuration management
 ├── progress.py              # Progress tracking and display
 └── cli.py                   # Command-line interface
+
+All modules live under the `cineripr/` namespace.
 ```
 
 This modular architecture provides:

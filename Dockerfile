@@ -27,5 +27,5 @@ RUN apt-get update \
 WORKDIR /work
 COPY --from=base /usr/local /usr/local
 
-ENTRYPOINT ["emby-extractor"]
+ENTRYPOINT ["cineripr"]
 

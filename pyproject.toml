@@ -37,6 +37,5 @@ Source = "https://github.com/Rokk001/CineRipR"
 Issues = "https://github.com/Rokk001/CineRipR/issues"
 
 [project.scripts]
-# Backwards-compatible CLI plus new name
-emby-extractor = "emby_extractor.cli:main"
+# Primary CLI only
 cineripr = "cineripr.cli:main"
