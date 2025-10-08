@@ -228,13 +228,21 @@ def _extract_with_seven_zip(
     else:
         stdout_lines = []
         last_percent = -1
+        progress_shown = False
+        
         for line in process.stdout:
             stdout_lines.append(line)
             text = line.strip()
+            
+            # Log 7-Zip output for debugging
+            if logger and text:
+                logger.debug(f"7-Zip output: {text}")
+            
             # Parse percentage from 7z output (e.g., " 12%")
             m = re.search(r"(\d{1,3})%", text)
             if m:
                 percent = max(0, min(100, int(m.group(1))))
+                progress_shown = True
 
                 # Update progress tracker when percent changes
                 if (
@@ -252,6 +260,10 @@ def _extract_with_seven_zip(
 
                     message = f"Extracting {archive.name}"
                     progress.advance(logger, message, absolute=current_part)
+        
+        # If no progress was shown, show a simple progress message
+        if not progress_shown and progress is not None and logger is not None:
+            logger.info(f"Extracting {archive.name} (no progress info from 7-Zip)")
 
     process.wait()
 
