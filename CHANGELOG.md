@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.17] - 2025-01-08
+
+### Fixed
+- **CRITICAL FIX:** Fixed the "Subpath validation error" that was still occurring in version 1.0.16
+- Corrected the archive and file moving logic to properly use only the release name instead of the full relative path
+- This resolves the persistent error: `'/data/extracted/Movies/A.Test.Movie' is not in the subpath of '/data/downloads'`
+- Fixed all remaining instances where `finished_rel_parent` was incorrectly used instead of `release_name`
+
+### Changed
+- Updated all archive group moving logic to consistently use `release_name` instead of `finished_rel_parent`
+- Modified file moving logic to extract only the last part of the relative path for the destination directory
+
 ## [1.0.16] - 2025-01-08
 
 ### Fixed

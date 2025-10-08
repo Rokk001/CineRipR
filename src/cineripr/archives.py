@@ -546,10 +546,10 @@ def process_downloads(
                                 )
 
                             # Mark for moving to finished later
-                            # Use the relative_parent that was already calculated from download_root
-                            finished_relative_parent = relative_parent
+                            # Use only the release name, not the full path structure
+                            release_name = relative_parent.parts[-1] if relative_parent.parts else "unknown"
                             files_to_move.append(
-                                (current_dir, finished_relative_parent)
+                                (current_dir, release_name)
                             )
                         except OSError:
                             pass
@@ -559,8 +559,8 @@ def process_downloads(
                 # Process archives in this directory
                 groups = build_archive_groups(archives)
                 target_dir = paths.extracted_root / relative_parent
-                # Use the relative_parent that was already calculated from download_root
-                finished_relative_parent = relative_parent
+                # Use only the release name, not the full path structure
+                release_name = relative_parent.parts[-1] if relative_parent.parts else "unknown"
 
                 # Calculate total parts across all groups for unified progress tracking
                 total_parts = sum(group.part_count for group in groups)
@@ -764,11 +764,11 @@ def process_downloads(
                     # Collect for later move to finished
                     if extracted_ok:
                         archive_groups_to_move.append(
-                            (group, finished_relative_parent, current_dir)
+                            (group, release_name, current_dir)
                         )
                         # Also track the extracted directory to move its contents
                         extracted_dirs_to_move.append(
-                            (target_dir, finished_relative_parent)
+                            (target_dir, release_name)
                         )
                         processed += 1
 
@@ -830,9 +830,8 @@ def process_downloads(
                     )
 
                 files_moved = 0
-                for group, finished_rel_parent, source_dir in archive_groups_to_move:
+                for group, release_name, source_dir in archive_groups_to_move:
                     # Use only the release name, not the full path structure
-                    release_name = finished_rel_parent.parts[-1] if finished_rel_parent.parts else "unknown"
                     destination_dir = paths.finished_root / release_name
 
                     if demo_mode:
@@ -881,7 +880,7 @@ def process_downloads(
                 # Move extracted files to finished directory
                 if not demo_mode:
                     # Move extracted directories (this ensures extracted files are moved even if archives fail)
-                    for extracted_dir, finished_rel_parent in extracted_dirs_to_move:
+                    for extracted_dir, release_name in extracted_dirs_to_move:
                         if extracted_dir.exists():
                             move_remaining_to_finished(
                                 extracted_dir,
@@ -892,7 +891,7 @@ def process_downloads(
                     # Move remaining companion files from archive directories
                     for (
                         group,
-                        finished_rel_parent,
+                        release_name,
                         source_dir,
                     ) in archive_groups_to_move:
                         move_remaining_to_finished(
@@ -906,10 +905,9 @@ def process_downloads(
             # Move files that had no archives
             if files_to_move and not release_failed:
                 if not demo_mode:
-                    for source_dir, finished_rel_parent in files_to_move:
+                    for source_dir, release_name in files_to_move:
                         try:
                             # Use only the release name, not the full path structure
-                            release_name = finished_rel_parent.parts[-1] if finished_rel_parent.parts else "unknown"
                             finished_dir = paths.finished_root / release_name
                             finished_dir.mkdir(parents=True, exist_ok=True)
                             for entry in sorted(
