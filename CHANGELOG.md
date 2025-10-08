@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 2025-01-08
+
+### Fixed
+- **Finished Directory Structure**: Fixed unwanted "Movies" subfolder creation in finished directory
+- Files now move directly to `finished/ReleaseName/` instead of `finished/Movies/ReleaseName/`
+- Use only release name instead of full path structure for finished directory organization
+
 ## [1.0.15] - 2025-01-08
 
 ### Fixed
