@@ -72,32 +72,52 @@ Use `cineripr --help` to list all available options.
 
 ## Run in Docker
 
-Build locally:
-```bash
-docker build -t ghcr.io/<user-or-org>/cineripr:1.0.7 .
-```
+### Using Pre-built Images (Recommended)
 
-Run with volumes (paths anpassen):
+Pull and run the latest version:
 ```bash
+docker pull ghcr.io/rokk001/cineripr:latest
 docker run --rm \
   -v /pfad/zu/downloads:/data/downloads:ro \
   -v /pfad/zu/extracted:/data/extracted \
   -v /pfad/zu/finished:/data/finished \
   -v /pfad/zu/cineripr.toml:/config/cineripr.toml:ro \
-  ghcr.io/<user-or-org>/cineripr:1.0.7 \
+  ghcr.io/rokk001/cineripr:latest \
   --config /config/cineripr.toml
 ```
 
-### Docker Features (v1.0.7+)
+Pull a specific version:
+```bash
+docker pull ghcr.io/rokk001/cineripr:1.0.12
+docker run --rm \
+  -v /pfad/zu/downloads:/data/downloads:ro \
+  -v /pfad/zu/extracted:/data/extracted \
+  -v /pfad/zu/finished:/data/finished \
+  -v /pfad/zu/cineripr.toml:/config/cineripr.toml:ro \
+  ghcr.io/rokk001/cineripr:1.0.12 \
+  --config /config/cineripr.toml
+```
+
+### Build Locally (Optional)
+
+If you prefer to build locally:
+```bash
+docker build -t ghcr.io/rokk001/cineripr:local .
+```
+
+### Docker Features (v1.0.12+)
 - **Non-root execution** - Container runs as `cineripr` user for better security
 - **Automatic permission handling** - Extracted files have correct permissions (644/755)
 - **Support for .dctmp files** - Temporary archive format support
 - **UMASK configuration** - Proper default permissions for containerized environments
+- **Multi-platform support** - Images available for linux/amd64 and linux/arm64
+- **Automated builds** - Images automatically built and published via GitHub Actions
 
-Hinweise:
-- In der TOML Container-Pfade verwenden (z. B. `/data/*`).
-- 7-Zip ist vorinstalliert (`/usr/bin/7z`).
-- Bei Berechtigungsproblemen siehe `DOCKER_PERMISSIONS.md`.
+### Notes
+- Use container paths in TOML configuration (e.g., `/data/*`)
+- 7-Zip is pre-installed (`/usr/bin/7z`)
+- For permission issues, see `DOCKER_PERMISSIONS.md`
+- Images are automatically built on every push and release
 
 ## TV Show Organization
 
