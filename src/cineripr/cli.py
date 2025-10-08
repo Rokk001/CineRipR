@@ -247,6 +247,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
     def run_once() -> tuple[int, ProcessResult | None]:
+        # Display tool name and version at the start of each loop
+        _LOGGER.info("CineRipR %s", __version__)
         try:
             result: ProcessResult = process_downloads(
                 settings.paths,
