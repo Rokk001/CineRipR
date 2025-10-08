@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - 2025-01-08
+
+### Fixed
+- **Subpath Validation Error**: Fixed "is not in the subpath" error when processing extracted files
+- Use `relative_parent` instead of `current_dir.relative_to(download_root)` for proper path handling
+- Eliminates "Unexpected error in main loop" when moving files between extracted and finished directories
+
 ## [1.0.14] - 2025-01-08
 
 ### Fixed
