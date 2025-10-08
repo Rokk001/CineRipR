@@ -440,6 +440,7 @@ def process_downloads(
             # Track all extracted targets and archive groups for this release
             extracted_targets: list[Path] = []
             archive_groups_to_move: list[tuple[ArchiveGroup, Path, Path]] = []
+            extracted_dirs_to_move: list[tuple[Path, Path]] = []  # Track extracted directories to move
             files_to_move: list[tuple[Path, Path]] = []
             release_failed = False
             is_main_context = False
@@ -765,6 +766,10 @@ def process_downloads(
                         archive_groups_to_move.append(
                             (group, finished_relative_parent, current_dir)
                         )
+                        # Also track the extracted directory to move its contents
+                        extracted_dirs_to_move.append(
+                            (target_dir, finished_relative_parent)
+                        )
                         processed += 1
 
                 # Complete extraction phase
@@ -865,13 +870,24 @@ def process_downloads(
                             continue
 
                 # Complete the move tracker once for all files
-                move_tracker.complete(
-                    _logger,
-                    f"Finished moving {total_files_to_move} file(s) for release {release_dir.name}",
-                )
+                if files_moved > 0:
+                    move_tracker.complete(
+                        _logger,
+                        f"Finished moving {files_moved} file(s) for release {release_dir.name}",
+                    )
 
-                # Move remaining companion files
+                # Move extracted files to finished directory
                 if not demo_mode:
+                    # Move extracted directories (this ensures extracted files are moved even if archives fail)
+                    for extracted_dir, finished_rel_parent in extracted_dirs_to_move:
+                        if extracted_dir.exists():
+                            move_remaining_to_finished(
+                                extracted_dir,
+                                finished_root=paths.finished_root,
+                                download_root=download_root,
+                            )
+                    
+                    # Move remaining companion files from archive directories
                     for (
                         group,
                         finished_rel_parent,
