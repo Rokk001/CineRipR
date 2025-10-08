@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.12] - 2025-01-08
+
+### Fixed
+- Fixed file overwrite behavior in finished directory
+- Files now properly overwrite existing files instead of creating duplicates with _1, _2 suffixes
+- Eliminates duplicate files in finished directory when processing the same release multiple times
+
 ## [1.0.11] - 2025-01-08
 
 ### Added
