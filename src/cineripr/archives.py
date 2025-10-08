@@ -546,9 +546,8 @@ def process_downloads(
                                 )
 
                             # Mark for moving to finished later
-                            finished_relative_parent = current_dir.relative_to(
-                                download_root
-                            )
+                            # Use the relative_parent that was already calculated from download_root
+                            finished_relative_parent = relative_parent
                             files_to_move.append(
                                 (current_dir, finished_relative_parent)
                             )
@@ -560,7 +559,8 @@ def process_downloads(
                 # Process archives in this directory
                 groups = build_archive_groups(archives)
                 target_dir = paths.extracted_root / relative_parent
-                finished_relative_parent = current_dir.relative_to(download_root)
+                # Use the relative_parent that was already calculated from download_root
+                finished_relative_parent = relative_parent
 
                 # Calculate total parts across all groups for unified progress tracking
                 total_parts = sum(group.part_count for group in groups)
