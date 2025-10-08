@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11] - 2025-01-08
+
+### Added
+- Display tool name and version at the start of each processing loop
+- Clear identification of CineRipR version during execution
+
+### Fixed
+- Version synchronization between pyproject.toml and __init__.py
+- Consistent version display across all components
+
 ## [1.0.10] - 2025-01-08
 
 ### Fixed
