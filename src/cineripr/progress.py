@@ -171,16 +171,15 @@ class ProgressTracker:
         text = _truncate_to_fit(text)
 
         if self._inline:
-            # For inline mode, bypass logger completely and use direct stderr
-            # stderr is not affected by logging configuration
+            # For inline mode, use a simple approach that works everywhere
+            # Just print the progress without trying to clear lines
+            # This avoids all the terminal compatibility issues
             try:
-                # Clear the line and write new content to stderr
-                sys.stderr.write(f"\r{' ' * self._last_len}\r")  # Clear previous line
-                sys.stderr.write(text)
-                sys.stderr.flush()
+                # Use print with end='\r' and flush=True for simple line updates
+                print(f"\r{text}", end="", flush=True)
                 self._last_len = len(text)
             except (OSError, Exception):
-                # If stderr fails, disable inline mode and use regular logging
+                # If print fails, disable inline mode and use regular logging
                 self._inline = False
                 logger.info(text)
         else:
@@ -203,8 +202,7 @@ class ProgressTracker:
         self._emit(logger, message)
         # If we were updating inline, add a newline to move to next line
         if self._inline:
-            sys.stderr.write("\n")
-            sys.stderr.flush()
+            print()  # Simple newline
             self._last_len = 0  # Reset for next use
 
 
