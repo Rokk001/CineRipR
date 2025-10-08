@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2025-01-08
+
+### Fixed
+- Improved error handling for archive file moving to finished directory
+- Enhanced logging for move failures with detailed error messages and file paths
+- Better debugging information when files fail to move from download to finished directory
+
+### Added
+- Debug script for troubleshooting move issues (`debug_move_issue.py`)
+- More detailed error reporting in move operations
+
 ## [1.0.7] - 2025-01-08
 
 ### Added
