@@ -230,6 +230,10 @@ def _extract_with_seven_zip(
         last_percent = -1
         progress_shown = False
         
+        # Show initial progress message
+        if progress is not None and logger is not None:
+            progress.log(logger, f"Extracting {archive.name}...")
+        
         for line in process.stdout:
             stdout_lines.append(line)
             text = line.strip()
@@ -261,16 +265,18 @@ def _extract_with_seven_zip(
                     message = f"Extracting {archive.name}"
                     progress.advance(logger, message, absolute=current_part)
         
-        # If no progress was shown, show a simple progress message
+        # If no progress was shown, show completion message
         if not progress_shown and progress is not None and logger is not None:
-            logger.info(f"Extracting {archive.name} (no progress info from 7-Zip)")
+            progress.complete(logger, f"Extracted {archive.name}")
 
     process.wait()
 
-    # Complete the progress tracker
+    # Complete the progress tracker (only if not already completed)
     if process.returncode == 0 and progress is not None and logger is not None:
-        message = f"Extracting {archive.name}"
-        progress.complete(logger, message)
+        # Only complete if we haven't already shown completion
+        if progress.current < progress.total:
+            message = f"Extracting {archive.name}"
+            progress.complete(logger, message)
         # Fix permissions after successful extraction
         fix_file_permissions(target_dir)
 
