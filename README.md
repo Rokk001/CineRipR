@@ -74,7 +74,7 @@ Use `cineripr --help` to list all available options.
 
 Build locally:
 ```bash
-docker build -t ghcr.io/<user-or-org>/cineripr:1.0.0 .
+docker build -t ghcr.io/<user-or-org>/cineripr:1.0.7 .
 ```
 
 Run with volumes (paths anpassen):
@@ -84,13 +84,20 @@ docker run --rm \
   -v /pfad/zu/extracted:/data/extracted \
   -v /pfad/zu/finished:/data/finished \
   -v /pfad/zu/cineripr.toml:/config/cineripr.toml:ro \
-  ghcr.io/<user-or-org>/cineripr:1.0.0 \
+  ghcr.io/<user-or-org>/cineripr:1.0.7 \
   --config /config/cineripr.toml
 ```
+
+### Docker Features (v1.0.7+)
+- **Non-root execution** - Container runs as `cineripr` user for better security
+- **Automatic permission handling** - Extracted files have correct permissions (644/755)
+- **Support for .dctmp files** - Temporary archive format support
+- **UMASK configuration** - Proper default permissions for containerized environments
 
 Hinweise:
 - In der TOML Container-Pfade verwenden (z. B. `/data/*`).
 - 7-Zip ist vorinstalliert (`/usr/bin/7z`).
+- Bei Berechtigungsproblemen siehe `DOCKER_PERMISSIONS.md`.
 
 ## TV Show Organization
 

@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2025-01-08
+
+### Added
+- Support for .dctmp archive files (temporary archive format)
+- Docker permission handling with non-root user
+- Automatic file permission correction after extraction
+- `fix_file_permissions()` function for Docker environments
+
+### Fixed
+- .dctmp files are now properly recognized as archives instead of being copied as regular files
+- Docker containers now run as non-root user (cineripr) to prevent permission issues
+- Extracted files have correct permissions (644 for files, 755 for directories)
+- File permission issues in Docker environments resolved
+- Archive files are properly moved to finished directory instead of remaining in extracted folder
+
+### Changed
+- Dockerfile now creates and uses non-root user with proper umask settings
+- UMASK=002 set for better default permissions in Docker containers
+- All extraction methods now fix permissions after successful extraction
+- Enhanced Docker documentation with permission troubleshooting guide
+
 ## [1.0.0] - 2025-10-07
 ## [1.0.1] - 2025-10-07
 ## [1.0.2] - 2025-10-07
