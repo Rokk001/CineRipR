@@ -374,8 +374,11 @@ def move_remaining_to_finished(
     """
 
     def move_file(src_file: Path) -> None:
-        rel_parent = src_file.parent.relative_to(download_root)
-        dest_dir = finished_root / rel_parent
+        # Get the release name (last part of the path relative to download_root)
+        rel_path = src_file.parent.relative_to(download_root)
+        # Use only the release name, not the full path structure
+        release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
+        dest_dir = finished_root / release_name
         dest_dir.mkdir(parents=True, exist_ok=True)
         try:
             dest = ensure_unique_destination(dest_dir / src_file.name)

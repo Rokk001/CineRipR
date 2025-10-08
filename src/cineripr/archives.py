@@ -831,7 +831,9 @@ def process_downloads(
 
                 files_moved = 0
                 for group, finished_rel_parent, source_dir in archive_groups_to_move:
-                    destination_dir = paths.finished_root / finished_rel_parent
+                    # Use only the release name, not the full path structure
+                    release_name = finished_rel_parent.parts[-1] if finished_rel_parent.parts else "unknown"
+                    destination_dir = paths.finished_root / release_name
 
                     if demo_mode:
                         for idx, member in enumerate(group.members, 1):
@@ -906,7 +908,9 @@ def process_downloads(
                 if not demo_mode:
                     for source_dir, finished_rel_parent in files_to_move:
                         try:
-                            finished_dir = paths.finished_root / finished_rel_parent
+                            # Use only the release name, not the full path structure
+                            release_name = finished_rel_parent.parts[-1] if finished_rel_parent.parts else "unknown"
+                            finished_dir = paths.finished_root / release_name
                             finished_dir.mkdir(parents=True, exist_ok=True)
                             for entry in sorted(
                                 source_dir.iterdir(), key=lambda p: p.name.lower()
