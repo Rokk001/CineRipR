@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2025-01-08
+
+### Fixed
+- **CRITICAL FIX**: Progress bar now properly updates the same line instead of creating new lines
+- Replaced complex stdout/stderr manipulation with simple print() approach for better compatibility
+- Progress bars now work correctly across all terminals and environments (Windows, Linux, Docker)
+- Eliminates messy terminal output with multiple progress bar lines
+- Much more robust and reliable progress display
+
 ## [1.0.12] - 2025-01-08
 
 ### Fixed
