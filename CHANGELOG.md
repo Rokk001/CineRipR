@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.14] - 2025-01-08
+
+### Fixed
+- **Docker Permissions**: Fixed file permissions issue where extracted files were owned by `nobody` user
+- Docker container now uses UID/GID 1000 for `cineripr` user to ensure proper file ownership
+- Extracted files are now accessible and writable by host users
+
 ## [1.0.13] - 2025-01-08
 
 ### Fixed
