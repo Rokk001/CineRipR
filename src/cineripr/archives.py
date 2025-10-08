@@ -850,10 +850,16 @@ def process_downloads(
                                     f"Moved {member.name}",
                                     absolute=files_moved,
                                 )
-                        except OSError:
-                            _logger.exception(
-                                "Failed to move archive %s to the finished directory",
+                        except OSError as e:
+                            _logger.error(
+                                "Failed to move archive %s to the finished directory: %s",
                                 group.primary,
+                                e,
+                            )
+                            _logger.error(
+                                "Source: %s, Destination: %s",
+                                member,
+                                destination_dir / member.name,
                             )
                             failed.append(group.primary)
                             continue
