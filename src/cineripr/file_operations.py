@@ -13,25 +13,15 @@ from .progress import ProgressTracker
 
 
 def ensure_unique_destination(destination: Path) -> Path:
-    """Ensure a file doesn't overwrite existing files by appending a counter.
+    """Return the destination path, allowing overwrites.
 
     Args:
         destination: Desired destination path
 
     Returns:
-        Unique destination path (original or with _N suffix)
+        Destination path (existing files will be overwritten)
     """
-    if not destination.exists():
-        return destination
-
-    suffix = "".join(destination.suffixes)
-    base_name = destination.name[: -len(suffix)] if suffix else destination.name
-    counter = 1
-    while True:
-        candidate = destination.with_name(f"{base_name}_{counter}{suffix}")
-        if not candidate.exists():
-            return candidate
-        counter += 1
+    return destination
 
 
 def cleanup_failed_extraction_dir(target_dir: Path, *, pre_existing: bool) -> None:
