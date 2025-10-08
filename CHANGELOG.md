@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 2025-01-08
+
+### Fixed
+- Fixed extraction progress bar display for RAR files
+- Always show initial progress message when starting extraction
+- Show completion message even when 7-Zip doesn't provide detailed progress updates
+- Prevent duplicate completion messages in progress tracking
+- Ensure progress bar is visible for all RAR extractions regardless of 7-Zip output
+
+## [1.0.9] - 2025-01-08
+
+### Fixed
+- Fixed progress bar display for RAR extractions
+- Added debug logging for 7-Zip output to troubleshoot progress issues
+- Show fallback message when 7-Zip doesn't provide progress information
+- Improved progress tracking visibility for RAR extractions
+
 ## [1.0.8] - 2025-01-08
 
 ### Fixed
