@@ -171,14 +171,17 @@ class ProgressTracker:
         text = _truncate_to_fit(text)
 
         if self._inline:
+            # For inline mode, bypass logger completely and use direct stdout
+            # This ensures we have full control over the output
             try:
-                # Use ANSI escape codes: \r (carriage return) + \033[K (clear to end of line)
-                # This works on Windows with Virtual Terminal Processing enabled
-                line = "\r\033[K" + text
-                sys.stdout.write(line)
+                # Clear the line and write new content
+                sys.stdout.write(f"\r{' ' * self._last_len}\r")  # Clear previous line
+                sys.stdout.write(text)
                 sys.stdout.flush()
                 self._last_len = len(text)
             except (OSError, Exception):
+                # If stdout fails, disable inline mode and use regular logging
+                self._inline = False
                 logger.info(text)
         else:
             logger.info(text)
@@ -202,6 +205,7 @@ class ProgressTracker:
         if self._inline:
             sys.stdout.write("\n")
             sys.stdout.flush()
+            self._last_len = 0  # Reset for next use
 
 
 __all__ = [
