@@ -44,11 +44,14 @@ def is_supported_archive(entry: Path) -> bool:
     - ZIP archives (including split: .zip, .z01, .z02, etc.)
     - TAR archives and compressed variants (.tar.gz, .tar.bz2, etc.)
     - Multi-part archives (.part01, .part02, etc.)
+    - DCTMP files (temporary archive files)
     """
     name = entry.name.lower()
 
     # Direct format match
     if name.endswith(".rar"):
+        return True
+    if name.endswith(".dctmp"):
         return True
     if any(name.endswith(suffix) for suffix in SUPPORTED_ARCHIVE_SUFFIXES):
         return True
@@ -226,5 +229,3 @@ __all__ = [
     "build_archive_groups",
     "validate_archive_group",
 ]
-
-

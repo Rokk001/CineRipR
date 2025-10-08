@@ -317,6 +317,15 @@ def copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
                     # Copy and overwrite existing files
                     dest_path = target_dir / entry.name
                     shutil.copy2(str(entry), str(dest_path))
+                    # Fix permissions for copied files (important for Docker environments)
+                    try:
+                        import stat
+
+                        dest_path.chmod(
+                            stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
+                        )
+                    except (OSError, ImportError):
+                        pass
                 except OSError:
                     pass
     except OSError:

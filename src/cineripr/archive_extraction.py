@@ -6,26 +6,66 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
-import sys
 import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
 
 from .archive_constants import UNWANTED_EXTRACTED_SUFFIXES
-from .progress import ProgressTracker, format_progress
+from .progress import ProgressTracker
+
+
+def fix_file_permissions(directory: Path) -> None:
+    """Fix file permissions for extracted files to be readable/writable by owner and group.
+
+    This is particularly important when running in Docker containers where files
+    might be created with restrictive permissions.
+
+    Args:
+        directory: Directory containing extracted files to fix permissions for
+    """
+    try:
+        for root, dirs, files in os.walk(directory):
+            # Fix directory permissions (755: rwxr-xr-x)
+            for d in dirs:
+                dir_path = Path(root) / d
+                try:
+                    dir_path.chmod(
+                        stat.S_IRWXU
+                        | stat.S_IRGRP
+                        | stat.S_IXGRP
+                        | stat.S_IROTH
+                        | stat.S_IXOTH
+                    )
+                except OSError:
+                    pass
+
+            # Fix file permissions (644: rw-r--r--)
+            for f in files:
+                file_path = Path(root) / f
+                try:
+                    file_path.chmod(
+                        stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
+                    )
+                except OSError:
+                    pass
+    except OSError:
+        pass
 
 
 def detect_archive_format(archive: Path) -> str | None:
     """Detect the archive format by file extension.
 
     Returns:
-        Format name (e.g., 'rar', 'zip', 'tar') or None if unknown
+        Format name (e.g., 'rar', 'zip', 'tar', 'dctmp') or None if unknown
     """
     lower = archive.name.lower()
     if lower.endswith(".rar"):
         return "rar"
+    if lower.endswith(".dctmp"):
+        return "dctmp"
     for format_name, suffixes, _description in shutil.get_unpack_formats():
         for suffix in suffixes:
             if lower.endswith(suffix.lower()):
@@ -73,6 +113,16 @@ def can_extract_archive(
     format_name = detect_archive_format(archive)
 
     if format_name == "rar":
+        command = resolve_seven_zip_command(seven_zip_path)
+        if command is None:
+            return (
+                False,
+                "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.",
+            )
+        return True, None
+
+    if format_name == "dctmp":
+        # DCTMP files are temporary archive files that should be handled by 7-Zip
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
             return (
@@ -209,6 +259,8 @@ def _extract_with_seven_zip(
     if process.returncode == 0 and progress is not None and logger is not None:
         message = f"Extracting {archive.name}"
         progress.complete(logger, message)
+        # Fix permissions after successful extraction
+        fix_file_permissions(target_dir)
 
     # Handle extraction failure with temp directory fallback
     if process.returncode != 0:
@@ -260,6 +312,8 @@ def _extract_with_seven_zip(
                             shutil.move(str(item), str(dest))
                         except OSError:
                             pass
+                    # Fix permissions after successful extraction
+                    fix_file_permissions(target_dir)
                     return
         except Exception:
             pass
@@ -310,6 +364,22 @@ def extract_archive(
             logger=logger,
             part_count=part_count,
         )
+    elif format_name == "dctmp":
+        # DCTMP files are temporary archive files that should be handled by 7-Zip
+        command = resolve_seven_zip_command(seven_zip_path)
+        if command is None:
+            raise RuntimeError(
+                "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip."
+            )
+        _extract_with_seven_zip(
+            command,
+            archive,
+            target_dir,
+            cpu_cores=cpu_cores,
+            progress=progress,
+            logger=logger,
+            part_count=part_count,
+        )
     else:
         # Use shutil for other formats
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -317,12 +387,14 @@ def extract_archive(
         if progress is not None and logger is not None:
             logger.info("Extracted %s", archive.name)
 
+    # Fix file permissions after extraction (important for Docker environments)
+    fix_file_permissions(target_dir)
+
 
 __all__ = [
     "detect_archive_format",
     "resolve_seven_zip_command",
     "can_extract_archive",
     "extract_archive",
+    "fix_file_permissions",
 ]
-
-
