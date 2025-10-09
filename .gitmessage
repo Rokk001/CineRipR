@@ -1,0 +1,14 @@
+# Commit Message Guidelines
+# 
+# NEVER include:
+# - Specific file paths from user's local environment
+# - UNC paths like \\HS\Download\...
+# - Local directory structures
+# - Personal/private information
+# 
+# ALWAYS use:
+# - Generic descriptions
+# - Placeholder examples
+# - General technical terms
+# 
+# Example: "Fixed Windows UNC path handling" NOT "Fixed \\HS\Download\dcpp\A.Test.Extract"
