@@ -84,11 +84,11 @@ The `build_tv_show_path()` function:
 
 ### Example Transformations
 
-| Input Path                                       | Output Path                                         |
-| ------------------------------------------------ | --------------------------------------------------- |
-| `Show.Name.S01.GROUP`                            | `TV-Shows/Show Name/Season 01/`                     |
-| `Another.Show.S02.GROUP`                         | `TV-Shows/Another Show/Season 02/`                  |
-| `Movie.Name.2024.GROUP`                          | `Movies/Movie.Name.2024.GROUP/`                     |
+| Input Path               | Output Path                        |
+| ------------------------ | ---------------------------------- |
+| `Show.Name.S01.GROUP`    | `TV-Shows/Show Name/Season 01/`    |
+| `Another.Show.S02.GROUP` | `TV-Shows/Another Show/Season 02/` |
+| `Movie.Name.2024.GROUP`  | `Movies/Movie.Name.2024.GROUP/`    |
 
 ## Error Handling
 

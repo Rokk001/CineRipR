@@ -45,58 +45,58 @@ def _set_file_permissions(path: Path) -> None:
 
 def _is_unc_path(path: Path) -> bool:
     """Check if path is a Windows UNC path.
-    
+
     Args:
         path: Path to check
-        
+
     Returns:
         True if path is a UNC path, False otherwise
     """
     path_str = str(path)
-    return path_str.startswith('\\\\') or path_str.startswith('//')
+    return path_str.startswith("\\\\") or path_str.startswith("//")
 
 
 def _normalize_path_for_docker(path: Path) -> Path:
     """Normalize path for Docker container compatibility.
-    
+
     Args:
         path: Path to normalize
-        
+
     Returns:
         Normalized path
     """
     path_str = str(path)
-    
+
     # Handle Windows UNC paths in Docker
     if _is_unc_path(path):
         # Convert UNC path to Docker mount path
-        # \\HS\Download\dcpp\A.Test.Extract -> /data/downloads/dcpp/A.Test.Extract
-        if path_str.startswith('\\\\'):
+        # \\SERVER\Share\path -> /data/downloads/path
+        if path_str.startswith("\\\\"):
             # Remove \\ and convert to Unix-style path
             path_str = path_str[2:]
             # Replace backslashes with forward slashes
-            path_str = path_str.replace('\\', '/')
+            path_str = path_str.replace("\\", "/")
             # Add /data prefix for Docker mount
-            if not path_str.startswith('/data/'):
-                path_str = '/data/' + path_str
-    
+            if not path_str.startswith("/data/"):
+                path_str = "/data/" + path_str
+
     return Path(path_str)
 
 
 def _safe_move_with_retry(src: Path, dst: Path, logger: logging.Logger = None) -> bool:
     """Safely move files with multiple retry strategies for Docker/UNC paths.
-    
+
     Args:
         src: Source file path
         dst: Destination file path
         logger: Optional logger for error messages
-        
+
     Returns:
         True if move was successful, False otherwise
     """
     # Ensure destination directory exists
     dst.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Strategy 1: Direct move
     try:
         shutil.move(str(src), str(dst))
@@ -104,43 +104,47 @@ def _safe_move_with_retry(src: Path, dst: Path, logger: logging.Logger = None) -
     except OSError as e:
         if logger:
             logger.warning("Direct move failed for %s: %s", src.name, e)
-    
+
     # Strategy 2: Copy + delete (for read-only filesystems)
     try:
         shutil.copy2(str(src), str(dst))
         _set_file_permissions(dst)
-        
+
         # Try to delete original
         try:
             src.unlink()
         except OSError as delete_error:
             if logger:
-                logger.warning("Could not delete original file %s: %s", src, delete_error)
-        
+                logger.warning(
+                    "Could not delete original file %s: %s", src, delete_error
+                )
+
         return True
     except OSError as e:
         if logger:
             logger.error("Copy fallback also failed for %s: %s", src.name, e)
-    
+
     # Strategy 3: Try with normalized paths (for UNC paths in Docker)
     if _is_unc_path(src):
         try:
             normalized_src = _normalize_path_for_docker(src)
             normalized_dst = _normalize_path_for_docker(dst)
-            
+
             if logger:
-                logger.info("Trying normalized paths: %s -> %s", normalized_src, normalized_dst)
-            
+                logger.info(
+                    "Trying normalized paths: %s -> %s", normalized_src, normalized_dst
+                )
+
             # Ensure normalized destination directory exists
             normalized_dst.parent.mkdir(parents=True, exist_ok=True)
-            
+
             shutil.move(str(normalized_src), str(normalized_dst))
             _set_file_permissions(normalized_dst)
             return True
         except OSError as e:
             if logger:
                 logger.error("Normalized path move also failed for %s: %s", src.name, e)
-    
+
     return False
 
 
@@ -506,7 +510,7 @@ def move_remaining_to_finished(
 
     For TV shows, this uses the proper TV-Show structure from README:
     TV-Shows/Show Name/Season XX/
-    
+
     For movies and other content, this mirrors the original download structure.
 
     Args:
@@ -519,15 +523,17 @@ def move_remaining_to_finished(
     def move_file(src_file: Path) -> None:
         # Determine if this is a TV show based on the extracted directory structure
         is_tv_show = looks_like_tv_show(current_dir)
-        
+
         if is_tv_show:
             # For TV shows, use the proper structure from README
             try:
                 # Get the category prefix (TV-Shows)
                 category_prefix = get_category_prefix(current_dir)
-                
+
                 # Build the proper TV show path using the existing logic
-                tv_show_path = build_tv_show_path(current_dir, download_root, category_prefix)
+                tv_show_path = build_tv_show_path(
+                    current_dir, download_root, category_prefix
+                )
                 dest_dir = finished_root / tv_show_path
             except (ValueError, OSError):
                 # Fallback to simple structure if TV show path building fails
@@ -535,7 +541,9 @@ def move_remaining_to_finished(
                     rel_path = src_file.parent.relative_to(download_root)
                     release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
                 except ValueError:
-                    release_name = src_file.parent.name if src_file.parent.name else "unknown"
+                    release_name = (
+                        src_file.parent.name if src_file.parent.name else "unknown"
+                    )
                 dest_dir = finished_root / release_name
         else:
             # For movies and other content, use the original logic
@@ -572,7 +580,7 @@ def move_remaining_to_finished(
                 # Log error if move completely failed
                 _logger = logging.getLogger(__name__)
                 _logger.error("Failed to move %s to %s", src_file, dest)
-                
+
         except OSError as e:
             _logger = logging.getLogger(__name__)
             _logger.error("Error moving %s: %s", src_file, e)

@@ -10,8 +10,8 @@
    - Look for any path that looks like a real directory
 
 2. **Replace ALL private paths with generic examples:**
-   - `\\HS\Download\...` → `\\SERVER\Share\...`
-   - `Henry.Danger.S01...` → `Show.Name.S01...`
+   - `\\SERVER\Share\...` → `\\SERVER\Share\...`
+   - `Show.Name.S01...` → `Show.Name.S01...`
    - Any real file names → Generic example names
 
 3. **Use ONLY these generic patterns:**
@@ -38,8 +38,8 @@ If I violate this again, I will:
 ## EXAMPLES OF WHAT TO REPLACE:
 
 ❌ WRONG:
-- `\\HS\Download\dcpp\A.Test.Extract`
-- `Henry.Danger.S01.GERMAN.1080p.WEB.H264-MiSFiTS`
+- `\\SERVER\Share\specific\path`
+- `Real.Show.Name.S01.GROUP`
 - Any real folder names from user's system
 
 ✅ CORRECT:

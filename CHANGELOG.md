@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file.
 ## [1.0.19] - 2025-01-27
 
 ### Fixed
-- **CRITICAL FIX:** Windows UNC Path Support - Fixed handling of Windows UNC paths in Docker containers (e.g., `\\HS\Download\dcpp\A.Test.Extract`)
+- **CRITICAL FIX:** Windows UNC Path Support - Fixed handling of Windows UNC paths in Docker containers
 - Added multiple retry strategies for file operations in Docker environments
 - Improved path normalization for Windows network shares in Docker containers
 - Enhanced error handling and logging for failed file operations
