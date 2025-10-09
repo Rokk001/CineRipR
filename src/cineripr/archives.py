@@ -31,7 +31,8 @@ from .path_utils import (
 )
 from .config import Paths, SubfolderPolicy
 from typing import Callable, Optional
-from .cleanup import cleanup_finished  # re-export usage parity
+
+# from .cleanup import cleanup_finished  # re-export usage parity
 from .progress import ProgressTracker, format_progress, next_progress_color
 import os
 
@@ -440,7 +441,9 @@ def process_downloads(
             # Track all extracted targets and archive groups for this release
             extracted_targets: list[Path] = []
             archive_groups_to_move: list[tuple[ArchiveGroup, Path, Path]] = []
-            extracted_dirs_to_move: list[tuple[Path, Path]] = []  # Track extracted directories to move
+            extracted_dirs_to_move: list[tuple[Path, Path]] = (
+                []
+            )  # Track extracted directories to move
             files_to_move: list[tuple[Path, Path]] = []
             release_failed = False
             is_main_context = False
@@ -547,10 +550,12 @@ def process_downloads(
 
                             # Mark for moving to finished later
                             # Use only the release name, not the full path structure
-                            release_name = relative_parent.parts[-1] if relative_parent.parts else "unknown"
-                            files_to_move.append(
-                                (current_dir, release_name)
+                            release_name = (
+                                relative_parent.parts[-1]
+                                if relative_parent.parts
+                                else "unknown"
                             )
+                            files_to_move.append((current_dir, release_name))
                         except OSError:
                             pass
                     _logger.debug("No supported archives found in %s", current_dir)
@@ -560,7 +565,9 @@ def process_downloads(
                 groups = build_archive_groups(archives)
                 target_dir = paths.extracted_root / relative_parent
                 # Use only the release name, not the full path structure
-                release_name = relative_parent.parts[-1] if relative_parent.parts else "unknown"
+                release_name = (
+                    relative_parent.parts[-1] if relative_parent.parts else "unknown"
+                )
 
                 # Calculate total parts across all groups for unified progress tracking
                 total_parts = sum(group.part_count for group in groups)
@@ -767,9 +774,7 @@ def process_downloads(
                             (group, release_name, current_dir)
                         )
                         # Also track the extracted directory to move its contents
-                        extracted_dirs_to_move.append(
-                            (target_dir, release_name)
-                        )
+                        extracted_dirs_to_move.append((target_dir, release_name))
                         processed += 1
 
                 # Complete extraction phase
@@ -849,7 +854,60 @@ def process_downloads(
                                     destination_dir / member.name
                                 )
                                 destination_dir.mkdir(parents=True, exist_ok=True)
-                                shutil.move(str(member), str(destination))
+
+                                # Try to move first, fallback to copy+delete if read-only filesystem
+                                try:
+                                    shutil.move(str(member), str(destination))
+                                except OSError as move_error:
+                                    if (
+                                        "Read-only file system" in str(move_error)
+                                        or move_error.errno == 30
+                                    ):
+                                        _logger.warning(
+                                            "Read-only file system detected, using copy+delete for %s",
+                                            member.name,
+                                        )
+                                        # Copy the file instead of moving
+                                        shutil.copy2(str(member), str(destination))
+                                        # Try to delete the original (may fail on read-only filesystem)
+                                        try:
+                                            member.unlink()
+                                        except OSError:
+                                            _logger.warning(
+                                                "Could not delete original file %s (read-only filesystem)",
+                                                member,
+                                            )
+                                    else:
+                                        raise move_error
+
+                                # Set proper permissions for moved files
+                                try:
+                                    import grp
+                                    import pwd
+
+                                    # Set permissions to 777 (read/write/execute for all)
+                                    destination.chmod(0o777)
+
+                                    # Set group to 'users' if available
+                                    try:
+                                        users_gid = grp.getgrnam("users").gr_gid
+                                        destination.chown(
+                                            destination.stat().st_uid, users_gid
+                                        )
+                                    except (KeyError, OSError):
+                                        # Fallback: try to get current user's group (Unix/Linux only)
+                                        try:
+                                            if hasattr(os, "getuid"):  # Unix/Linux only
+                                                current_uid = os.getuid()
+                                                current_user = pwd.getpwuid(current_uid)
+                                                current_gid = current_user.pw_gid
+                                                destination.chown(
+                                                    current_uid, current_gid
+                                                )
+                                        except (OSError, KeyError, AttributeError):
+                                            pass
+                                except (OSError, ImportError):
+                                    pass
                                 files_moved += 1
                                 move_tracker.advance(
                                     _logger,
@@ -887,7 +945,7 @@ def process_downloads(
                                 finished_root=paths.finished_root,
                                 download_root=download_root,
                             )
-                    
+
                     # Move remaining companion files from archive directories
                     for (
                         group,
@@ -919,7 +977,64 @@ def process_downloads(
                                     destination = ensure_unique_destination(
                                         finished_dir / entry.name
                                     )
-                                    shutil.move(str(entry), str(destination))
+
+                                    # Try to move first, fallback to copy+delete if read-only filesystem
+                                    try:
+                                        shutil.move(str(entry), str(destination))
+                                    except OSError as move_error:
+                                        if (
+                                            "Read-only file system" in str(move_error)
+                                            or move_error.errno == 30
+                                        ):
+                                            _logger.warning(
+                                                "Read-only file system detected, using copy+delete for %s",
+                                                entry.name,
+                                            )
+                                            # Copy the file instead of moving
+                                            shutil.copy2(str(entry), str(destination))
+                                            # Try to delete the original (may fail on read-only filesystem)
+                                            try:
+                                                entry.unlink()
+                                            except OSError:
+                                                _logger.warning(
+                                                    "Could not delete original file %s (read-only filesystem)",
+                                                    entry,
+                                                )
+                                        else:
+                                            raise move_error
+
+                                    # Set proper permissions for moved files
+                                    try:
+                                        import grp
+                                        import pwd
+
+                                        # Set permissions to 777 (read/write/execute for all)
+                                        destination.chmod(0o777)
+
+                                        # Set group to 'users' if available
+                                        try:
+                                            users_gid = grp.getgrnam("users").gr_gid
+                                            destination.chown(
+                                                destination.stat().st_uid, users_gid
+                                            )
+                                        except (KeyError, OSError):
+                                            # Fallback: try to get current user's group (Unix/Linux only)
+                                            try:
+                                                if hasattr(
+                                                    os, "getuid"
+                                                ):  # Unix/Linux only
+                                                    current_uid = os.getuid()
+                                                    current_user = pwd.getpwuid(
+                                                        current_uid
+                                                    )
+                                                    current_gid = current_user.pw_gid
+                                                    destination.chown(
+                                                        current_uid, current_gid
+                                                    )
+                                            except (OSError, KeyError, AttributeError):
+                                                pass
+                                    except (OSError, ImportError):
+                                        pass
                                 except OSError:
                                     pass
                             _remove_empty_subdirs(source_dir)

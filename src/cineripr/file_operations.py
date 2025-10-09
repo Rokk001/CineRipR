@@ -12,6 +12,37 @@ from .archive_detection import is_supported_archive
 from .progress import ProgressTracker
 
 
+def _set_file_permissions(path: Path) -> None:
+    """Set file permissions to 777 and group to 'users' if possible.
+
+    Args:
+        path: File or directory path to set permissions for
+    """
+    try:
+        import grp
+        import pwd
+
+        # Set permissions to 777 (read/write/execute for all)
+        path.chmod(0o777)
+
+        # Set group to 'users' if available
+        try:
+            users_gid = grp.getgrnam("users").gr_gid
+            path.chown(path.stat().st_uid, users_gid)
+        except (KeyError, OSError):
+            # Fallback: try to get current user's group (Unix/Linux only)
+            try:
+                if hasattr(os, "getuid"):  # Unix/Linux only
+                    current_uid = os.getuid()
+                    current_user = pwd.getpwuid(current_uid)
+                    current_gid = current_user.pw_gid
+                    path.chown(current_uid, current_gid)
+            except (OSError, KeyError, AttributeError):
+                pass
+    except (OSError, ImportError):
+        pass
+
+
 def ensure_unique_destination(destination: Path) -> Path:
     """Return the destination path, allowing overwrites.
 
@@ -308,14 +339,7 @@ def copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
                     dest_path = target_dir / entry.name
                     shutil.copy2(str(entry), str(dest_path))
                     # Fix permissions for copied files (important for Docker environments)
-                    try:
-                        import stat
-
-                        dest_path.chmod(
-                            stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
-                        )
-                    except (OSError, ImportError):
-                        pass
+                    _set_file_permissions(dest_path)
                 except OSError:
                     pass
     except OSError:
@@ -348,7 +372,34 @@ def move_archive_group(
 
     for index, src in enumerate(files, 1):
         destination = ensure_unique_destination(destination_dir / src.name)
-        moved_path = Path(shutil.move(str(src), str(destination)))
+
+        # Try to move first, fallback to copy+delete if read-only filesystem
+        try:
+            moved_path = Path(shutil.move(str(src), str(destination)))
+        except OSError as move_error:
+            if "Read-only file system" in str(move_error) or move_error.errno == 30:
+                if logger is not None:
+                    logger.warning(
+                        "Read-only file system detected, using copy+delete for %s",
+                        src.name,
+                    )
+                # Copy the file instead of moving
+                shutil.copy2(str(src), str(destination))
+                moved_path = destination
+                # Try to delete the original (may fail on read-only filesystem)
+                try:
+                    src.unlink()
+                except OSError:
+                    if logger is not None:
+                        logger.warning(
+                            "Could not delete original file %s (read-only filesystem)",
+                            src,
+                        )
+            else:
+                raise move_error
+
+        # Set proper permissions for moved files
+        _set_file_permissions(moved_path)
         moved.append(moved_path)
         if tracker is not None and logger is not None:
             tracker.advance(logger, f"Moved {src.name}", absolute=index)
@@ -374,15 +425,50 @@ def move_remaining_to_finished(
     """
 
     def move_file(src_file: Path) -> None:
-        # Get the release name (last part of the path relative to download_root)
-        rel_path = src_file.parent.relative_to(download_root)
-        # Use only the release name, not the full path structure
-        release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
+        # Try to get the release name from the path relative to download_root
+        # If that fails (e.g., for files in extracted directory), use a fallback
+        try:
+            rel_path = src_file.parent.relative_to(download_root)
+            release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
+        except ValueError:
+            # File is not under download_root (e.g., in extracted directory)
+            # Try to extract release name from the file path itself
+            path_parts = src_file.parts
+            # Look for common patterns in the path to extract release name
+            for part in path_parts:
+                # Look for parts that might be release names (contain dots, dashes, etc.)
+                if "." in part and any(char.isdigit() for char in part):
+                    # This looks like a release name, use it
+                    release_name = part
+                    break
+            else:
+                # Fallback: use the parent directory name
+                release_name = (
+                    src_file.parent.name if src_file.parent.name else "unknown"
+                )
+
         dest_dir = finished_root / release_name
         dest_dir.mkdir(parents=True, exist_ok=True)
         try:
             dest = ensure_unique_destination(dest_dir / src_file.name)
-            shutil.move(str(src_file), str(dest))
+
+            # Try to move first, fallback to copy+delete if read-only filesystem
+            try:
+                shutil.move(str(src_file), str(dest))
+            except OSError as move_error:
+                if "Read-only file system" in str(move_error) or move_error.errno == 30:
+                    # Copy the file instead of moving
+                    shutil.copy2(str(src_file), str(dest))
+                    # Try to delete the original (may fail on read-only filesystem)
+                    try:
+                        src_file.unlink()
+                    except OSError:
+                        pass  # Ignore deletion failures on read-only filesystem
+                else:
+                    raise move_error
+
+            # Set proper permissions for moved files
+            _set_file_permissions(dest)
         except OSError:
             pass
 

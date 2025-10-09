@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.18] - 2025-01-08
+
+### Fixed
+- **CRITICAL FIX:** Read-only File System Support - Fixed critical issue where file moves would fail on read-only file systems (errno 30)
+- Added fallback to copy+delete operations when move operations fail due to read-only file system
+- Graceful handling of cases where original files cannot be deleted on read-only file systems
+- **CRITICAL FIX:** Subpath Validation Error - Fixed persistent "is not in the subpath" error that was still occurring
+- Corrected path validation logic in `move_remaining_to_finished()` function with robust fallback path parsing
+- **Docker Permissions:** Set proper file permissions (777) and group ownership ('users') for all extracted and moved files
+- Added cross-platform compatibility with proper Unix/Linux vs Windows handling
+- Enhanced error handling and logging across all file operations
+
+### Changed
+- Updated all file move operations to handle read-only filesystem scenarios
+- Improved path validation logic to prevent subpath validation errors
+- Added consistent permission management throughout the application
+
 ## [1.0.17] - 2025-01-08
 
 ### Fixed
