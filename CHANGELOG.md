@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.19] - 2025-01-27
+
+### Fixed
+- **CRITICAL FIX:** Windows UNC Path Support - Fixed handling of Windows UNC paths in Docker containers (e.g., `\\HS\Download\dcpp\A.Test.Extract`)
+- Added multiple retry strategies for file operations in Docker environments
+- Improved path normalization for Windows network shares in Docker containers
+- Enhanced error handling and logging for failed file operations
+- Added `_safe_move_with_retry()` function with comprehensive fallback strategies
+
+### Changed
+- Updated all file move operations to use new safe move function
+- Improved Docker container compatibility for Windows network paths
+- Enhanced logging for better debugging of file operation failures
+
 ## [1.0.18] - 2025-01-08
 
 ### Fixed

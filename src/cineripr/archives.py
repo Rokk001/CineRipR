@@ -978,30 +978,11 @@ def process_downloads(
                                         finished_dir / entry.name
                                     )
 
-                                    # Try to move first, fallback to copy+delete if read-only filesystem
-                                    try:
-                                        shutil.move(str(entry), str(destination))
-                                    except OSError as move_error:
-                                        if (
-                                            "Read-only file system" in str(move_error)
-                                            or move_error.errno == 30
-                                        ):
-                                            _logger.warning(
-                                                "Read-only file system detected, using copy+delete for %s",
-                                                entry.name,
-                                            )
-                                            # Copy the file instead of moving
-                                            shutil.copy2(str(entry), str(destination))
-                                            # Try to delete the original (may fail on read-only filesystem)
-                                            try:
-                                                entry.unlink()
-                                            except OSError:
-                                                _logger.warning(
-                                                    "Could not delete original file %s (read-only filesystem)",
-                                                    entry,
-                                                )
-                                        else:
-                                            raise move_error
+                                    # Use safe move with retry strategies for Docker/UNC paths
+                                    from .file_operations import _safe_move_with_retry
+                                    if not _safe_move_with_retry(entry, destination, _logger):
+                                        _logger.error("Failed to move %s to finished directory", entry.name)
+                                        continue
 
                                     # Set proper permissions for moved files
                                     try:
