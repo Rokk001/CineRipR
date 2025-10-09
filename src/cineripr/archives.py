@@ -915,13 +915,18 @@ def process_downloads(
                 # Move extracted files to finished directory
                 if not demo_mode:
                     # Move extracted directories (this ensures extracted files are moved even if archives fail)
+                    # Only move TV shows to finished, movies stay in extracted
                     for extracted_dir, release_name in extracted_dirs_to_move:
                         if extracted_dir.exists():
-                            move_remaining_to_finished(
-                                extracted_dir,
-                                finished_root=paths.finished_root,
-                                download_root=download_root,
-                            )
+                            # Check if this is a TV show or movie
+                            if looks_like_tv_show(extracted_dir):
+                                # TV shows: move to finished directory
+                                move_remaining_to_finished(
+                                    extracted_dir,
+                                    finished_root=paths.finished_root,
+                                    download_root=download_root,
+                                )
+                            # Movies: leave in extracted directory (do nothing)
 
                     # Move remaining companion files from archive directories
                     for (
