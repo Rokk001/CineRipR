@@ -15,8 +15,8 @@ This document explains how CineRipR moves files from the `extracted` directory t
 ### Input Structure (from downloads)
 ```
 Download/
-  Henry.Danger.S01.GERMAN.1080p.WEB.H264-MiSFiTS/
-    Henry.Danger.S01E05.GERMAN.1080p.WEB.H264-MiSFiTS/
+  Show.Name.S01.GROUP/
+    Show.Name.S01E05.GROUP/
       episode-archive.part01.rar
       episode-archive.part02.rar
 ```
@@ -25,20 +25,20 @@ Download/
 ```
 Extracted/
   TV-Shows/
-    Henry Danger/
+    Show Name/
       Season 01/
-        Henry.Danger.S01E05.GERMAN.1080p.WEB.H264-MiSFiTS.mkv
-        Henry.Danger.S01E05.GERMAN.1080p.WEB.H264-MiSFiTS.nfo
+        Show.Name.S01E05.GROUP.mkv
+        Show.Name.S01E05.GROUP.nfo
 ```
 
 ### Finished Structure (final)
 ```
 Finished/
   TV-Shows/
-    Henry Danger/
+    Show Name/
       Season 01/
-        Henry.Danger.S01E05.GERMAN.1080p.WEB.H264-MiSFiTS.mkv
-        Henry.Danger.S01E05.GERMAN.1080p.WEB.H264-MiSFiTS.nfo
+        Show.Name.S01E05.GROUP.mkv
+        Show.Name.S01E05.GROUP.nfo
 ```
 
 ## Movie Organization
@@ -46,7 +46,7 @@ Finished/
 ### Input Structure
 ```
 Download/
-  Movie.Name.2024.GERMAN.1080p.BluRay-GROUP/
+  Movie.Name.2024.GROUP/
     movie-archive.part01.rar
     movie-archive.part02.rar
 ```
@@ -55,9 +55,9 @@ Download/
 ```
 Finished/
   Movies/
-    Movie.Name.2024.GERMAN.1080p.BluRay-GROUP/
-      Movie.Name.2024.GERMAN.1080p.BluRay-GROUP.mkv
-      Movie.Name.2024.GERMAN.1080p.BluRay-GROUP.nfo
+    Movie.Name.2024.GROUP/
+      Movie.Name.2024.GROUP.mkv
+      Movie.Name.2024.GROUP.nfo
 ```
 
 ## Key Functions
@@ -84,16 +84,16 @@ The `build_tv_show_path()` function:
 
 ### Example Transformations
 
-| Input Path | Output Path |
-|------------|-------------|
-| `Henry.Danger.S01.GERMAN.1080p.WEB.H264-MiSFiTS` | `TV-Shows/Henry Danger/Season 01/` |
-| `12.Monkeys.S02.German.1080p.BluRay-GROUP` | `TV-Shows/12 Monkeys/Season 02/` |
-| `Movie.Name.2024.GERMAN.1080p.BluRay-GROUP` | `Movies/Movie.Name.2024.GERMAN.1080p.BluRay-GROUP/` |
+| Input Path                                       | Output Path                                         |
+| ------------------------------------------------ | --------------------------------------------------- |
+| `Show.Name.S01.GROUP`                            | `TV-Shows/Show Name/Season 01/`                     |
+| `Another.Show.S02.GROUP`                         | `TV-Shows/Another Show/Season 02/`                  |
+| `Movie.Name.2024.GROUP`                          | `Movies/Movie.Name.2024.GROUP/`                     |
 
 ## Error Handling
 
 ### UNC Path Support
-- Detects Windows UNC paths (e.g., `\\HS\Download\...`)
+- Detects Windows UNC paths (e.g., `\\SERVER\Share\...`)
 - Normalizes paths for Docker container compatibility
 - Uses multiple retry strategies for file operations
 
