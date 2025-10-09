@@ -5,6 +5,7 @@
 # - UNC paths like \\HS\Download\...
 # - Local directory structures
 # - Personal/private information
+# - ANY real paths from user's system
 # 
 # ALWAYS use:
 # - Generic descriptions
@@ -12,3 +13,13 @@
 # - General technical terms
 # 
 # Example: "Fixed Windows UNC path handling" NOT "Fixed \\HS\Download\dcpp\A.Test.Extract"
+# 
+# CRITICAL: Before ANY commit or release, scan for:
+# - Backslashes followed by letters (UNC paths)
+# - Specific folder names from user's system
+# - Any path that looks like a real directory
+# 
+# If found, replace with generic placeholders like:
+# - \\SERVER\Share\... -> \\SERVER\Share\...
+# - Specific folder names -> Generic folder names
+# - Real file names -> Example file names
