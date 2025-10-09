@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.20] - 2025-01-27
+
+### Fixed
+- **CRITICAL FIX:** TV Show Organization - Fixed TV show extraction and finished path logic
+- TV shows now properly follow README specification: `TV-Shows/Show Name/Season XX/`
+- Fixed issue where TV shows were not using proper folder structure in finished directory
+- Enhanced `move_remaining_to_finished()` to detect TV shows and use correct path building
+- Added comprehensive documentation for finished path logic
+
+### Changed
+- Updated TV show path building to use existing `build_tv_show_path()` logic
+- Improved finished directory organization for both TV shows and movies
+- Enhanced error handling and fallback logic for path building
+
+### Added
+- `FINISHED_PATH_LOGIC.md` - Complete documentation of finished path logic
+- Detailed explanation of TV show vs movie organization
+- Debugging guide for finished path issues
+
 ## [1.0.19] - 2025-01-27
 
 ### Fixed

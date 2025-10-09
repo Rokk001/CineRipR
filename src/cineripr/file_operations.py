@@ -504,39 +504,62 @@ def move_remaining_to_finished(
 ) -> None:
     """Move all remaining files (any type) under current_dir to finished.
 
-    This is independent of extraction policy. The destination mirrors the
-    original download structure beneath finished_root.
+    For TV shows, this uses the proper TV-Show structure from README:
+    TV-Shows/Show Name/Season XX/
+    
+    For movies and other content, this mirrors the original download structure.
 
     Args:
         current_dir: Source directory
         finished_root: Root of finished directory
         download_root: Root of downloads directory
     """
+    from .path_utils import looks_like_tv_show, build_tv_show_path, get_category_prefix
 
     def move_file(src_file: Path) -> None:
-        # Try to get the release name from the path relative to download_root
-        # If that fails (e.g., for files in extracted directory), use a fallback
-        try:
-            rel_path = src_file.parent.relative_to(download_root)
-            release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
-        except ValueError:
-            # File is not under download_root (e.g., in extracted directory)
-            # Try to extract release name from the file path itself
-            path_parts = src_file.parts
-            # Look for common patterns in the path to extract release name
-            for part in path_parts:
-                # Look for parts that might be release names (contain dots, dashes, etc.)
-                if "." in part and any(char.isdigit() for char in part):
-                    # This looks like a release name, use it
-                    release_name = part
-                    break
-            else:
-                # Fallback: use the parent directory name
-                release_name = (
-                    src_file.parent.name if src_file.parent.name else "unknown"
-                )
+        # Determine if this is a TV show based on the extracted directory structure
+        is_tv_show = looks_like_tv_show(current_dir)
+        
+        if is_tv_show:
+            # For TV shows, use the proper structure from README
+            try:
+                # Get the category prefix (TV-Shows)
+                category_prefix = get_category_prefix(current_dir)
+                
+                # Build the proper TV show path using the existing logic
+                tv_show_path = build_tv_show_path(current_dir, download_root, category_prefix)
+                dest_dir = finished_root / tv_show_path
+            except (ValueError, OSError):
+                # Fallback to simple structure if TV show path building fails
+                try:
+                    rel_path = src_file.parent.relative_to(download_root)
+                    release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
+                except ValueError:
+                    release_name = src_file.parent.name if src_file.parent.name else "unknown"
+                dest_dir = finished_root / release_name
+        else:
+            # For movies and other content, use the original logic
+            try:
+                rel_path = src_file.parent.relative_to(download_root)
+                release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
+            except ValueError:
+                # File is not under download_root (e.g., in extracted directory)
+                # Try to extract release name from the file path itself
+                path_parts = src_file.parts
+                # Look for common patterns in the path to extract release name
+                for part in path_parts:
+                    # Look for parts that might be release names (contain dots, dashes, etc.)
+                    if "." in part and any(char.isdigit() for char in part):
+                        # This looks like a release name, use it
+                        release_name = part
+                        break
+                else:
+                    # Fallback: use the parent directory name
+                    release_name = (
+                        src_file.parent.name if src_file.parent.name else "unknown"
+                    )
+            dest_dir = finished_root / release_name
 
-        dest_dir = finished_root / release_name
         dest_dir.mkdir(parents=True, exist_ok=True)
         try:
             dest = ensure_unique_destination(dest_dir / src_file.name)

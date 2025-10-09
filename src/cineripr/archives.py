@@ -980,8 +980,14 @@ def process_downloads(
 
                                     # Use safe move with retry strategies for Docker/UNC paths
                                     from .file_operations import _safe_move_with_retry
-                                    if not _safe_move_with_retry(entry, destination, _logger):
-                                        _logger.error("Failed to move %s to finished directory", entry.name)
+
+                                    if not _safe_move_with_retry(
+                                        entry, destination, _logger
+                                    ):
+                                        _logger.error(
+                                            "Failed to move %s to finished directory",
+                                            entry.name,
+                                        )
                                         continue
 
                                     # Set proper permissions for moved files
