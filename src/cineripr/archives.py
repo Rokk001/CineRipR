@@ -34,7 +34,6 @@ from typing import Callable, Optional
 
 # from .cleanup import cleanup_finished  # re-export usage parity
 from .progress import ProgressTracker, format_progress, next_progress_color
-import os
 
 
 _logger = logging.getLogger(__name__)
@@ -882,30 +881,8 @@ def process_downloads(
 
                                 # Set proper permissions for moved files
                                 try:
-                                    import grp
-                                    import pwd
-
                                     # Set permissions to 777 (read/write/execute for all)
                                     destination.chmod(0o777)
-
-                                    # Set group to 'users' if available
-                                    try:
-                                        users_gid = grp.getgrnam("users").gr_gid
-                                        destination.chown(
-                                            destination.stat().st_uid, users_gid
-                                        )
-                                    except (KeyError, OSError):
-                                        # Fallback: try to get current user's group (Unix/Linux only)
-                                        try:
-                                            if hasattr(os, "getuid"):  # Unix/Linux only
-                                                current_uid = os.getuid()
-                                                current_user = pwd.getpwuid(current_uid)
-                                                current_gid = current_user.pw_gid
-                                                destination.chown(
-                                                    current_uid, current_gid
-                                                )
-                                        except (OSError, KeyError, AttributeError):
-                                            pass
                                 except (OSError, ImportError):
                                     pass
                                 files_moved += 1

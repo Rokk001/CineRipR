@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.22] - 2025-01-27
+
+### Fixed
+- **CRITICAL FIX:** Removed all chown commands that were causing errors in Docker containers
+- Fixed 'PosixPath' object has no attribute 'chown' error
+- Simplified permission handling to only set chmod 777, no group ownership changes
+- Removed unused imports and cleaned up code
+
+### Changed
+- Permission setting now only uses chmod 777 without chown operations
+- Removed dependency on grp and pwd modules for group ownership
+- Simplified _set_file_permissions() function to avoid Docker permission issues
+
 ## [1.0.21] - 2025-01-27
 
 ### Fixed

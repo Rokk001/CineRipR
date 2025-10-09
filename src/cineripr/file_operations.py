@@ -13,32 +13,14 @@ from .progress import ProgressTracker
 
 
 def _set_file_permissions(path: Path) -> None:
-    """Set file permissions to 777 and group to 'users' if possible.
+    """Set file permissions to 777.
 
     Args:
         path: File or directory path to set permissions for
     """
     try:
-        import grp
-        import pwd
-
         # Set permissions to 777 (read/write/execute for all)
         path.chmod(0o777)
-
-        # Set group to 'users' if available
-        try:
-            users_gid = grp.getgrnam("users").gr_gid
-            path.chown(path.stat().st_uid, users_gid)
-        except (KeyError, OSError):
-            # Fallback: try to get current user's group (Unix/Linux only)
-            try:
-                if hasattr(os, "getuid"):  # Unix/Linux only
-                    current_uid = os.getuid()
-                    current_user = pwd.getpwuid(current_uid)
-                    current_gid = current_user.pw_gid
-                    path.chown(current_uid, current_gid)
-            except (OSError, KeyError, AttributeError):
-                pass
     except (OSError, ImportError):
         pass
 
