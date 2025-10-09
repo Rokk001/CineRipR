@@ -914,20 +914,14 @@ def process_downloads(
 
                 # Move extracted files to finished directory
                 if not demo_mode:
-                    # Move the original files from download directory to finished directory
-                    # (the extracted files in extracted_dir are copies, originals are in download)
+                    # Move extracted directories (this ensures extracted files are moved even if archives fail)
                     for extracted_dir, release_name in extracted_dirs_to_move:
                         if extracted_dir.exists():
-                            # Find the corresponding source directory in downloads
-                            # and move the original files from there
-                            for source_dir, _ in files_to_move:
-                                if source_dir.name == release_name:
-                                    move_remaining_to_finished(
-                                        source_dir,
-                                        finished_root=paths.finished_root,
-                                        download_root=download_root,
-                                    )
-                                    break
+                            move_remaining_to_finished(
+                                extracted_dir,
+                                finished_root=paths.finished_root,
+                                download_root=download_root,
+                            )
 
                     # Move remaining companion files from archive directories
                     for (
