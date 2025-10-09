@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.23] - 2025-01-27
+
+### Fixed
+- **CRITICAL FIX:** Archive Movement Logic - Corrected implementation of archive file movement
+- Fixed confusion about what gets moved to finished directory
+- Original archive files (e.g., .rar) are now correctly moved from download/ to finished/ after extraction
+- Extracted content remains in extracted/ directory as intended
+- Clarified the two-step process: extract content to extracted/, then move original archives to finished/
+
+### Changed
+- Updated `process_downloads()` to use `move_archive_group()` for moving original archive files
+- Improved documentation and comments to clarify the extraction vs. movement process
+- Enhanced project documentation to prevent future confusion about file movement logic
+
+### Added
+- Clear documentation of the two-step process in PROJECT_STATUS.md
+- Updated version tracking and project structure documentation
+
 ## [1.0.22] - 2025-01-27
 
 ### Fixed

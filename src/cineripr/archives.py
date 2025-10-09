@@ -924,6 +924,7 @@ def process_downloads(
                                 if source_dir.name == release_name:
                                     # Move archive files using move_archive_group
                                     from .file_operations import move_archive_group
+
                                     move_archive_group(
                                         group.members,
                                         finished_root=paths.finished_root,

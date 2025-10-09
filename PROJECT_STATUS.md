@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.22)
+## Aktueller Stand (Version 1.0.23)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -8,6 +8,7 @@
 3. **Docker Permission Errors**: Alle `chown` Befehle entfernt - nur noch `chmod 777`
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
+6. **Archive Movement Logic**: Korrekte Implementierung - Original-Archive werden nach `finished/` verschoben, extrahierte Inhalte bleiben in `extracted/`
 
 ### 🔧 Aktuelle Architektur
 
@@ -27,8 +28,8 @@
 ### 📁 Projektstruktur
 ```
 src/cineripr/
-├── __init__.py              # Version 1.0.22
-├── archives.py              # Hauptorchestrierung (972 Zeilen)
+├── __init__.py              # Version 1.0.23
+├── archives.py              # Hauptorchestrierung (981 Zeilen)
 ├── file_operations.py       # Datei-Operationen (589 Zeilen)
 ├── path_utils.py            # Pfad-Utilities
 ├── archive_extraction.py    # Extraktionslogik
@@ -87,7 +88,7 @@ Finished/
 - **Safe Move**: Mehrere Retry-Strategien
 
 ### 📋 Nächste Schritte (TODO)
-1. **Testing**: Aktuelle Version 1.0.22 testen
+1. **Testing**: Aktuelle Version 1.0.23 testen
 2. **Performance**: Große Archive-Performance optimieren
 3. **Logging**: Verbesserte Debug-Ausgaben
 4. **Error Handling**: Robustere Fehlerbehandlung
