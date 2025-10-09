@@ -965,65 +965,12 @@ def process_downloads(
                 if not demo_mode:
                     for source_dir, release_name in files_to_move:
                         try:
-                            # Use only the release name, not the full path structure
-                            finished_dir = paths.finished_root / release_name
-                            finished_dir.mkdir(parents=True, exist_ok=True)
-                            for entry in sorted(
-                                source_dir.iterdir(), key=lambda p: p.name.lower()
-                            ):
-                                if not entry.is_file():
-                                    continue
-                                try:
-                                    destination = ensure_unique_destination(
-                                        finished_dir / entry.name
-                                    )
-
-                                    # Use safe move with retry strategies for Docker/UNC paths
-                                    from .file_operations import _safe_move_with_retry
-
-                                    if not _safe_move_with_retry(
-                                        entry, destination, _logger
-                                    ):
-                                        _logger.error(
-                                            "Failed to move %s to finished directory",
-                                            entry.name,
-                                        )
-                                        continue
-
-                                    # Set proper permissions for moved files
-                                    try:
-                                        import grp
-                                        import pwd
-
-                                        # Set permissions to 777 (read/write/execute for all)
-                                        destination.chmod(0o777)
-
-                                        # Set group to 'users' if available
-                                        try:
-                                            users_gid = grp.getgrnam("users").gr_gid
-                                            destination.chown(
-                                                destination.stat().st_uid, users_gid
-                                            )
-                                        except (KeyError, OSError):
-                                            # Fallback: try to get current user's group (Unix/Linux only)
-                                            try:
-                                                if hasattr(
-                                                    os, "getuid"
-                                                ):  # Unix/Linux only
-                                                    current_uid = os.getuid()
-                                                    current_user = pwd.getpwuid(
-                                                        current_uid
-                                                    )
-                                                    current_gid = current_user.pw_gid
-                                                    destination.chown(
-                                                        current_uid, current_gid
-                                                    )
-                                            except (OSError, KeyError, AttributeError):
-                                                pass
-                                    except (OSError, ImportError):
-                                        pass
-                                except OSError:
-                                    pass
+                            # Use move_remaining_to_finished for proper TV show organization
+                            move_remaining_to_finished(
+                                source_dir,
+                                finished_root=paths.finished_root,
+                                download_root=download_root,
+                            )
                             _remove_empty_subdirs(source_dir)
                             _remove_empty_tree(source_dir, stop=download_root)
                         except OSError:

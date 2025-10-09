@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.21] - 2025-01-27
+
+### Fixed
+- **CRITICAL FIX:** Fixed files being moved with 1:1 download structure instead of proper TV show organization
+- Fixed issue where non-archive files were bypassing the proper TV show path building logic
+- Updated `process_downloads()` to use `move_remaining_to_finished()` for all file moves
+- Ensures TV shows follow the correct `TV-Shows/Show Name/Season XX/` structure
+
+### Changed
+- All file moves now use the centralized `move_remaining_to_finished()` function
+- Removed duplicate file moving logic that was creating incorrect folder structures
+- Improved consistency between archive and non-archive file handling
+
 ## [1.0.20] - 2025-01-27
 
 ### Fixed
