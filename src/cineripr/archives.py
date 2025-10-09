@@ -912,20 +912,22 @@ def process_downloads(
                         f"Finished moving {files_moved} file(s) for release {release_dir.name}",
                     )
 
-                # Move original files from download to finished directory
+                # Move archive files from download to finished directory
                 if not demo_mode:
-                    # Move the original files from download directory to finished directory
-                    # (the extracted files in extracted_dir are copies, originals are in download)
+                    # Move the archive files from download directory to finished directory
+                    # (the extracted content stays in extracted/, archives move to finished/)
                     for extracted_dir, release_name in extracted_dirs_to_move:
                         if extracted_dir.exists():
-                            # Find the corresponding source directory in downloads
-                            # and move the original files from there
-                            for source_dir, _ in files_to_move:
+                            # Find the corresponding archive files in downloads
+                            # and move the archive files to finished
+                            for group, _, source_dir in archive_groups_to_move:
                                 if source_dir.name == release_name:
-                                    move_remaining_to_finished(
-                                        source_dir,
+                                    # Move archive files using move_archive_group
+                                    from .file_operations import move_archive_group
+                                    move_archive_group(
+                                        group.members,
                                         finished_root=paths.finished_root,
-                                        download_root=download_root,
+                                        relative_parent=Path(release_name),
                                     )
                                     break
 
