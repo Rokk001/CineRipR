@@ -21,6 +21,7 @@ from .file_operations import (
     handle_extraction_failure,
     move_remaining_to_finished,
     ensure_unique_destination,
+    move_related_episode_artifacts,
 )
 from .path_utils import (
     is_season_directory,
@@ -953,6 +954,18 @@ def process_downloads(
                             finished_root=paths.finished_root,
                             download_root=download_root,
                         )
+                        # Additionally, move related artifacts for TV episodes (Subs/Sample/etc.)
+                        try:
+                            from .archive_constants import EPISODE_ONLY_TAG_RE
+
+                            if EPISODE_ONLY_TAG_RE.search(source_dir.name):
+                                move_related_episode_artifacts(
+                                    source_dir,
+                                    finished_root=paths.finished_root,
+                                    download_root=download_root,
+                                )
+                        except Exception:
+                            pass
                     except OSError:
                         pass
                     _remove_empty_subdirs(source_dir)

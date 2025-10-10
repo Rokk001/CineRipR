@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.29] - 2025-10-10
+
+### Fixed
+- Extracted TV shows: derive show name correctly when season folders (e.g., `S01`) are present; target `_extracted/TV-Shows/<Series>/Season XX/...`
+- Ensure related episode artifacts in sibling folders (`Subs`, `Sample`, `Sonstige`, `Proof`) are moved alongside the episode to finished
+
+### Notes
+- If no valid archive groups are found for a context, extraction is skipped with an error log (likely incomplete download)
+- Finished archiving logic remains unchanged
+
 ## [1.0.28] - 2025-10-10
 
 ### Fixed

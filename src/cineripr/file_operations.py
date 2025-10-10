@@ -580,3 +580,65 @@ __all__ = [
     "move_remaining_to_finished",
     "move_extracted_to_finished",
 ]
+
+
+def move_related_episode_artifacts(
+    episode_dir: Path, *, finished_root: Path, download_root: Path
+) -> None:
+    """Move related artifacts (Subs/Sample/Sonstige/Proof) for a TV episode.
+
+    Looks at sibling directories of the episode directory and moves files that
+    match the episode tag (E01/E001) into the corresponding destination under
+    finished, preserving structure.
+
+    This avoids leaving behind subtitles or samples stored in sibling folders.
+    """
+    from .archive_constants import EPISODE_ONLY_TAG_RE
+
+    match = EPISODE_ONLY_TAG_RE.search(episode_dir.name)
+    if not match:
+        return
+    episode_tag = match.group(0).lower()
+
+    parent = episode_dir.parent
+    try:
+        siblings = [p for p in parent.iterdir() if p.is_dir()]
+    except OSError:
+        return
+
+    related_names = {"subs", "sub", "sample", "sonstige", "proof"}
+
+    for sib in siblings:
+        if sib == episode_dir:
+            continue
+        if sib.name.strip().lower() not in related_names:
+            continue
+        # Walk sib and move only files that include the episode tag
+        try:
+            for root, _dirs, files in os.walk(sib):
+                root_path = Path(root)
+                for fname in files:
+                    if episode_tag not in fname.lower():
+                        continue
+                    src_file = root_path / fname
+                    # Compute destination based on the episode_dir
+                    try:
+                        rel_parts = episode_dir.relative_to(download_root).parts
+                        if not rel_parts:
+                            continue
+                        release_root_name = rel_parts[0]
+                        release_root = download_root / release_root_name
+                        try:
+                            sub_rel = episode_dir.relative_to(release_root)
+                        except ValueError:
+                            sub_rel = Path("")
+                        # Put artifacts next to episode files under the same sub_rel
+                        dest_dir = finished_root / release_root_name / sub_rel
+                        dest_dir.mkdir(parents=True, exist_ok=True)
+                        dest = ensure_unique_destination(dest_dir / fname)
+                        if _safe_move_with_retry(src_file, dest):
+                            _set_file_permissions(dest)
+                    except ValueError:
+                        continue
+        except OSError:
+            continue
