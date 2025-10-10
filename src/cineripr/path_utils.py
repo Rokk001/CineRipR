@@ -96,12 +96,22 @@ def build_tv_show_path(base_dir: Path, download_root: Path, base_prefix: Path) -
             season_num = int(season_match.group(1))
             season_normalized = f"Season {season_num:02d}"
 
-            # Extract show name from the tagged segment by stripping everything from .Sxx
-            show_name = re.sub(r"\.S\d+.*", "", tagged_part, flags=re.IGNORECASE)
-            show_name = show_name.replace(".", " ").strip()
-            if not show_name and parts:
-                # Fallback to the first component if we somehow stripped everything
+            # If the tagged_part is a pure season directory (e.g., 'S01', 'Season 01', 'Staffel 01'),
+            # derive the show name from the first rel_path component (parts[0]).
+            pure_season_dir = (
+                SEASON_SHORT_DIR_RE.match(tagged_part) is not None
+                or SEASON_DIR_RE.match(tagged_part) is not None
+                or STAFFEL_DIR_RE.match(tagged_part) is not None
+            )
+            if pure_season_dir:
                 show_name = parts[0].replace(".", " ").strip()
+            else:
+                # Extract show name from the tagged segment by stripping everything from .Sxx
+                show_name = re.sub(r"\.S\d+.*", "", tagged_part, flags=re.IGNORECASE)
+                show_name = show_name.replace(".", " ").strip()
+                if not show_name and parts:
+                    # Fallback to the first component if we somehow stripped everything
+                    show_name = parts[0].replace(".", " ").strip()
 
             return base_prefix / show_name / season_normalized
 

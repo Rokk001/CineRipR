@@ -116,7 +116,7 @@ def _iter_release_directories(
     # For extracted targets we want a category prefix:
     # TV shows under 'TV-Show', movies under 'Movies'.
     extracted_prefix = (
-        Path("TV-Show") if looks_like_tv_show(base_dir) else Path("Movies")
+        Path("TV-Shows") if looks_like_tv_show(base_dir) else Path("Movies")
     )
 
     # Process all subdirectories first
@@ -568,7 +568,15 @@ def process_downloads(
                     continue
 
                 # Process archives in this directory
+                # Build archive groups; if grouping fails unexpectedly, skip extraction for this context
                 groups = build_archive_groups(archives)
+                if not groups:
+                    _logger.error(
+                        "No valid archive groups found in %s - likely incomplete download; skipping extraction",
+                        current_dir,
+                    )
+                    failed.append(current_dir)
+                    continue
                 target_dir = paths.extracted_root / relative_parent
                 # Use only the release name, not the full path structure
                 release_name = (

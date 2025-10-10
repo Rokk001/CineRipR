@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.28] - 2025-10-10
+
+### Fixed
+- Use `TV-Shows` (plural) as extracted category name
+- Correct show-name derivation when season folder like `S01` is present: place under `<Series>/Season 01`, not under `S01/Season 01`
+- Skip extraction when no valid archive groups are found (likely incomplete download); log error only
+
+### Notes
+- Finished archiving logic unchanged (1:1 mirror of downloads)
+
 ## [1.0.27] - 2025-10-10
 
 ### Fixed
