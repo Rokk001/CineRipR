@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.23)
+## Aktueller Stand (Version 1.0.24)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -8,7 +8,13 @@
 3. **Docker Permission Errors**: Alle `chown` Befehle entfernt - nur noch `chmod 777`
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
-6. **Archive Movement Logic**: Korrekte Implementierung - Original-Archive werden nach `finished/` verschoben, extrahierte Inhalte bleiben in `extracted/`
+6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`
+
+### 🔖 Entscheidungen (wichtig fürs nächste Mal)
+- `extracted` ist der finale, endgültige Zielpfad für extrahierte Inhalte.
+- `finished` spiegelt die Download-Quelle 1:1 (alle Dateien/Unterordner) unter `finished/<ReleaseName>/`.
+- Keine TV-spezifische Umstrukturierung im `finished`-Pfad.
+- Companions (z. B. `Sample`, `Subs`) werden beim Verschieben nach `finished` unverändert übernommen.
 
 ### 🔧 Aktuelle Architektur
 
@@ -76,10 +82,9 @@ Finished/
 
 ### 🔄 Prozess-Flow
 1. **Scan**: Downloads-Verzeichnis scannen
-2. **Extract**: Archive in `extracted/` extrahieren
-3. **Organize**: TV-Shows/Movies korrekt strukturieren
-4. **Move**: Von `extracted/` zu `finished/` mit korrekter Struktur
-5. **Cleanup**: Original-Archive zu `finished/` verschieben
+2. **Extract**: Archive nach `extracted/` extrahieren (dies ist der finale Ort der extrahierten Inhalte)
+3. **Move**: QUELL-DATEIEN aus dem Download-Release 1:1 nach `finished/<ReleaseName>/` verschieben (Spiegelung der Struktur)
+4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
 ### 🐳 Docker-Unterstützung
 - **UNC-Pfade**: `\\SERVER\Share\...` → `/data/downloads/...`

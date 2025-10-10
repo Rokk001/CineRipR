@@ -422,15 +422,11 @@ def copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
                 if entry.suffix.lower() == ".sfv":
                     continue
                 try:
-                    # Copy and overwrite existing files
+                    # Copy and overwrite existing files (do not remove source)
                     dest_path = target_dir / entry.name
-                    # Use safe copy with retry strategies for Docker/UNC paths
-                    if _safe_move_with_retry(entry, dest_path):
-                        # Fix permissions for copied files (important for Docker environments)
-                        _set_file_permissions(dest_path)
-                    else:
-                        _logger = logging.getLogger(__name__)
-                        _logger.error("Failed to copy %s to %s", entry, dest_path)
+                    shutil.copy2(str(entry), str(dest_path))
+                    # Fix permissions for copied files (important for Docker environments)
+                    _set_file_permissions(dest_path)
                 except OSError as e:
                     _logger = logging.getLogger(__name__)
                     _logger.error("Error copying %s: %s", entry, e)
@@ -488,90 +484,87 @@ def move_remaining_to_finished(
     finished_root: Path,
     download_root: Path,
 ) -> None:
-    """Move all remaining files (any type) under current_dir to finished.
+    """Mirror files from a release directory in downloads to finished 1:1.
 
-    For TV shows, this uses the proper TV-Show structure from README:
-    TV-Shows/Show Name/Season XX/
-
-    For movies and other content, this mirrors the original download structure.
+    All files under the release root in downloads are moved into
+    finished/<release_root_name>/, preserving the relative subfolder structure.
 
     Args:
-        current_dir: Source directory
+        current_dir: A directory within a release (often the release root itself)
         finished_root: Root of finished directory
         download_root: Root of downloads directory
     """
-    from .path_utils import looks_like_tv_show, build_tv_show_path, get_category_prefix
-
-    def move_file(src_file: Path) -> None:
-        # Determine if this is a TV show based on the extracted directory structure
-        is_tv_show = looks_like_tv_show(current_dir)
-
-        if is_tv_show:
-            # For TV shows, use the proper structure from README
-            try:
-                # Get the category prefix (TV-Shows)
-                category_prefix = get_category_prefix(current_dir)
-
-                # Build the proper TV show path using the existing logic
-                tv_show_path = build_tv_show_path(
-                    current_dir, download_root, category_prefix
-                )
-                dest_dir = finished_root / tv_show_path
-            except (ValueError, OSError):
-                # Fallback to simple structure if TV show path building fails
-                try:
-                    rel_path = src_file.parent.relative_to(download_root)
-                    release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
-                except ValueError:
-                    release_name = (
-                        src_file.parent.name if src_file.parent.name else "unknown"
-                    )
-                dest_dir = finished_root / release_name
-        else:
-            # For movies and other content, use the original logic
-            try:
-                rel_path = src_file.parent.relative_to(download_root)
-                release_name = rel_path.parts[-1] if rel_path.parts else "unknown"
-            except ValueError:
-                # File is not under download_root (e.g., in extracted directory)
-                # Try to extract release name from the file path itself
-                path_parts = src_file.parts
-                # Look for common patterns in the path to extract release name
-                for part in path_parts:
-                    # Look for parts that might be release names (contain dots, dashes, etc.)
-                    if "." in part and any(char.isdigit() for char in part):
-                        # This looks like a release name, use it
-                        release_name = part
-                        break
-                else:
-                    # Fallback: use the parent directory name
-                    release_name = (
-                        src_file.parent.name if src_file.parent.name else "unknown"
-                    )
-            dest_dir = finished_root / release_name
-
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            dest = ensure_unique_destination(dest_dir / src_file.name)
-
-            # Use safe move with retry strategies for Docker/UNC paths
-            if _safe_move_with_retry(src_file, dest):
-                # Set proper permissions for moved files
-                _set_file_permissions(dest)
-            else:
-                # Log error if move completely failed
-                _logger = logging.getLogger(__name__)
-                _logger.error("Failed to move %s to %s", src_file, dest)
-
-        except OSError as e:
-            _logger = logging.getLogger(__name__)
-            _logger.error("Error moving %s: %s", src_file, e)
+    # Determine the release root as the first path segment under download_root
+    try:
+        rel_parts = current_dir.relative_to(download_root).parts
+        if not rel_parts:
+            return
+        release_root_name = rel_parts[0]
+        release_root = download_root / release_root_name
+    except ValueError:
+        # current_dir is not under download_root; fall back to using its top name
+        release_root = current_dir
+        release_root_name = current_dir.name
 
     try:
         for root, _dirs, files in os.walk(current_dir):
             root_path = Path(root)
+            try:
+                sub_rel = root_path.relative_to(release_root)
+            except ValueError:
+                sub_rel = Path("")
+            dest_dir = finished_root / release_root_name / sub_rel
+            dest_dir.mkdir(parents=True, exist_ok=True)
             for fname in files:
-                move_file(root_path / fname)
+                src_file = root_path / fname
+                dest = ensure_unique_destination(dest_dir / fname)
+                if _safe_move_with_retry(src_file, dest):
+                    _set_file_permissions(dest)
+                else:
+                    _logger = logging.getLogger(__name__)
+                    _logger.error("Failed to move %s to %s", src_file, dest)
+    except OSError:
+        pass
+
+
+def move_extracted_to_finished(
+    extracted_dir: Path,
+    *,
+    extracted_root: Path,
+    finished_root: Path,
+) -> None:
+    """Move all files from an extracted directory into finished, preserving structure.
+
+    This preserves the relative path under extracted_root and mirrors it under finished_root.
+
+    Args:
+        extracted_dir: Directory under extracted_root whose contents should be moved
+        extracted_root: Root of the extracted tree
+        finished_root: Root of the finished tree
+    """
+    try:
+        rel = extracted_dir.relative_to(extracted_root)
+    except ValueError:
+        # If not under extracted_root, fall back to using just the directory name
+        rel = Path(extracted_dir.name)
+
+    try:
+        for root, _dirs, files in os.walk(extracted_dir):
+            root_path = Path(root)
+            try:
+                sub_rel = root_path.relative_to(extracted_dir)
+            except ValueError:
+                sub_rel = Path("")
+            dest_dir = finished_root / rel / sub_rel
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            for fname in files:
+                src_file = root_path / fname
+                dest = ensure_unique_destination(dest_dir / fname)
+                if _safe_move_with_retry(src_file, dest):
+                    _set_file_permissions(dest)
+                else:
+                    _logger = logging.getLogger(__name__)
+                    _logger.error("Failed to move %s to %s", src_file, dest)
     except OSError:
         pass
 
@@ -585,4 +578,5 @@ __all__ = [
     "copy_non_archives_to_extracted",
     "move_archive_group",
     "move_remaining_to_finished",
+    "move_extracted_to_finished",
 ]

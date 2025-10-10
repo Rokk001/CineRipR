@@ -442,7 +442,7 @@ def process_downloads(
             archive_groups_to_move: list[tuple[ArchiveGroup, Path, Path]] = []
             extracted_dirs_to_move: list[tuple[Path, Path]] = (
                 []
-            )  # Track extracted directories to move
+            )  # (extracted_dir, relative_parent_name)
             files_to_move: list[tuple[Path, Path]] = []
             release_failed = False
             is_main_context = False
@@ -773,7 +773,7 @@ def process_downloads(
                             (group, release_name, current_dir)
                         )
                         # Also track the extracted directory to move its contents
-                        extracted_dirs_to_move.append((target_dir, release_name))
+                        extracted_dirs_to_move.append((target_dir, Path(release_name)))
                         processed += 1
 
                 # Complete extraction phase
@@ -912,39 +912,20 @@ def process_downloads(
                         f"Finished moving {files_moved} file(s) for release {release_dir.name}",
                     )
 
-                # Move archive files from download to finished directory
-                if not demo_mode:
-                    # Move the archive files from download directory to finished directory
-                    # (the extracted content stays in extracted/, archives move to finished/)
-                    for extracted_dir, release_name in extracted_dirs_to_move:
-                        if extracted_dir.exists():
-                            # Find the corresponding archive files in downloads
-                            # and move the archive files to finished
-                            for group, _, source_dir in archive_groups_to_move:
-                                if source_dir.name == release_name:
-                                    # Move archive files using move_archive_group
-                                    from .file_operations import move_archive_group
+                # Do not move extracted content into finished; keep finished strictly mirroring downloads
 
-                                    move_archive_group(
-                                        group.members,
-                                        finished_root=paths.finished_root,
-                                        relative_parent=Path(release_name),
-                                    )
-                                    break
-
-                    # Move remaining companion files from archive directories
-                    for (
-                        group,
-                        release_name,
-                        source_dir,
-                    ) in archive_groups_to_move:
+                # Move remaining companion files from archive directories (that are still in download tree)
+                for _group, _release_name, source_dir in archive_groups_to_move:
+                    try:
                         move_remaining_to_finished(
                             source_dir,
                             finished_root=paths.finished_root,
                             download_root=download_root,
                         )
-                        _remove_empty_subdirs(source_dir)
-                        _remove_empty_tree(source_dir, stop=download_root)
+                    except OSError:
+                        pass
+                    _remove_empty_subdirs(source_dir)
+                    _remove_empty_tree(source_dir, stop=download_root)
 
             # Move files that had no archives
             if files_to_move and not release_failed:

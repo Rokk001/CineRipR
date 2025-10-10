@@ -6,9 +6,9 @@ This document explains how CineRipR moves files from the `extracted` directory t
 
 ## Process Flow
 
-1. **Extraction Phase**: Files are first extracted to the `extracted` directory with proper TV show structure
-2. **Move Phase**: After successful extraction, files are moved from `extracted` to `finished` directory
-3. **Cleanup Phase**: Original archive files are moved to `finished` directory
+1. **Extraction Phase**: Archive-Inhalte werden in den `extracted`-Pfad extrahiert (endgültiger Zielort für extrahierte Inhalte)
+2. **Move Phase**: Die QUELL-DATEIEN aus dem Download-Release (z. B. RAR-Parts sowie Begleitdateien aus dem Download-Verzeichnis) werden 1:1 nach `finished/<ReleaseName>/` verschoben (Struktur bleibt erhalten)
+3. **Cleanup Phase**: Optionales Aufräumen/Pflege des `finished`-Verzeichnisses nach Retention-Regeln
 
 ## TV Show Organization
 
@@ -21,7 +21,7 @@ Download/
       episode-archive.part02.rar
 ```
 
-### Extracted Structure (temporary)
+### Extracted Structure (final for extracted content)
 ```
 Extracted/
   TV-Shows/
@@ -31,7 +31,7 @@ Extracted/
         Show.Name.S01E05.GROUP.nfo
 ```
 
-### Finished Structure (final)
+### Finished Structure (original sources archive)
 ```
 Finished/
   TV-Shows/
@@ -64,14 +64,11 @@ Finished/
 
 ### `move_remaining_to_finished()`
 
-This function handles moving files from `extracted` to `finished` directory:
+This function handles moving verbleibende Dateien aus dem Download-Release 1:1 nach `finished/<ReleaseName>/` (Spiegelung der Download-Struktur). Extrahierte Inhalte bleiben in `extracted/`.
 
-1. **TV Show Detection**: Uses `looks_like_tv_show()` to determine if content is a TV show
-2. **Path Building**: 
-   - For TV shows: Uses `build_tv_show_path()` to create proper `TV-Shows/Show Name/Season XX/` structure
-   - For movies: Uses original release name structure
-3. **File Movement**: Uses `_safe_move_with_retry()` for Docker/UNC path compatibility
-4. **Permission Setting**: Sets proper permissions (777) and group ownership ('users')
+1. **Mirroring**: Verzeichnisstruktur unterhalb des Release-Roots im Download wird unverändert unter `finished/<ReleaseName>/` angelegt
+2. **File Movement**: Verwendet `_safe_move_with_retry()` für Docker/UNC-Kompatibilität
+3. **Permissions**: setzt chmod 777 wo möglich (keine Eigentümer-Änderung)
 
 ### TV Show Path Building Logic
 

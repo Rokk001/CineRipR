@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.24] - 2025-10-10
+
+### Fixed
+- Finished move now mirrors the release directory from downloads 1:1 under `finished/<ReleaseName>/` for both movies and series
+- Removed unintended movement of extracted content into finished
+- Ensured companions (`Sample`, `Subs`, etc.) are preserved exactly as in downloads during move
+
+### Changed
+- Simplified move logic to avoid TV-specific restructuring in finished
+
 ## [1.0.23] - 2025-01-27
 
 ### Fixed
