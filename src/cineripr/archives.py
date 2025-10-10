@@ -27,7 +27,6 @@ from .path_utils import (
     build_tv_show_path,
     normalize_special_subdir,
     looks_like_tv_show,
-    get_category_prefix,
 )
 from .config import Paths, SubfolderPolicy
 from typing import Callable, Optional
@@ -114,11 +113,11 @@ def _iter_release_directories(
         _logger.info("DEBUG: Processing directory: %s", base_dir)
     contexts: list[tuple[Path, Path, bool]] = []
 
-    # For extracted targets we do NOT want a category prefix (no 'TV-Shows'/'Movies').
-    # We want paths like '<extracted_root>/<Show Name>/Season XX' or
-    # '<extracted_root>/<ReleaseName>/...'. The finished move logic mirrors
-    # downloads separately and remains unchanged.
-    extracted_prefix = Path("")
+    # For extracted targets we want a category prefix:
+    # TV shows under 'TV-Show', movies under 'Movies'.
+    extracted_prefix = (
+        Path("TV-Show") if looks_like_tv_show(base_dir) else Path("Movies")
+    )
 
     # Process all subdirectories first
     try:

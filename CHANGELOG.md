@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.27] - 2025-10-10
+
+### Fixed
+- Extraction path category restored: TV shows extract under `TV-Show/`, movies under `Movies/`
+- Example: `_extracted/TV-Show/<Series>/Season XX/...` and `_extracted/Movies/<Release>/...`
+
+### Notes
+- Finished archiving logic remains unchanged (1:1 mirror of downloads)
+
 ## [1.0.26] - 2025-10-10
 
 ### Fixed
