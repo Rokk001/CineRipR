@@ -834,9 +834,25 @@ def process_downloads(
                     )
 
                 files_moved = 0
-                for group, release_name, source_dir in archive_groups_to_move:
-                    # Use only the release name, not the full path structure
-                    destination_dir = paths.finished_root / release_name
+                for group, _release_name, source_dir in archive_groups_to_move:
+                    # Mirror the release directory under finished: <finished>/<ReleaseRoot>/<sub_rel>
+                    try:
+                        rel_parts = source_dir.relative_to(download_root).parts
+                        if not rel_parts:
+                            # Should not happen; skip if we cannot compute relative parts
+                            continue
+                        release_root_name = rel_parts[0]
+                        release_root = download_root / release_root_name
+                        try:
+                            sub_rel = source_dir.relative_to(release_root)
+                        except ValueError:
+                            sub_rel = Path("")
+                        destination_dir = (
+                            paths.finished_root / release_root_name / sub_rel
+                        )
+                    except ValueError:
+                        # Fallback: place under finished using the source_dir name
+                        destination_dir = paths.finished_root / source_dir.name
 
                     if demo_mode:
                         for idx, member in enumerate(group.members, 1):

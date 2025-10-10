@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.25] - 2025-10-10
+
+### Fixed
+- Finished move for series: season folders now land under `<ReleaseName>/Season XX` instead of at the finished root
+- Robust release-root derivation for mirroring download structure
+
+### Changed
+- No change in extracted behavior; extracted remains final for extracted content
+
 ## [1.0.24] - 2025-10-10
 
 ### Fixed
