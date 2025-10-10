@@ -86,6 +86,19 @@ Finished/
 3. **Move**: QUELL-DATEIEN aus dem Download-Release 1:1 nach `finished/<ReleaseName>/` verschieben (Spiegelung der Struktur)
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
+## Session Notes (2025-10-10)
+- Version 1.0.25 veröffentlicht (Tag `v1.0.25`) mit Fix: Serien landen unter `<finished>/<Serie>/Season XX` statt direkt unter `<finished>/Season XX`.
+- Klarstellung: `extracted` ist der finale Zielpfad für extrahierte Inhalte; `finished` spiegelt die Download-Quelle 1:1 pro Release-Root.
+- Companion-Ordner (`Sample`, `Subs`, …) werden beim Verschieben nach `finished` unverändert übernommen.
+- UNC-/Docker-Pfade: Safe-Move mit Fallback (copy+delete) bleibt aktiv; chmod 777, kein chown.
+
+### Nächste sinnvolle Checks
+- Stichprobe: `\\hs\Multimedia\Neu\_finished\Henry Danger\Season 01..` existiert unter dem Serien-Root (keine Seasons am Finished-Root).
+- Bei Auffälligkeiten Logs mit `--debug` prüfen; ggf. konkrete Release-Pfade posten.
+
+### Offene Hinweise (Low Priority)
+- Lint-Warnungen zu "too general exception" vorhanden, funktional unkritisch.
+
 ### 🐳 Docker-Unterstützung
 - **UNC-Pfade**: `\\SERVER\Share\...` → `/data/downloads/...`
 - **Read-only Filesystem**: Copy+Delete Fallback

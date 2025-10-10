@@ -114,7 +114,11 @@ def _iter_release_directories(
         _logger.info("DEBUG: Processing directory: %s", base_dir)
     contexts: list[tuple[Path, Path, bool]] = []
 
-    base_prefix = get_category_prefix(base_dir)
+    # For extracted targets we do NOT want a category prefix (no 'TV-Shows'/'Movies').
+    # We want paths like '<extracted_root>/<Show Name>/Season XX' or
+    # '<extracted_root>/<ReleaseName>/...'. The finished move logic mirrors
+    # downloads separately and remains unchanged.
+    extracted_prefix = Path("")
 
     # Process all subdirectories first
     try:
@@ -191,10 +195,10 @@ def _iter_release_directories(
             if should_extract:
                 if looks_like_tv_show(base_dir):
                     season_rel = build_tv_show_path(
-                        base_dir, download_root, base_prefix
+                        base_dir, download_root, extracted_prefix
                     )
                 else:
-                    season_rel = base_prefix / base_dir.relative_to(download_root)
+                    season_rel = extracted_prefix / base_dir.relative_to(download_root)
                 contexts.append((child, season_rel, should_extract))
                 if debug:
                     _logger.info("DEBUG:   Added episode to contexts: %s", child.name)
@@ -211,11 +215,15 @@ def _iter_release_directories(
             if should_extract:
                 if looks_like_tv_show(base_dir):
                     rel = (
-                        build_tv_show_path(base_dir, download_root, base_prefix)
+                        build_tv_show_path(base_dir, download_root, extracted_prefix)
                         / normalized
                     )
                 else:
-                    rel = base_prefix / base_dir.relative_to(download_root) / normalized
+                    rel = (
+                        extracted_prefix
+                        / base_dir.relative_to(download_root)
+                        / normalized
+                    )
                 contexts.append((child, rel, should_extract))
             continue
 
@@ -272,9 +280,9 @@ def _iter_release_directories(
             _logger.info("DEBUG:   Default branch: should_extract=%s", should_extract)
         if should_extract:
             if looks_like_tv_show(base_dir):
-                child_rel = build_tv_show_path(child, download_root, base_prefix)
+                child_rel = build_tv_show_path(child, download_root, extracted_prefix)
             else:
-                child_rel = base_prefix / child.relative_to(download_root)
+                child_rel = extracted_prefix / child.relative_to(download_root)
             contexts.append((child, child_rel, should_extract))
             if debug:
                 _logger.info(
@@ -290,9 +298,9 @@ def _iter_release_directories(
         base_has_files = False
     if base_has_archives or base_has_files:
         if looks_like_tv_show(base_dir):
-            main_rel = build_tv_show_path(base_dir, download_root, base_prefix)
+            main_rel = build_tv_show_path(base_dir, download_root, extracted_prefix)
         else:
-            main_rel = base_prefix / base_dir.relative_to(download_root)
+            main_rel = extracted_prefix / base_dir.relative_to(download_root)
         contexts.append((base_dir, main_rel, True))
 
     if debug:

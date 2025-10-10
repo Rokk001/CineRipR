@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.26] - 2025-10-10
+
+### Fixed
+- Extraction path for series restored: extracted now uses `<extracted_root>/<Series>/Season XX/...` (no seasons at extracted root)
+- Change limited strictly to extraction target computation; finished archiving logic unchanged
+
+### Notes
+- Finished still mirrors downloads 1:1 under `<finished>/<ReleaseRoot>/...`
+
 ## [1.0.25] - 2025-10-10
 
 ### Fixed
