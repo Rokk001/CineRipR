@@ -94,11 +94,26 @@ def resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
             return str(candidate)
         return str(seven_zip_path)
 
-    # Auto-detect common 7-Zip executables
-    for name in ("7z", "7za", "7zr"):
+    # Auto-detect common 7-Zip executables (check PATH first)
+    for name in ("7z", "7za", "7zr", "7zz"):
         resolved = shutil.which(name)
         if resolved:
             return resolved
+    
+    # Fallback: Check common installation paths explicitly
+    # This is necessary in Docker containers where /usr/local/bin might not be in PATH
+    common_paths = [
+        "/usr/local/bin/7z",    # Official 7-Zip Linux binary (symlink)
+        "/usr/local/bin/7zz",   # Official 7-Zip Linux binary (main executable)
+        "/usr/bin/7z",          # p7zip-full package location
+        "/usr/bin/7za",         # p7zip package location
+        "/usr/bin/7zr",         # p7zip package location
+    ]
+    for path_str in common_paths:
+        candidate = Path(path_str)
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+    
     return None
 
 

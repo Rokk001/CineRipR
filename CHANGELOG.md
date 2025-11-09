@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.37] - 2025-11-09
+
+### Fixed
+- **Critical 7-Zip Detection Fix**: Enhanced 7-Zip executable resolution for Docker containers
+  - Added explicit path checking for common installation locations
+  - Docker containers with `/usr/local/bin` 7-Zip installation now work correctly
+  - Fixes "No such file or directory: '/usr/bin/7z'" error
+  - Added fallback checks for `/usr/local/bin/7z`, `/usr/local/bin/7zz`
+  - Supports both official 7-Zip binary and p7zip packages
+
+### Added
+- GitHub repository link in WebGUI footer with icon
+- Hover effect for footer links
+
 ## [1.0.36] - 2025-11-09
 
 ### Added
