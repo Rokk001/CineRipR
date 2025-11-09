@@ -2,10 +2,56 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
+
+
+@dataclass
+class QueueItem:
+    """Represents an item in the processing queue."""
+
+    name: str
+    path: str
+    status: str = "pending"  # pending, processing, completed, failed
+    archive_count: int = 0
+    added_time: datetime = field(default_factory=datetime.now)
+    error: str | None = None
+
+
+@dataclass
+class SystemHealth:
+    """System health metrics."""
+
+    disk_downloads_total_gb: float = 0.0
+    disk_downloads_used_gb: float = 0.0
+    disk_downloads_free_gb: float = 0.0
+    disk_downloads_percent: float = 0.0
+    disk_extracted_total_gb: float = 0.0
+    disk_extracted_used_gb: float = 0.0
+    disk_extracted_free_gb: float = 0.0
+    disk_extracted_percent: float = 0.0
+    disk_finished_total_gb: float = 0.0
+    disk_finished_used_gb: float = 0.0
+    disk_finished_free_gb: float = 0.0
+    disk_finished_percent: float = 0.0
+    seven_zip_version: str = "Unknown"
+
+
+@dataclass
+class Notification:
+    """Notification message."""
+
+    id: str
+    type: str  # success, error, warning, info
+    title: str
+    message: str
+    timestamp: datetime = field(default_factory=datetime.now)
+    read: bool = False
 
 
 @dataclass
@@ -37,6 +83,9 @@ class GlobalStatus:
     recent_logs: list[dict[str, Any]] = field(default_factory=list)
     start_time: datetime | None = None
     last_completion_time: datetime | None = None
+    queue: list[QueueItem] = field(default_factory=list)
+    system_health: SystemHealth = field(default_factory=SystemHealth)
+    notifications: list[Notification] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert status to dictionary for JSON serialization."""
@@ -69,6 +118,43 @@ class GlobalStatus:
                 if self.last_completion_time
                 else None
             ),
+            "queue": [
+                {
+                    "name": item.name,
+                    "path": item.path,
+                    "status": item.status,
+                    "archive_count": item.archive_count,
+                    "added_time": item.added_time.isoformat(),
+                    "error": item.error,
+                }
+                for item in self.queue
+            ],
+            "system_health": {
+                "disk_downloads_total_gb": self.system_health.disk_downloads_total_gb,
+                "disk_downloads_used_gb": self.system_health.disk_downloads_used_gb,
+                "disk_downloads_free_gb": self.system_health.disk_downloads_free_gb,
+                "disk_downloads_percent": self.system_health.disk_downloads_percent,
+                "disk_extracted_total_gb": self.system_health.disk_extracted_total_gb,
+                "disk_extracted_used_gb": self.system_health.disk_extracted_used_gb,
+                "disk_extracted_free_gb": self.system_health.disk_extracted_free_gb,
+                "disk_extracted_percent": self.system_health.disk_extracted_percent,
+                "disk_finished_total_gb": self.system_health.disk_finished_total_gb,
+                "disk_finished_used_gb": self.system_health.disk_finished_used_gb,
+                "disk_finished_free_gb": self.system_health.disk_finished_free_gb,
+                "disk_finished_percent": self.system_health.disk_finished_percent,
+                "seven_zip_version": self.system_health.seven_zip_version,
+            },
+            "notifications": [
+                {
+                    "id": notif.id,
+                    "type": notif.type,
+                    "title": notif.title,
+                    "message": notif.message,
+                    "timestamp": notif.timestamp.isoformat(),
+                    "read": notif.read,
+                }
+                for notif in self.notifications[-20:]  # Last 20 notifications
+            ],
         }
 
 
@@ -196,6 +282,136 @@ class StatusTracker:
             self._status = GlobalStatus()
             self._status.last_update = datetime.now()
 
+    # Queue Management
+    def add_to_queue(self, name: str, path: str, archive_count: int = 0) -> None:
+        """Add an item to the processing queue."""
+        with self._lock:
+            self._status.queue.append(
+                QueueItem(name=name, path=path, archive_count=archive_count)
+            )
+            self._status.last_update = datetime.now()
+
+    def update_queue_item(
+        self, name: str, status: str, error: str | None = None
+    ) -> None:
+        """Update a queue item's status."""
+        with self._lock:
+            for item in self._status.queue:
+                if item.name == name:
+                    item.status = status
+                    item.error = error
+                    break
+            self._status.last_update = datetime.now()
+
+    def remove_from_queue(self, name: str) -> None:
+        """Remove an item from the queue."""
+        with self._lock:
+            self._status.queue = [
+                item for item in self._status.queue if item.name != name
+            ]
+            self._status.last_update = datetime.now()
+
+    def clear_completed_queue_items(self) -> None:
+        """Remove completed and failed items from queue."""
+        with self._lock:
+            self._status.queue = [
+                item
+                for item in self._status.queue
+                if item.status not in ("completed", "failed")
+            ]
+            self._status.last_update = datetime.now()
+
+    # System Health
+    def update_system_health(
+        self,
+        downloads_path: Path | None = None,
+        extracted_path: Path | None = None,
+        finished_path: Path | None = None,
+        seven_zip_version: str | None = None,
+    ) -> None:
+        """Update system health metrics."""
+        with self._lock:
+            if downloads_path and downloads_path.exists():
+                usage = shutil.disk_usage(downloads_path)
+                self._status.system_health.disk_downloads_total_gb = (
+                    usage.total / (1024**3)
+                )
+                self._status.system_health.disk_downloads_used_gb = (
+                    usage.used / (1024**3)
+                )
+                self._status.system_health.disk_downloads_free_gb = (
+                    usage.free / (1024**3)
+                )
+                self._status.system_health.disk_downloads_percent = (
+                    (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                )
+
+            if extracted_path and extracted_path.exists():
+                usage = shutil.disk_usage(extracted_path)
+                self._status.system_health.disk_extracted_total_gb = (
+                    usage.total / (1024**3)
+                )
+                self._status.system_health.disk_extracted_used_gb = (
+                    usage.used / (1024**3)
+                )
+                self._status.system_health.disk_extracted_free_gb = (
+                    usage.free / (1024**3)
+                )
+                self._status.system_health.disk_extracted_percent = (
+                    (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                )
+
+            if finished_path and finished_path.exists():
+                usage = shutil.disk_usage(finished_path)
+                self._status.system_health.disk_finished_total_gb = (
+                    usage.total / (1024**3)
+                )
+                self._status.system_health.disk_finished_used_gb = (
+                    usage.used / (1024**3)
+                )
+                self._status.system_health.disk_finished_free_gb = (
+                    usage.free / (1024**3)
+                )
+                self._status.system_health.disk_finished_percent = (
+                    (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                )
+
+            if seven_zip_version:
+                self._status.system_health.seven_zip_version = seven_zip_version
+
+            self._status.last_update = datetime.now()
+
+    # Notifications
+    def add_notification(
+        self, notif_type: str, title: str, message: str
+    ) -> None:
+        """Add a notification."""
+        with self._lock:
+            notif_id = f"{datetime.now().timestamp()}"
+            self._status.notifications.append(
+                Notification(
+                    id=notif_id, type=notif_type, title=title, message=message
+                )
+            )
+            # Keep only last 50 notifications
+            if len(self._status.notifications) > 50:
+                self._status.notifications = self._status.notifications[-50:]
+            self._status.last_update = datetime.now()
+
+    def mark_notification_read(self, notif_id: str) -> None:
+        """Mark a notification as read."""
+        with self._lock:
+            for notif in self._status.notifications:
+                if notif.id == notif_id:
+                    notif.read = True
+                    break
+            self._status.last_update = datetime.now()
+
+    def get_unread_notifications(self) -> list[Notification]:
+        """Get all unread notifications."""
+        with self._lock:
+            return [notif for notif in self._status.notifications if not notif.read]
+
 
 # Global status tracker instance
 _status_tracker = StatusTracker()
@@ -206,5 +422,13 @@ def get_status_tracker() -> StatusTracker:
     return _status_tracker
 
 
-__all__ = ["StatusTracker", "ProcessingStatus", "GlobalStatus", "get_status_tracker"]
+__all__ = [
+    "StatusTracker",
+    "ProcessingStatus",
+    "GlobalStatus",
+    "QueueItem",
+    "SystemHealth",
+    "Notification",
+    "get_status_tracker",
+]
 

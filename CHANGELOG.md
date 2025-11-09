@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.35] - 2025-11-09
+
+### Added
+- **Toast Notifications**: Real-time pop-up notifications for important events
+- **Processing Queue Display**: See all pending archives waiting for processing
+- **Log Filtering & Search**: Filter logs by level and search through log history
+- **System Health Monitoring**: Real-time disk space monitoring for all paths
+- **Tab Navigation**: Clean organization with Overview, Queue, System Health, and Logs tabs
+- **Favicon**: Browser tab icon with CineRipR branding
+- **7-Zip Version Display**: Shows installed 7-Zip version in System Health
+
+### Changed
+- Complete WebGUI restructuring with tab-based navigation
+- Improved status consistency (no more "Idle" with "Processing..." displayed)
+- Better mobile responsiveness
+- Cleaner, less overwhelming interface layout
+
+### Fixed
+- Status display inconsistencies between running and idle states
+- Current release cleared when processing completes
+
 ## [1.0.34] - 2025-01-27
 
 ### Changed

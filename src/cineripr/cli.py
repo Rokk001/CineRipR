@@ -324,6 +324,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Display tool name and version at the start of each loop
         _LOGGER.info("CineRipR %s", __version__)
         tracker.start_processing()
+        
+        # Update system health at start of each run
+        if args.webgui:
+            # Get 7-Zip version
+            seven_zip_cmd = resolve_seven_zip_command(settings.seven_zip_path)
+            seven_zip_version = "Unknown"
+            if seven_zip_cmd:
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        [seven_zip_cmd], 
+                        capture_output=True, 
+                        text=True, 
+                        timeout=5
+                    )
+                    output = result.stdout + result.stderr
+                    # Extract version from output (e.g., "7-Zip 24.09")
+                    import re
+                    match = re.search(r'7-Zip\s+([\d.]+)', output)
+                    if match:
+                        seven_zip_version = f"7-Zip {match.group(1)}"
+                except Exception:
+                    pass
+            
+            tracker.update_system_health(
+                downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+                extracted_path=settings.paths.extracted_root,
+                finished_path=settings.paths.finished_root,
+                seven_zip_version=seven_zip_version
+            )
+        
         try:
             # Define status callback for process_downloads
             def status_callback(
@@ -365,7 +396,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 failed=len(result.failed),
                 unsupported=len(result.unsupported),
             )
+            
+            # Clear current release when done
+            if args.webgui:
+                with tracker._lock:
+                    tracker._status.current_release = None
+            
             tracker.stop_processing()
+            
+            # Send completion notification
+            if args.webgui and result.processed > 0:
+                tracker.add_notification(
+                    "success",
+                    "Processing Complete",
+                    f"Successfully processed {result.processed} archive(s)"
+                )
+            
             return 0, result
         except RuntimeError as exc:
             _LOGGER.error("Processing error: %s", exc)
