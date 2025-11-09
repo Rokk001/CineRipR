@@ -903,7 +903,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         except Exception as exc:
             _LOGGER.error("Unexpected error in main loop: %s", exc)
 
-        if not settings.repeat_forever:
+        # Check repeat_forever from DB if WebGUI is enabled (FIX v2.5.5)
+        repeat_forever_check = settings.repeat_forever
+        if args.webgui:
+            try:
+                from .web.settings_db import get_settings_db
+                db = get_settings_db()
+                repeat_forever_check = bool(db.get("repeat_forever", settings.repeat_forever))
+            except Exception:
+                pass
+        
+        if not repeat_forever_check:
             # If WebGUI is running, keep the main thread alive
             if args.webgui and webgui_thread and webgui_thread.is_alive():
                 _LOGGER.info("WebGUI is running. Press Ctrl+C to exit.")
@@ -917,14 +927,36 @@ def main(argv: Sequence[str] | None = None) -> int:
             break
 
         # sleep before next iteration
+        # CRITICAL FIX v2.5.5: Always read from DB, not from settings object!
+        # This ensures WebGUI changes are immediately reflected
         delay = max(1, int(settings.repeat_after_minutes))  # Minimum 1 minute
+        if args.webgui:
+            try:
+                from .web.settings_db import get_settings_db
+                db = get_settings_db()
+                # Read fresh from DB
+                db_repeat_forever = db.get("repeat_forever", settings.repeat_forever)
+                db_repeat_after_minutes = db.get("repeat_after_minutes", settings.repeat_after_minutes)
+                
+                # Update settings object for this iteration
+                settings.repeat_forever = bool(db_repeat_forever)
+                settings.repeat_after_minutes = int(db_repeat_after_minutes)
+                
+                # Use DB value for delay
+                delay = max(1, int(db_repeat_after_minutes))
+                
+                # Update tracker with DB values
+                tracker.set_repeat_mode(settings.repeat_forever)
+            except Exception as e:
+                _LOGGER.debug(f"Failed to read settings from DB in loop: {e}")
+        
         if delay < 1:
             _LOGGER.warning("Delay must be >= 1 minute, using 1 minute")
             delay = 1
         try:
             import time
 
-            # Set next run time in tracker (NEW in v2.1.0)
+            # Set next run time in tracker (NEW in v2.1.0, FIXED in v2.5.5)
             tracker.set_next_run(delay)
 
             _LOGGER.info("💤 Next run scheduled in %s minute(s)...", delay)

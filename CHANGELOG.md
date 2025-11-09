@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.5] - 2025-11-10
+
+### 🐛 CRITICAL FIX - THE REAL ONE THIS TIME
+
+- **Main Loop Overwrites Settings:** Fixed the root cause - main loop was reading from old `settings` object instead of DB
+  - Main loop now reads `repeat_forever` and `repeat_after_minutes` from DB on EVERY iteration
+  - WebGUI changes are now IMMEDIATELY reflected in the next loop cycle
+  - No more "delay: 3 minute(s)" when you set it to 4 - it uses the DB value!
+  - Countdown/progressbar now updates correctly because loop uses DB values
+
+### 🔧 Technical Changes
+
+- `cli.py`: Main loop now reads settings from DB before calculating delay (lines 923-941)
+- `cli.py`: Loop checks `repeat_forever` from DB, not from settings object (lines 906-916)
+- This ensures WebGUI changes take effect immediately, not on next container restart
+
 ## [2.5.4] - 2025-11-10
 
 ### 🔍 Debug Release
