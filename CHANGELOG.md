@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.34] - 2025-01-27
+
+### Changed
+- **Modernized WebGUI Design**: Complete visual overhaul with modern UI/UX
+  - Glassmorphism effects with backdrop blur
+  - Dark theme with gradient backgrounds
+  - Animated background particles
+  - Smooth transitions and hover effects
+  - Better card designs with accent colors
+  - Animated progress bar with shimmer effect
+  - Improved status indicators with pulse and ripple animations
+  - Enhanced responsive design for mobile devices
+  - Better typography with Inter font family
+  - Auto-scrolling logs with smooth animations
+
 ## [1.0.33] - 2025-01-27
 
 ### Fixed
