@@ -136,7 +136,28 @@ Organized Files
 
 ## Configuration System
 
-### TOML Configuration (`cineripr.toml`)
+### Configuration Priority (v2.3.0+)
+
+Settings are loaded in the following priority order:
+
+1. **WebGUI Settings (SQLite)** - Highest priority
+   - Configured via WebGUI at http://localhost:8080
+   - Stored in SQLite database (`/config/cineripr_settings.db`)
+   - Overrides all other settings
+
+2. **CLI Arguments** - Second priority
+   - Override settings via command-line
+   - Required for paths if no TOML file
+
+3. **TOML File** (Optional) - Third priority
+   - Legacy configuration file
+   - Only used if provided via `--config`
+
+4. **Defaults** - Lowest priority
+   - Built-in default values
+
+### TOML Configuration (Optional)
+
 ```toml
 [paths]
 download_roots = ["/data/downloads"]
@@ -157,11 +178,20 @@ include_other = false
 seven_zip = "/usr/bin/7z"
 ```
 
-### CLI Overrides
-- All configuration options can be overridden via command line
+### CLI Arguments
+
+- Paths can be set via CLI args: `--download-root`, `--extracted-root`, `--finished-root`
+- All other settings can be overridden via command line
 - Supports multiple download roots
 - Demo mode for testing
 - Debug mode for troubleshooting
+
+### WebGUI Configuration
+
+- All settings manageable via WebGUI (v2.3.0+)
+- Settings stored in SQLite database
+- No TOML file required for Docker deployments
+- Settings persist across container restarts
 
 ## Error Handling Strategy
 

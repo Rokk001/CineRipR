@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.2.3)
+## Aktueller Stand (Version 2.3.0)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -440,3 +440,68 @@ Nach dem v2.0.0 Refactoring gab es mehrere Import-Fehler in den `__init__.py` Da
 **Alle Import-Fehler aus dem v2.0.0 Refactoring sind jetzt behoben!**
 
 Der Container sollte jetzt ohne Fehler starten.
+
+---
+
+## Session Notes - Version 2.3.0 (2025-11-10)
+
+### 🚀 Major Changes
+
+#### TOML Configuration Optional
+- **`--config` ist jetzt optional**
+  - Wenn nicht vorhanden, müssen Pfade über CLI-Args gesetzt werden
+  - Alle anderen Settings können über WebGUI verwaltet werden
+  - TOML-Datei ist für Docker-Deployments nicht mehr erforderlich
+
+#### WebGUI Settings Priority
+- **WebGUI-Settings überschreiben jetzt TOML/CLI-Settings**
+  - Priority-Order: **WebGUI (SQLite) > CLI args > TOML file > Defaults**
+  - Settings aus SQLite-Datenbank haben höchste Priorität
+  - Behebt Problem, dass TOML-Settings WebGUI-Settings überschrieben haben
+
+### 🔧 Technische Änderungen
+
+#### `cli.py` - `load_and_merge_settings()`
+- **Umschreibung der Settings-Loading-Logik:**
+  1. TOML-Datei optional laden (wenn vorhanden)
+  2. Pfade aus CLI-Args setzen (erforderlich wenn keine TOML)
+  3. WebGUI-Settings aus SQLite-Datenbank laden
+  4. WebGUI-Settings überschreiben TOML/CLI-Settings
+
+#### `--config` Argument
+- **Jetzt optional** (default: `None` statt `DEFAULT_CONFIG`)
+- Wenn nicht vorhanden, müssen Pfade über CLI-Args gesetzt werden
+
+### 📝 Docker Deployment
+
+**Vorher (v2.2.5):**
+```yaml
+command: ["umask 000 && exec python -m cineripr.cli --config /config/cineripr.toml"]
+volumes:
+  - /mnt/user/appdata/cineripr/cineripr.toml:/config/cineripr.toml:ro
+```
+
+**Nachher (v2.3.0):**
+```yaml
+command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished"]
+volumes:
+  - /mnt/user/appdata/cineripr:/config  # Für Settings-DB
+```
+
+### ✅ Behobene Probleme
+
+- **TOML-Settings überschrieben WebGUI-Settings**
+  - Jetzt haben WebGUI-Settings höchste Priorität
+  - 30 Minuten aus WebGUI werden jetzt verwendet (nicht mehr 60 Minuten aus TOML)
+
+### 🎯 Migration
+
+**Für Docker-User:**
+- TOML-Datei aus Dockerfile entfernen
+- Pfade über CLI-Args setzen: `--download-root`, `--extracted-root`, `--finished-root`
+- Alle anderen Settings über WebGUI konfigurieren
+- Settings-Datenbank wird automatisch in `/config` Volume erstellt
+
+**Für TOML-User:**
+- TOML-Dateien funktionieren weiterhin (backward compatible)
+- WebGUI-Settings überschreiben TOML-Settings, wenn konfiguriert

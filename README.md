@@ -50,7 +50,7 @@ Downloaded media often comes as:
 | **🎬 Movie Organization** | Proper naming and structure for movie collections |
 | **🔄 Real-Time Progress** | Live progress bars with color-coded status |
 | **🐳 Docker-Ready** | Production-tested Docker image with official 7-Zip binary |
-| **⚙️ Configurable** | TOML config + CLI overrides for maximum flexibility |
+| **⚙️ Configurable** | WebGUI settings + CLI args + optional TOML config |
 
 ### 🌐 WebGUI Dashboard
 
@@ -99,10 +99,13 @@ docker-compose up -d
 # Install
 pip install cineripr
 
-# Create config
-cineripr --config cineripr.toml
+# Run with CLI args (no config file needed)
+cineripr \
+  --download-root /data/downloads \
+  --extracted-root /data/extracted \
+  --finished-root /data/finished
 
-# Run
+# Or use config file (optional)
 cineripr --config cineripr.toml
 ```
 
@@ -159,11 +162,11 @@ services:
       - /path/to/downloads:/data/downloads
       - /path/to/extracted:/data/extracted
       - /path/to/finished:/data/finished
-      - ./cineripr.toml:/config/cineripr.toml:ro
+      - /path/to/appdata/cineripr:/config  # For settings database
     restart: unless-stopped
     user: "99:100"  # Adjust to your system
     entrypoint: ["/bin/sh", "-c"]
-    command: ["umask 000 && exec python -m cineripr.cli --config /config/cineripr.toml"]
+    command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished"]
 ```
 
 ### Python (Development)
@@ -190,9 +193,34 @@ cineripr --config cineripr.toml
 
 ## ⚙️ Configuration
 
-### Basic Configuration
+### Configuration Methods
 
-Create `cineripr.toml`:
+CineRipR supports multiple configuration methods with priority order:
+
+1. **WebGUI Settings** (Highest Priority) - Configure via WebGUI at http://localhost:8080
+2. **CLI Arguments** - Override settings via command-line
+3. **TOML File** (Optional) - Legacy configuration file
+4. **Defaults** - Built-in default values
+
+### Docker Deployment (Recommended)
+
+**No TOML file required!** Configure paths via CLI args, all other settings via WebGUI:
+
+```yaml
+command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished"]
+volumes:
+  - /path/to/appdata/cineripr:/config  # Settings database stored here
+```
+
+**Configure via WebGUI:**
+- Open http://localhost:8080
+- Go to **Settings** tab
+- Configure all settings (scheduling, retention, subfolders, etc.)
+- Settings are saved automatically in SQLite database
+
+### TOML Configuration (Optional)
+
+If you prefer TOML files, create `cineripr.toml`:
 
 ```toml
 [paths]
@@ -211,30 +239,17 @@ include_sub = true
 include_other = false
 ```
 
-### Advanced Options
+**Note:** WebGUI settings will override TOML settings if configured.
 
-```toml
-[options]
-repeat_forever = true          # Run continuously
-repeat_after_minutes = 5       # Wait 5 minutes between runs
+### CLI Arguments
 
-[tools]
-seven_zip = "/usr/local/bin/7z"  # Custom 7-Zip path
-
-[webgui]
-enabled = true                 # Enable WebGUI (default)
-port = 8080                    # WebGUI port
-host = "0.0.0.0"              # Bind address
-```
-
-### CLI Overrides
-
-Override any config setting via command-line:
+Set paths via CLI args (required if no TOML file):
 
 ```bash
 cineripr \
-  --config cineripr.toml \
-  --download-root /extra/downloads \
+  --download-root /data/downloads \
+  --extracted-root /data/extracted \
+  --finished-root /data/finished \
   --retention-days 30 \
   --enable-delete \
   --webgui-port 9090
