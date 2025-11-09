@@ -327,6 +327,13 @@ def _extract_with_seven_zip(
 
                     message = f"Extracting {archive.name}"
                     progress.advance(logger, message, absolute=current_part)
+                    
+                    # Call progress callback if provided (for WebGUI updates)
+                    if progress_callback:
+                        try:
+                            progress_callback(current_part, part_count)
+                        except Exception:
+                            pass  # Ignore callback errors
         
         # If no progress was shown, show completion message
         if not progress_shown and progress is not None and logger is not None:
@@ -414,6 +421,7 @@ def extract_archive(
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
     part_count: int = 1,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> None:
     """Extract an archive to the target directory.
 

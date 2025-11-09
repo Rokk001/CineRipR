@@ -525,6 +525,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         
         try:
             # Define status callback for process_downloads
+            current_release_name: str | None = None
+            
             def status_callback(
                 status: str,
                 message: str,
@@ -532,6 +534,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 archive_progress: int,
                 archive_total: int,
             ) -> None:
+                nonlocal current_release_name
+                
+                # Extract release name from message if available
+                if status == "scanning" and message.startswith("Processing "):
+                    current_release_name = message.replace("Processing ", "")
+                    tracker.set_current_release(current_release_name)
+                
+                # Update release status
                 if tracker.get_status().current_release:
                     tracker.update_release_status(
                         status=status,
@@ -540,8 +550,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                         archive_progress=archive_progress,
                         archive_total=archive_total,
                     )
+                elif current_release_name:
+                    # Use actual release name if available
+                    tracker.set_current_release(current_release_name)
+                    tracker.update_release_status(
+                        status=status,
+                        message=message,
+                        current_archive=current_archive,
+                        archive_progress=archive_progress,
+                        archive_total=archive_total,
+                    )
                 else:
-                    # Create a dummy release for status updates
+                    # Fallback: Create a dummy release for status updates
                     tracker.set_current_release("Processing...")
                     tracker.update_release_status(
                         status=status,

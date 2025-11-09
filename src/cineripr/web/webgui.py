@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template_string, request
 
+from .. import __version__
 from .settings_db import get_settings_db
 from .status import get_status_tracker
 
@@ -1234,7 +1235,7 @@ def get_html_template() -> str:
                 <div class="header-icon">🎬</div>
                 <div class="header-text">
                     <h1>CineRipR</h1>
-                    <div class="subtitle">Archive Extraction Dashboard</div>
+                    <div class="subtitle">Archive Extraction Dashboard <span style="opacity: 0.6; font-size: 0.9em;">v{{ version }}</span></div>
                 </div>
             </div>
             <div class="header-right">
@@ -1409,6 +1410,10 @@ def get_html_template() -> str:
                 <h2>🔧 System Information</h2>
                 <div style="padding: 15px; background: var(--stat-bg); border-radius: 10px;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div>
+                            <div style="color: var(--text-muted); font-size: 0.85em; margin-bottom: 5px;">CineRipR Version</div>
+                            <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="cineripr-version">{{ version }}</div>
+                        </div>
                         <div>
                             <div style="color: var(--text-muted); font-size: 0.85em; margin-bottom: 5px;">7-Zip Version</div>
                             <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="seven-zip-version">Unknown</div>
@@ -1591,6 +1596,7 @@ def get_html_template() -> str:
                     Last update: <span id="last-update">-</span>
                 </div>
                 <div>Auto-refresh every 2 seconds</div>
+                <div>CineRipR v{{ version }}</div>
                 <div>
                     <a href="https://github.com/Rokk001/CineRipR" target="_blank" rel="noopener noreferrer" style="color: rgba(255, 255, 255, 0.6); text-decoration: none; display: flex; align-items: center; gap: 6px; transition: color 0.3s;">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink: 0;">
@@ -2410,7 +2416,8 @@ def create_app() -> Flask:
     @app.route("/")
     def index() -> str:
         """Serve the main dashboard page."""
-        return render_template_string(get_html_template())
+        template = get_html_template()
+        return render_template_string(template, version=__version__)
 
     @app.route("/favicon.svg")
     def favicon() -> Any:
