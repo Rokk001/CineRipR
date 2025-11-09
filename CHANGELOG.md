@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.5] - 2025-11-10
+
+### 🎨 UI/UX Improvements
+
+- **Header Countdown:** Added live countdown display in header when idle
+  - Shows time until next run (e.g., "2h 15m" or "45s")
+  - Pulse animation when < 1 minute remaining
+  - Only visible when `repeat_mode` is active
+
+- **Header Control Button:** Replaced oversized Control Panel card with compact header button
+  - Dynamic button that changes based on state:
+    - **Idle:** "Run Now" button (⏭️)
+    - **Running:** "Pause" button (⏸)
+    - **Paused:** "Resume" button (▶)
+  - Clean, minimal design that doesn't clutter the interface
+  - Button appears next to status indicator in header
+
+### 🗑️ Removed
+
+- **Control Panel Card:** Removed dedicated "Control Panel" card from Overview tab
+  - Functionality moved to compact header button
+  - Reduces visual clutter and improves navigation
+
+[2.2.5]: https://github.com/Rokk001/CineRipR/compare/v2.2.4...v2.2.5
+
+---
+
 ## [2.2.4] - 2025-11-10
 
 ### 🐛 Bug Fixes

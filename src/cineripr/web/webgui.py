@@ -203,9 +203,80 @@ def get_html_template() -> str:
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 20px;
-            background: var(--input-bg);
-            border-radius: 12px;
+        }
+        
+        /* Header Countdown (NEW in v2.2.5) */
+        .header-countdown {
+            margin-left: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+        
+        .header-countdown-separator {
+            opacity: 0.3;
+            margin: 0 5px;
+        }
+        
+        .header-countdown-label {
+            opacity: 0.7;
+        }
+        
+        .header-countdown-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: var(--accent-color);
+            min-width: 50px;
+        }
+        
+        .header-countdown-time.pulse {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        /* Header Control Button (NEW in v2.2.5) */
+        .header-control-btn {
+            margin-left: 10px;
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .header-control-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .header-control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .header-control-btn.run-now {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: var(--accent-color);
+        }
+        
+        .header-control-btn.pause {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+        
+        .header-control-btn.resume {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #10b981;
         }
         
         .status-dot {
@@ -1173,6 +1244,16 @@ def get_html_template() -> str:
                 <div class="header-status">
                     <div class="status-dot" id="status-dot"></div>
                     <div id="status-text">Idle</div>
+                    <!-- Countdown im Header (nur bei Idle + repeat_mode) -->
+                    <div class="header-countdown" id="header-countdown" style="display: none;">
+                        <span class="header-countdown-separator">|</span>
+                        <span class="header-countdown-label">Next:</span>
+                        <span class="header-countdown-time" id="header-countdown-time">--:--</span>
+                    </div>
+                    <!-- Dynamischer Control Button -->
+                    <button class="header-control-btn" id="header-control-btn" onclick="handleHeaderControl()" style="display: none;">
+                        <span id="header-control-icon">⏭️</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1261,22 +1342,6 @@ def get_html_template() -> str:
                     <button class="control-btn trigger" onclick="triggerRunNow()">
                         <span>⏭️</span> Run Now
                     </button>
-                </div>
-            </div>
-            
-            <!-- Control Panel -->
-            <div class="card">
-                <h2>🎮 Control Panel</h2>
-                <div class="control-panel">
-                    <button class="control-btn pause" id="pause-btn" onclick="pauseProcessing()">
-                        <span>⏸</span> Pause Processing
-                    </button>
-                    <button class="control-btn resume" id="resume-btn" onclick="resumeProcessing()">
-                        <span>▶</span> Resume Processing
-                    </button>
-                </div>
-                <div class="control-status" id="control-status">
-                    Processing is active
                 </div>
             </div>
         </div>
@@ -1805,8 +1870,6 @@ def get_html_template() -> str:
                 .then(r => r.json())
                 .then(data => {
                     showToast('warning', 'Processing Paused', 'Processing has been paused');
-                    document.getElementById('pause-btn').disabled = true;
-                    document.getElementById('resume-btn').disabled = false;
                 })
                 .catch(err => {
                     showToast('error', 'Error', 'Failed to pause processing');
@@ -1819,8 +1882,6 @@ def get_html_template() -> str:
                 .then(r => r.json())
                 .then(data => {
                     showToast('success', 'Processing Resumed', 'Processing has been resumed');
-                    document.getElementById('pause-btn').disabled = false;
-                    document.getElementById('resume-btn').disabled = true;
                 })
                 .catch(err => {
                     showToast('error', 'Error', 'Failed to resume processing');
@@ -1842,6 +1903,19 @@ def get_html_template() -> str:
                         showToast('error', 'Error', 'Failed to trigger run');
                         console.error('Trigger error:', err);
                     });
+            }
+        }
+        
+        // NEW in v2.2.5: Handle header control button
+        function handleHeaderControl() {
+            const btn = document.getElementById('header-control-btn');
+            
+            if (btn.classList.contains('run-now')) {
+                triggerRunNow();
+            } else if (btn.classList.contains('pause')) {
+                pauseProcessing();
+            } else if (btn.classList.contains('resume')) {
+                resumeProcessing();
             }
         }
         
@@ -2063,22 +2137,73 @@ def get_html_template() -> str:
                         statusText.textContent = 'Idle';
                     }
                     
-                    // Control panel
-                    const pauseBtn = document.getElementById('pause-btn');
-                    const resumeBtn = document.getElementById('resume-btn');
-                    const controlStatus = document.getElementById('control-status');
+                    // Header Countdown & Control Button (NEW in v2.2.5)
+                    const headerCountdown = document.getElementById('header-countdown');
+                    const headerCountdownTime = document.getElementById('header-countdown-time');
+                    const headerControlBtn = document.getElementById('header-control-btn');
+                    const headerControlIcon = document.getElementById('header-control-icon');
                     
                     if (isPaused) {
-                        pauseBtn.disabled = true;
-                        resumeBtn.disabled = false;
-                        controlStatus.textContent = '⏸ Processing is paused';
-                        controlStatus.classList.add('paused');
+                        // Paused: Resume Button, kein Countdown
+                        headerCountdown.style.display = 'none';
+                        headerControlBtn.style.display = 'flex';
+                        headerControlBtn.classList.remove('run-now', 'pause');
+                        headerControlBtn.classList.add('resume');
+                        headerControlIcon.textContent = '▶';
+                        headerControlBtn.title = 'Resume Processing';
+                    } else if (isRunning) {
+                        // Running: Pause Button, kein Countdown
+                        headerCountdown.style.display = 'none';
+                        headerControlBtn.style.display = 'flex';
+                        headerControlBtn.classList.remove('run-now', 'resume');
+                        headerControlBtn.classList.add('pause');
+                        headerControlIcon.textContent = '⏸';
+                        headerControlBtn.title = 'Pause Processing';
                     } else {
-                        pauseBtn.disabled = false;
-                        resumeBtn.disabled = true;
-                        controlStatus.textContent = '▶ Processing is active';
-                        controlStatus.classList.remove('paused');
+                        // Idle: Countdown + Run Now Button (wenn repeat_mode aktiv)
+                        if (data.repeat_mode && data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
+                            // Countdown anzeigen
+                            headerCountdown.style.display = 'flex';
+                            
+                            const seconds = data.seconds_until_next_run;
+                            const hours = Math.floor(seconds / 3600);
+                            const minutes = Math.floor((seconds % 3600) / 60);
+                            const secs = seconds % 60;
+                            
+                            const timeStr = hours > 0 
+                                ? `${hours}h ${minutes}m`
+                                : minutes > 0
+                                    ? `${minutes}m ${secs}s`
+                                    : `${secs}s`;
+                            
+                            headerCountdownTime.textContent = timeStr;
+                            
+                            // Pulse wenn < 1 Minute
+                            if (seconds < 60) {
+                                headerCountdownTime.classList.add('pulse');
+                            } else {
+                                headerCountdownTime.classList.remove('pulse');
+                            }
+                            
+                            // Run Now Button anzeigen
+                            headerControlBtn.style.display = 'flex';
+                            headerControlBtn.classList.remove('pause', 'resume');
+                            headerControlBtn.classList.add('run-now');
+                            headerControlIcon.textContent = '⏭️';
+                            headerControlBtn.title = 'Run Now';
+                        } else {
+                            // Kein Countdown: Nur Run Now Button (wenn repeat_mode nicht aktiv)
+                            headerCountdown.style.display = 'none';
+                            headerControlBtn.style.display = 'flex';
+                            headerControlBtn.classList.remove('pause', 'resume');
+                            headerControlBtn.classList.add('run-now');
+                            headerControlIcon.textContent = '⏭️';
+                            headerControlBtn.title = 'Run Now';
+                        }
                     }
+                    
+                    // Control panel (REMOVED in v2.2.5 - replaced by header button)
+                    // Legacy code removed
                     
                     // Current operation
                     const release = data.current_release;
