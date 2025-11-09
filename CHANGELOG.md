@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.1] - 2025-11-10
+
+### 🐛 Bug Fixes
+
+- **System Health Updates:** Fixed missing system information in WebGUI
+  - System health metrics (disk space, CPU, memory) are now updated every 30 seconds
+  - Previously only updated once at startup, causing empty displays
+  - Now updates continuously during idle periods
+
 ## [2.3.0] - 2025-11-10
 
 ### 🚀 Major Changes

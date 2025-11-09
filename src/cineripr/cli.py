@@ -689,6 +689,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             # Sleep with live countdown updates
             end_time = time.time() + (delay * 60)
+            last_system_health_update = 0
 
             while time.time() < end_time:
                 # Check for manual trigger (NEW in v2.1.0)
@@ -698,6 +699,58 @@ def main(argv: Sequence[str] | None = None) -> int:
                     break
 
                 remaining = end_time - time.time()
+
+                # Update system health every 30 seconds (for WebGUI)
+                if args.webgui and time.time() - last_system_health_update >= 30:
+                    try:
+                        seven_zip_cmd = resolve_seven_zip_command(settings.seven_zip_path)
+                        seven_zip_version = "Unknown"
+                        if seven_zip_cmd:
+                            try:
+                                import subprocess
+                                import re
+                                # Try multiple methods to get version
+                                methods = [
+                                    lambda: subprocess.run([seven_zip_cmd], capture_output=True, text=True, timeout=5),
+                                    lambda: subprocess.run([seven_zip_cmd, "--version"], capture_output=True, text=True, timeout=5),
+                                    lambda: subprocess.run([seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5),
+                                ]
+                                
+                                patterns = [
+                                    r'7-Zip\s+([\d.]+)',
+                                    r'7z\s+([\d.]+)',
+                                    r'p7zip\s+([\d.]+)',
+                                    r'Version\s+([\d.]+)',
+                                    r'([\d]+\.[\d]+)',
+                                ]
+                                
+                                for method in methods:
+                                    try:
+                                        result = method()
+                                        output = (result.stdout or "") + (result.stderr or "")
+                                        
+                                        for pattern in patterns:
+                                            match = re.search(pattern, output, re.IGNORECASE)
+                                            if match:
+                                                seven_zip_version = f"7-Zip {match.group(1)}"
+                                                break
+                                        
+                                        if seven_zip_version != "Unknown":
+                                            break
+                                    except Exception:
+                                        continue
+                            except Exception:
+                                pass
+                        
+                        tracker.update_system_health(
+                            downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+                            extracted_path=settings.paths.extracted_root,
+                            finished_path=settings.paths.finished_root,
+                            seven_zip_version=seven_zip_version
+                        )
+                        last_system_health_update = time.time()
+                    except Exception as e:
+                        _LOGGER.debug(f"Failed to update system health: {e}")
 
                 # Log every minute
                 if int(remaining) % 60 == 0 and remaining > 0:
