@@ -46,6 +46,9 @@ class SettingsDB:
     def _init_db(self):
         """Initialize database schema."""
         with self._lock:
+            # Ensure directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            
             conn = sqlite3.connect(str(self.db_path))
             try:
                 conn.execute("""
@@ -165,7 +168,33 @@ def get_settings_db(db_path: Path | None = None) -> SettingsDB:
     with _db_lock:
         if _settings_db is None:
             if db_path is None:
-                db_path = Path("/config/cineripr_settings.db")
+                # Try multiple paths in order of preference
+                possible_paths = [
+                    Path("/config/cineripr_settings.db"),  # Docker volume
+                    Path("/data/cineripr_settings.db"),   # Data directory
+                    Path("./cineripr_settings.db"),        # Current directory
+                    Path("/tmp/cineripr_settings.db"),     # Temp directory
+                ]
+                
+                db_path = None
+                for path in possible_paths:
+                    try:
+                        # Try to create parent directory
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        # Try to create a test file to check write permissions
+                        test_file = path.parent / ".test_write"
+                        test_file.touch()
+                        test_file.unlink()
+                        db_path = path
+                        break
+                    except (OSError, PermissionError):
+                        continue
+                
+                # Fallback to current directory if all else fails
+                if db_path is None:
+                    db_path = Path("./cineripr_settings.db")
+                    db_path.parent.mkdir(parents=True, exist_ok=True)
+            
             _settings_db = SettingsDB(db_path)
 
         return _settings_db

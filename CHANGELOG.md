@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.4] - 2025-11-10
+
+### 🐛 Bug Fixes
+
+- **Settings DB Path Fix:** Added fallback paths for settings database when `/config` is not writable
+  - Tries: `/config`, `/data`, current directory, `/tmp`
+  - Ensures directory exists before creating database
+  - Fixes "unable to open database file" error
+
+- **7-Zip Version Detection:** Improved version detection with multiple regex patterns
+  - Supports different 7-Zip output formats (7-Zip, 7z, p7zip)
+  - Tries `--version` flag as fallback
+  - Better error handling and logging
+
+- **Settings Default Values:** Fixed JavaScript logic to correctly display default values
+  - `repeat_forever`: Now correctly shows `true` (was showing `false`)
+  - `include_sub`: Now correctly shows `true` (was showing `false`)
+  - `toast_notifications`: Now correctly shows `true` (was showing `false`)
+  - All other defaults now correctly displayed
+
+[2.2.4]: https://github.com/Rokk001/CineRipR/compare/v2.2.3...v2.2.4
+
+---
+
 ## [2.2.3] - 2025-11-10
 
 ### 🐛 Hotfix

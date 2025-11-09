@@ -327,6 +327,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if seven_zip_cmd:
             try:
                 import subprocess
+                import re
+                # Try to get version - 7zz outputs version info when run without args
                 result = subprocess.run(
                     [seven_zip_cmd], 
                     capture_output=True, 
@@ -334,11 +336,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                     timeout=5
                 )
                 output = result.stdout + result.stderr
-                import re
-                match = re.search(r'7-Zip\s+([\d.]+)', output)
-                if match:
-                    seven_zip_version = f"7-Zip {match.group(1)}"
-            except Exception:
+                
+                # Try multiple regex patterns for different 7-Zip output formats
+                patterns = [
+                    r'7-Zip\s+([\d.]+)',           # "7-Zip 24.09"
+                    r'7z\s+([\d.]+)',             # "7z 24.09"
+                    r'p7zip\s+([\d.]+)',          # "p7zip 16.02"
+                    r'Version\s+([\d.]+)',       # "Version 24.09"
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, output, re.IGNORECASE)
+                    if match:
+                        seven_zip_version = f"7-Zip {match.group(1)}"
+                        break
+                
+                # If still unknown, try running with --version flag
+                if seven_zip_version == "Unknown":
+                    try:
+                        result = subprocess.run(
+                            [seven_zip_cmd, "--version"], 
+                            capture_output=True, 
+                            text=True, 
+                            timeout=5
+                        )
+                        output = result.stdout + result.stderr
+                        for pattern in patterns:
+                            match = re.search(pattern, output, re.IGNORECASE)
+                            if match:
+                                seven_zip_version = f"7-Zip {match.group(1)}"
+                                break
+                    except Exception:
+                        pass
+            except Exception as e:
+                _LOGGER.debug(f"Failed to get 7-Zip version: {e}")
                 pass
         
         tracker.update_system_health(
@@ -361,6 +392,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if seven_zip_cmd:
                 try:
                     import subprocess
+                    import re
+                    # Try to get version - 7zz outputs version info when run without args
                     result = subprocess.run(
                         [seven_zip_cmd], 
                         capture_output=True, 
@@ -368,12 +401,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                         timeout=5
                     )
                     output = result.stdout + result.stderr
-                    # Extract version from output (e.g., "7-Zip 24.09")
-                    import re
-                    match = re.search(r'7-Zip\s+([\d.]+)', output)
-                    if match:
-                        seven_zip_version = f"7-Zip {match.group(1)}"
-                except Exception:
+                    
+                    # Try multiple regex patterns for different 7-Zip output formats
+                    patterns = [
+                        r'7-Zip\s+([\d.]+)',           # "7-Zip 24.09"
+                        r'7z\s+([\d.]+)',             # "7z 24.09"
+                        r'p7zip\s+([\d.]+)',          # "p7zip 16.02"
+                        r'Version\s+([\d.]+)',       # "Version 24.09"
+                    ]
+                    
+                    for pattern in patterns:
+                        match = re.search(pattern, output, re.IGNORECASE)
+                        if match:
+                            seven_zip_version = f"7-Zip {match.group(1)}"
+                            break
+                    
+                    # If still unknown, try running with --version flag
+                    if seven_zip_version == "Unknown":
+                        try:
+                            result = subprocess.run(
+                                [seven_zip_cmd, "--version"], 
+                                capture_output=True, 
+                                text=True, 
+                                timeout=5
+                            )
+                            output = result.stdout + result.stderr
+                            for pattern in patterns:
+                                match = re.search(pattern, output, re.IGNORECASE)
+                                if match:
+                                    seven_zip_version = f"7-Zip {match.group(1)}"
+                                    break
+                        except Exception:
+                            pass
+                except Exception as e:
+                    _LOGGER.debug(f"Failed to get 7-Zip version: {e}")
                     pass
             
             tracker.update_system_health(

@@ -1851,24 +1851,34 @@ def get_html_template() -> str:
                 .then(r => r.json())
                 .then(data => {
                     // Scheduling
-                    document.getElementById('setting-repeat-forever').checked = data.repeat_forever || false;
-                    document.getElementById('setting-repeat-minutes').value = data.repeat_after_minutes || 30;
+                    // Default: repeat_forever = true
+                    document.getElementById('setting-repeat-forever').checked = data.repeat_forever !== false;
+                    // Default: repeat_after_minutes = 30
+                    document.getElementById('setting-repeat-minutes').value = data.repeat_after_minutes !== undefined ? data.repeat_after_minutes : 30;
                     
                     // Retention
-                    document.getElementById('setting-retention-days').value = data.finished_retention_days || 15;
-                    document.getElementById('setting-enable-delete').checked = data.enable_delete || false;
+                    // Default: finished_retention_days = 15
+                    document.getElementById('setting-retention-days').value = data.finished_retention_days !== undefined ? data.finished_retention_days : 15;
+                    // Default: enable_delete = false
+                    document.getElementById('setting-enable-delete').checked = data.enable_delete === true;
                     
                     // Subfolders
-                    document.getElementById('setting-include-sample').checked = data.include_sample || false;
-                    document.getElementById('setting-include-sub').checked = data.include_sub || true;
-                    document.getElementById('setting-include-other').checked = data.include_other || false;
+                    // Default: include_sample = false
+                    document.getElementById('setting-include-sample').checked = data.include_sample === true;
+                    // Default: include_sub = true
+                    document.getElementById('setting-include-sub').checked = data.include_sub !== false;
+                    // Default: include_other = false
+                    document.getElementById('setting-include-other').checked = data.include_other === true;
                     
                     // UI Preferences
+                    // Default: toast_notifications = true
                     document.getElementById('setting-toast-notifications').checked = data.toast_notifications !== false;
-                    document.getElementById('setting-toast-sound').checked = data.toast_sound || false;
+                    // Default: toast_sound = false
+                    document.getElementById('setting-toast-sound').checked = data.toast_sound === true;
                     
                     // Advanced
-                    document.getElementById('setting-demo-mode').checked = data.demo_mode || false;
+                    // Default: demo_mode = false
+                    document.getElementById('setting-demo-mode').checked = data.demo_mode === true;
                 })
                 .catch(err => {
                     console.error('Failed to load settings:', err);
