@@ -269,6 +269,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     webgui_thread = None
     if args.webgui:
         import threading
+        import time
 
         def start_webgui() -> None:
             try:
@@ -276,8 +277,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             except Exception as exc:
                 _LOGGER.error("WebGUI error: %s", exc)
 
-        webgui_thread = threading.Thread(target=start_webgui, daemon=True)
+        webgui_thread = threading.Thread(target=start_webgui, daemon=False)
         webgui_thread.start()
+        # Give WebGUI time to start
+        time.sleep(1)
         _LOGGER.info(
             "WebGUI started on http://%s:%d", args.webgui_host, args.webgui_port
         )
@@ -410,6 +413,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             _LOGGER.error("Unexpected error in main loop: %s", exc)
 
         if not settings.repeat_forever:
+            # If WebGUI is running, keep the main thread alive
+            if args.webgui and webgui_thread and webgui_thread.is_alive():
+                _LOGGER.info("WebGUI is running. Press Ctrl+C to exit.")
+                try:
+                    import time
+                    while webgui_thread.is_alive():
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    _LOGGER.info("Interrupted; exiting.")
             break
 
         # sleep before next iteration

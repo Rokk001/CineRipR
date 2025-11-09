@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.31] - 2025-01-27
+
+### Fixed
+- WebGUI now runs as non-daemon thread to prevent premature termination
+- Main thread now waits for WebGUI when active (prevents connection refused errors)
+- WebGUI remains accessible even when processing is complete
+
 ## [1.0.30] - 2025-01-27
 
 ### Added
