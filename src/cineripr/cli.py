@@ -394,6 +394,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Set repeat mode in tracker (NEW in v2.1.0)
     tracker.set_repeat_mode(settings.repeat_forever)
+    
+    # Set initial next run time so countdown is visible from start
+    if settings.repeat_forever and settings.repeat_after_minutes > 0:
+        tracker.set_next_run(settings.repeat_after_minutes)
 
     # Set up logging handler to forward logs to status tracker
     class StatusLogHandler(logging.Handler):
@@ -612,6 +616,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     tracker._status.current_release = None
             
             tracker.stop_processing()
+            
+            # Set next run time after processing completes (if repeat mode is enabled)
+            if args.webgui and settings.repeat_forever and settings.repeat_after_minutes > 0:
+                tracker.set_next_run(settings.repeat_after_minutes)
             
             # Update system health after processing (if WebGUI is enabled)
             if args.webgui:

@@ -27,14 +27,14 @@ FAVICON_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 
 # HTML Template - wird weiter unten definiert
 HTML_TEMPLATE = """
-<!-- HTML Template wird hier eingefügt -->
+<!-- HTML Template inserted here -->
 """
 
 # Jetzt das eigentliche HTML Template laden
 from pathlib import Path
 import os
 
-# Da das Template sehr groß ist, lade ich es aus einer separaten Funktion
+# Since the template is very large, it's loaded from a separate function
 def get_html_template() -> str:
     return '''<!DOCTYPE html>
 <html lang="de">
@@ -1245,7 +1245,7 @@ def get_html_template() -> str:
                 <div class="header-status">
                     <div class="status-dot" id="status-dot"></div>
                     <div id="status-text">Idle</div>
-                    <!-- Countdown im Header (nur bei Idle + repeat_mode) -->
+                    <!-- Countdown in header (when next run is scheduled) -->
                     <div class="header-countdown" id="header-countdown" style="display: none;">
                         <span class="header-countdown-separator">|</span>
                         <span class="header-countdown-label">Next:</span>
@@ -1288,19 +1288,19 @@ def get_html_template() -> str:
                 <h2>📈 Statistics</h2>
                 <div class="stats-grid">
                     <div class="stat-card success">
-                        <div class="stat-label">✓ Verarbeitet</div>
+                        <div class="stat-label">✓ Processed</div>
                         <div class="stat-value" id="processed">0</div>
                     </div>
                     <div class="stat-card error">
-                        <div class="stat-label">✗ Fehlgeschlagen</div>
+                        <div class="stat-label">✗ Failed</div>
                         <div class="stat-value" id="failed">0</div>
                     </div>
                     <div class="stat-card warning">
-                        <div class="stat-label">⚠ Nicht unterstützt</div>
+                        <div class="stat-label">⚠ Not Supported</div>
                         <div class="stat-value" id="unsupported">0</div>
                     </div>
                     <div class="stat-card info">
-                        <div class="stat-label">🗑 Gelöscht</div>
+                        <div class="stat-label">🗑 Deleted</div>
                         <div class="stat-value" id="deleted">0</div>
                     </div>
                 </div>

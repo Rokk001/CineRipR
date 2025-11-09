@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.5] - 2025-11-10
+
+### 🐛 Bug Fixes
+
+- **German Text Translation:** All German text in WebGUI translated to English
+  - "Verarbeitet" → "Processed"
+  - "Fehlgeschlagen" → "Failed"
+  - "Nicht unterstützt" → "Not Supported"
+  - "Gelöscht" → "Deleted"
+  - All German comments translated to English
+
+- **System Health Debugging:** Added comprehensive logging for system health updates
+  - Logs warnings when paths don't exist
+  - Logs errors when disk usage calculation fails
+  - Logs debug info for successful updates
+  - Helps diagnose why system health shows 0.0%
+
+- **Countdown Visible from Start:** Countdown for next run now shows immediately
+  - Previously only visible after first run completed
+  - Now shows from application start when repeat mode is enabled
+  - Better user experience - no need to wait for first run
+
+- **Next Run Time Set After Processing:** Next run countdown is re-set after each processing run
+  - Ensures countdown is always visible when repeat mode is enabled
+  - Countdown updates correctly between runs
+
 ## [2.3.4] - 2025-11-10
 
 ### 🚀 Major Changes
