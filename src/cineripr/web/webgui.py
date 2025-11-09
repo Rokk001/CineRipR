@@ -2165,8 +2165,8 @@ def get_html_template() -> str:
                         headerControlIcon.textContent = '⏸';
                         headerControlBtn.title = 'Pause Processing';
                     } else {
-                        // Idle: Countdown + Run Now Button (wenn repeat_mode aktiv)
-                        if (data.repeat_mode && data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
+                        // Idle: Countdown + Run Now Button (immer wenn next_run geplant ist)
+                        if (data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
                             // Countdown anzeigen
                             headerCountdown.style.display = 'flex';
                             
@@ -2197,7 +2197,7 @@ def get_html_template() -> str:
                             headerControlIcon.textContent = '⏭️';
                             headerControlBtn.title = 'Run Now';
                         } else {
-                            // Kein Countdown: Nur Run Now Button (wenn repeat_mode nicht aktiv)
+                            // Kein Countdown: Nur Run Now Button
                             headerCountdown.style.display = 'none';
                             headerControlBtn.style.display = 'flex';
                             headerControlBtn.classList.remove('pause', 'resume');

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.2] - 2025-11-10
+
+### 🚀 Major Changes
+
+- **DB Persistence for Statistics & History:** Statistics and History are now persisted in SQLite database
+  - Statistics (processed, failed, unsupported, deleted counts) survive Docker restarts
+  - History entries are saved to database and restored on startup
+  - Data is stored in the same database as settings (`cineripr_settings.db`)
+  - Last 100 history entries are kept in database
+
+### 🎯 Improvements
+
+- **Countdown Display:** Countdown for next run is now always displayed when available
+  - Removed dependency on `repeat_mode` flag
+  - Countdown shows time until next run regardless of repeat mode setting
+  - Better visibility of scheduled runs
+
+### 🔧 Technical Details
+
+- Added `statistics` and `history` tables to settings database
+- `StatusTracker` loads statistics and history from DB on startup
+- `update_counts()` automatically saves statistics to DB
+- `add_to_history()` automatically saves history to DB
+- History entries are created after each processing run
+
 ## [2.3.1] - 2025-11-10
 
 ### 🐛 Bug Fixes

@@ -585,8 +585,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 unsupported=len(result.unsupported),
             )
             
-            # Clear current release when done
+            # Add to history if WebGUI is enabled
             if args.webgui:
+                # Calculate duration
+                duration = 0.0
+                if tracker._status.start_time:
+                    from datetime import datetime
+                    duration = (datetime.now() - tracker._status.start_time).total_seconds()
+                
+                # Use current_release_name or a generic name
+                release_name = current_release_name if current_release_name else "Processing Run"
+                
+                # Determine status
+                status = "completed" if result.processed > 0 and len(result.failed) == 0 else "failed"
+                
+                # Add history entry
+                tracker.add_to_history(
+                    release_name=release_name,
+                    status=status,
+                    processed_archives=result.processed,
+                    failed_archives=len(result.failed),
+                    duration_seconds=duration,
+                    extracted_files=[],
+                    error_messages=[str(f) for f in result.failed[:10]]  # First 10 errors
+                )
+                
+                # Clear current release when done
                 with tracker._lock:
                     tracker._status.current_release = None
             

@@ -64,6 +64,32 @@ class SettingsDB:
                         value TEXT NOT NULL
                     )
                 """)
+                # Statistics table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS statistics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        processed_count INTEGER DEFAULT 0,
+                        failed_count INTEGER DEFAULT 0,
+                        unsupported_count INTEGER DEFAULT 0,
+                        deleted_count INTEGER DEFAULT 0,
+                        cleanup_failed_count INTEGER DEFAULT 0,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                # History table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        release_name TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        processed_archives INTEGER DEFAULT 0,
+                        failed_archives INTEGER DEFAULT 0,
+                        duration_seconds REAL DEFAULT 0.0,
+                        extracted_files TEXT,
+                        error_messages TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
             finally:
                 conn.close()
@@ -154,6 +180,124 @@ class SettingsDB:
     def mark_initialized(self):
         """Mark database as initialized."""
         self.set_metadata("initialized", "true")
+
+    def save_statistics(self, stats: dict):
+        """Save statistics to database."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                # Delete old statistics (keep only latest)
+                conn.execute("DELETE FROM statistics")
+                
+                # Insert new statistics
+                conn.execute("""
+                    INSERT INTO statistics (
+                        processed_count, failed_count, unsupported_count,
+                        deleted_count, cleanup_failed_count
+                    ) VALUES (?, ?, ?, ?, ?)
+                """, (
+                    stats.get("processed_count", 0),
+                    stats.get("failed_count", 0),
+                    stats.get("unsupported_count", 0),
+                    stats.get("deleted_count", 0),
+                    stats.get("cleanup_failed_count", 0),
+                ))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def load_statistics(self) -> dict:
+        """Load statistics from database."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.execute("""
+                    SELECT processed_count, failed_count, unsupported_count,
+                           deleted_count, cleanup_failed_count
+                    FROM statistics
+                    ORDER BY id DESC
+                    LIMIT 1
+                """)
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "processed_count": row[0],
+                        "failed_count": row[1],
+                        "unsupported_count": row[2],
+                        "deleted_count": row[3],
+                        "cleanup_failed_count": row[4],
+                    }
+                return {
+                    "processed_count": 0,
+                    "failed_count": 0,
+                    "unsupported_count": 0,
+                    "deleted_count": 0,
+                    "cleanup_failed_count": 0,
+                }
+            finally:
+                conn.close()
+
+    def save_history(self, history_items: list):
+        """Save history items to database."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                # Keep only last 100 items
+                conn.execute("""
+                    DELETE FROM history 
+                    WHERE id NOT IN (
+                        SELECT id FROM history ORDER BY id DESC LIMIT 100
+                    )
+                """)
+                
+                # Insert new history items
+                for item in history_items[-100:]:  # Keep only last 100
+                    conn.execute("""
+                        INSERT INTO history (
+                            release_name, status, processed_archives, failed_archives,
+                            duration_seconds, extracted_files, error_messages, timestamp
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        item.get("release_name", ""),
+                        item.get("status", "completed"),
+                        item.get("processed_archives", 0),
+                        item.get("failed_archives", 0),
+                        item.get("duration_seconds", 0.0),
+                        json.dumps(item.get("extracted_files", [])),
+                        json.dumps(item.get("error_messages", [])),
+                        item.get("timestamp", ""),
+                    ))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def load_history(self) -> list:
+        """Load history from database."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.execute("""
+                    SELECT release_name, status, processed_archives, failed_archives,
+                           duration_seconds, extracted_files, error_messages, timestamp
+                    FROM history
+                    ORDER BY id DESC
+                    LIMIT 100
+                """)
+                history = []
+                for row in cursor.fetchall():
+                    history.append({
+                        "release_name": row[0],
+                        "status": row[1],
+                        "processed_archives": row[2],
+                        "failed_archives": row[3],
+                        "duration_seconds": row[4],
+                        "extracted_files": json.loads(row[5]) if row[5] else [],
+                        "error_messages": json.loads(row[6]) if row[6] else [],
+                        "timestamp": row[7],
+                    })
+                return history
+            finally:
+                conn.close()
 
 
 # Global instance

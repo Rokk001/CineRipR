@@ -225,6 +225,49 @@ class StatusTracker:
     def __init__(self) -> None:
         self._status = GlobalStatus()
         self._lock = threading.Lock()
+        
+        # Load statistics and history from DB on startup
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            
+            # Load statistics
+            stats = db.load_statistics()
+            self._status.processed_count = stats.get("processed_count", 0)
+            self._status.failed_count = stats.get("failed_count", 0)
+            self._status.unsupported_count = stats.get("unsupported_count", 0)
+            self._status.deleted_count = stats.get("deleted_count", 0)
+            self._status.cleanup_failed_count = stats.get("cleanup_failed_count", 0)
+            
+            # Load history
+            history_data = db.load_history()
+            for item in history_data:
+                # Parse timestamp
+                timestamp = item["timestamp"]
+                if isinstance(timestamp, str):
+                    try:
+                        timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        timestamp = datetime.now()
+                elif not isinstance(timestamp, datetime):
+                    timestamp = datetime.now()
+                
+                self._status.history.append(
+                    ReleaseHistory(
+                        release_name=item["release_name"],
+                        status=item["status"],
+                        processed_archives=item["processed_archives"],
+                        failed_archives=item["failed_archives"],
+                        duration_seconds=item["duration_seconds"],
+                        extracted_files=item["extracted_files"],
+                        error_messages=item["error_messages"],
+                        timestamp=timestamp,
+                    )
+                )
+        except Exception as e:
+            # If DB loading fails, continue with empty state
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to load statistics/history from DB: {e}")
 
     def start_processing(self) -> None:
         """Mark processing as started."""
@@ -304,6 +347,21 @@ class StatusTracker:
             if cleanup_failed is not None:
                 self._status.cleanup_failed_count = cleanup_failed
             self._status.last_update = datetime.now()
+        
+        # Save statistics to DB
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            db.save_statistics({
+                "processed_count": self._status.processed_count,
+                "failed_count": self._status.failed_count,
+                "unsupported_count": self._status.unsupported_count,
+                "deleted_count": self._status.deleted_count,
+                "cleanup_failed_count": self._status.cleanup_failed_count,
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
 
     def get_status(self) -> GlobalStatus:
         """Get a copy of the current status."""
@@ -502,22 +560,46 @@ class StatusTracker:
     ) -> None:
         """Add a release to the history."""
         with self._lock:
-            self._status.history.append(
-                ReleaseHistory(
-                    release_name=release_name,
-                    status=status,
-                    processed_archives=processed_archives,
-                    failed_archives=failed_archives,
-                    timestamp=datetime.now(),
-                    duration_seconds=duration_seconds,
-                    extracted_files=extracted_files or [],
-                    error_messages=error_messages or [],
-                )
+            history_item = ReleaseHistory(
+                release_name=release_name,
+                status=status,
+                processed_archives=processed_archives,
+                failed_archives=failed_archives,
+                timestamp=datetime.now(),
+                duration_seconds=duration_seconds,
+                extracted_files=extracted_files or [],
+                error_messages=error_messages or [],
             )
+            self._status.history.append(history_item)
+            
             # Keep only last 100 releases
             if len(self._status.history) > 100:
                 self._status.history = self._status.history[-100:]
             self._status.last_update = datetime.now()
+        
+        # Save history to DB
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            
+            # Convert history to dict format for DB
+            history_data = []
+            with self._lock:
+                for h in self._status.history:
+                    history_data.append({
+                        "release_name": h.release_name,
+                        "status": h.status,
+                        "processed_archives": h.processed_archives,
+                        "failed_archives": h.failed_archives,
+                        "duration_seconds": h.duration_seconds,
+                        "extracted_files": h.extracted_files,
+                        "error_messages": h.error_messages,
+                        "timestamp": h.timestamp.isoformat(),
+                    })
+            db.save_history(history_data)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to save history to DB: {e}")
 
     # Theme Management
     def set_theme(self, theme: str) -> None:
