@@ -2473,15 +2473,17 @@ def get_html_template() -> str:
         
         // Initial load and auto-refresh
         // FIX v2.5.5: Ensure only ONE interval runs, use 2s as shown in footer
-        let statusInterval = null;
-        function startStatusUpdates() {
-            if (statusInterval) {
-                clearInterval(statusInterval); // Clear any existing interval
+        (function() {
+            let statusInterval = null;
+            function startStatusUpdates() {
+                if (statusInterval) {
+                    clearInterval(statusInterval); // Clear any existing interval
+                }
+                updateStatus(); // Initial call
+                statusInterval = setInterval(updateStatus, 2000); // 2 seconds as shown in footer
             }
-            updateStatus(); // Initial call
-            statusInterval = setInterval(updateStatus, 2000); // 2 seconds as shown in footer
-        }
-        startStatusUpdates();
+            startStatusUpdates();
+        })();
     </script>
 </body>
 </html>'''
