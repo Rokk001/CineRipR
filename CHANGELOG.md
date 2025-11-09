@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.4] - 2025-11-10
+
+### 🔍 Debug Release
+
+- **Enhanced Debug Logging:** Added comprehensive logging to settings API endpoint
+  - Logs every step: Setting save → DB read → Tracker update
+  - Helps identify why countdown/progressbar doesn't update
+  - Logs show exact values being read from DB
+  - Shows if `tracker.set_next_run()` is actually called
+  - Catches and logs all exceptions with full stack traces
+
+### 🔧 Technical Changes
+
+- `webgui.py`: Added detailed debug logs in `/api/settings/<key>` endpoint (lines 2591-2618)
+- All debug messages prefixed with `🔧 [DEBUG]` for easy filtering
+
 ## [2.5.3] - 2025-11-10
 
 ### 🐛 Critical Fixes

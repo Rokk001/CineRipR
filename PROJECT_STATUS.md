@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.3)
+## Aktueller Stand (Version 2.5.4 - DEBUG)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur

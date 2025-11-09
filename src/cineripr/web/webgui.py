@@ -2581,26 +2581,41 @@ def create_app() -> Flask:
             return jsonify({"key": key, "value": value})
 
         elif request.method == "POST":
+            import logging
+            _logger = logging.getLogger(__name__)
+            
             data = request.get_json()
             if not data or "value" not in data:
                 return jsonify({"error": "Missing 'value' in request body"}), 400
-            db.set(key, data["value"])
             
-            # Update countdown/repeat mode after EVERY setting save (FIX v2.5.3)
+            _logger.info(f"🔧 [DEBUG] Setting '{key}' changed to: {data['value']}")
+            db.set(key, data["value"])
+            _logger.info(f"🔧 [DEBUG] Setting '{key}' saved to DB successfully")
+            
+            # Update countdown/repeat mode after EVERY setting save (FIX v2.5.3, DEBUG v2.5.4)
             # This ensures countdown is always in sync with DB, regardless of race conditions
             try:
+                _logger.info(f"🔧 [DEBUG] Reading settings from DB...")
                 # Always reload from DB to get the latest values
                 repeat_forever = db.get("repeat_forever", False)
                 repeat_after_minutes = db.get("repeat_after_minutes", 30)
                 
+                _logger.info(f"🔧 [DEBUG] DB values: repeat_forever={repeat_forever}, repeat_after_minutes={repeat_after_minutes}")
+                
                 # Update tracker with current DB state
+                _logger.info(f"🔧 [DEBUG] Calling tracker.set_repeat_mode({repeat_forever})...")
                 tracker.set_repeat_mode(bool(repeat_forever))
+                
                 if repeat_forever and repeat_after_minutes > 0:
+                    _logger.info(f"🔧 [DEBUG] Calling tracker.set_next_run({repeat_after_minutes})...")
                     tracker.set_next_run(int(repeat_after_minutes))
+                    _logger.info(f"🔧 [DEBUG] ✓ tracker.set_next_run() completed successfully!")
+                else:
+                    _logger.info(f"🔧 [DEBUG] Skipping set_next_run (repeat_forever={repeat_forever}, minutes={repeat_after_minutes})")
+                    
             except Exception as e:
                 # Don't break on tracker update errors
-                import logging
-                logging.getLogger(__name__).debug(f"Failed to update tracker after settings save: {e}")
+                _logger.error(f"🔧 [DEBUG] ❌ EXCEPTION in tracker update: {e}", exc_info=True)
             
             tracker.add_notification("success", "Setting Updated", f"'{key}' has been updated")
             return jsonify({"status": "saved", "key": key, "value": data["value"]})
