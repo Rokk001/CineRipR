@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.1] - 2025-11-10
+
+### 🐛 Critical Bug Fixes
+
+- **CompletedProcess Crash:** Fixed variable shadowing causing `'CompletedProcess' object has no attribute 'processed'` error
+  - Renamed subprocess result variables from `result` to `proc_result`
+  - Fixed 4 occurrences in `cli.py` where subprocess results shadowed the ProcessResult
+  - This bug caused the main loop to crash with unexpected errors
+  
+- **Countdown Missing After Restart:** Enhanced fallback logic for countdown initialization
+  - Added debug logging for `repeat_forever` and `repeat_after_minutes` settings
+  - If `repeat_forever` is True but `repeat_after_minutes` is invalid, use default 30 minutes
+  - Fixed edge case where countdown would not show after container restart
+
+- **Disk Space Empty:** Implemented background thread for periodic system health updates
+  - System health (disk space, CPU, memory) now updates every 30 seconds
+  - Independent of main processing loop
+  - Works in both repeat mode and manual mode
+  - Updates 7-Zip version, disk usage, CPU, and memory metrics
+
+- **Queue Empty After Restart:** Added database persistence for queue
+  - Queue items now persist across application restarts
+  - New table `queue` in SQLite database
+  - Auto-save on every queue operation (add, update, remove)
+  - Auto-load on application startup
+
+### 🔧 Technical Changes
+
+- `cli.py`: Added background health monitor thread (daemon, 30s interval)
+- `cli.py`: Enhanced countdown initialization with fallback and debug logging
+- `cli.py`: Fixed variable shadowing (`result` → `proc_result`)
+- `settings_db.py`: Added `queue` table with `save_queue()` and `load_queue()` methods
+- `status.py`: Added `_save_queue_to_db()` helper method
+- `status.py`: Queue operations now auto-save to database
+- `status.py`: Queue loaded from database on startup
+
+### 📦 Dependencies
+
+- Added imports: `threading`, `time`, `re`, `subprocess` to `cli.py`
+
 ## [2.5.0] - 2025-11-10
 
 ### 🎨 Major UI/UX Improvements

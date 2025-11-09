@@ -29,10 +29,10 @@ Deployment and operational guides.
 Detailed release notes for all versions.
 
 - **[All Release Notes](releases/)** - Chronological list of all releases
-- **[Latest: v2.5.0](releases/v2.5.0.md)** - Most recent release (Visual Countdown & History Fixes)
+- **[Latest: v2.5.1](releases/v2.5.1.md)** - Critical Hotfix (Crash Fix, Queue/Disk/Countdown)
+- [v2.5.0](releases/v2.5.0.md) - Visual Countdown & History Fixes
 - [v2.4.3](releases/v2.4.3.md) - The REAL Countdown Fix
 - [v2.4.2](releases/v2.4.2.md) - Critical Countdown Fix (had bugs)
-- [v2.4.1](releases/v2.4.1.md) - Critical Bug Fixes
 
 ## 🔗 Quick Links
 

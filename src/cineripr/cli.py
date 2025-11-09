@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
+import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Sequence
 
@@ -127,7 +131,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     """Load settings from TOML (if provided), CLI args, and WebGUI database.
-    
+
     Priority order:
     1. WebGUI settings (SQLite) - highest priority
     2. CLI args
@@ -232,7 +236,7 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         from .web.settings_db import get_settings_db, DEFAULT_SETTINGS
 
         db = get_settings_db()
-        
+
         # Load all settings with defaults applied automatically
         # This ensures DEFAULT_SETTINGS are used if DB values don't exist
         db_settings = db.get_all()
@@ -240,11 +244,14 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         # Override with WebGUI settings (with defaults already applied)
         repeat_forever = bool(db_settings.get("repeat_forever", repeat_forever))
         repeat_after_minutes = int(db_settings.get("repeat_after_minutes", 30))
-        
+
         # Ensure minimum delay of 1 minute to prevent infinite loops
         # CRITICAL: If DB has 0 (from old version), use default 30
         if repeat_after_minutes < 1:
-            _LOGGER.warning("repeat_after_minutes was %d, setting to 30 (default)", repeat_after_minutes)
+            _LOGGER.warning(
+                "repeat_after_minutes was %d, setting to 30 (default)",
+                repeat_after_minutes,
+            )
             repeat_after_minutes = 30
 
         retention_days = int(db_settings.get("finished_retention_days", retention_days))
@@ -252,7 +259,9 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         demo_mode = bool(db_settings.get("demo_mode", demo_mode))
 
         # Subfolders
-        include_sample = bool(db_settings.get("include_sample", subfolders.include_sample))
+        include_sample = bool(
+            db_settings.get("include_sample", subfolders.include_sample)
+        )
         include_sub = bool(db_settings.get("include_sub", subfolders.include_sub))
         include_other = bool(db_settings.get("include_other", subfolders.include_other))
         subfolders = SubfolderPolicy(
@@ -347,6 +356,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Check if Flask is available
         try:
             from flask import Flask
+
             _LOGGER.info("Flask is available, starting WebGUI...")
         except ImportError as exc:
             _LOGGER.error(
@@ -371,20 +381,92 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "WebGUI started on http://%s:%d", args.webgui_host, args.webgui_port
             )
         else:
-            _LOGGER.error("WebGUI thread died unexpectedly. Check logs above for errors.")
+            _LOGGER.error(
+                "WebGUI thread died unexpectedly. Check logs above for errors."
+            )
 
     tracker = get_status_tracker()
 
-    # Set repeat mode and countdown in tracker (NEW in v2.1.0, FIXED in v2.4.1)
+    # Set repeat mode and countdown in tracker (NEW in v2.1.0, FIXED in v2.4.1, v2.5.1)
     # Always set these, even if repeat_forever is False initially
     # WebGUI settings might override this later
     tracker.set_repeat_mode(settings.repeat_forever)
-    
+
     # Set initial next run time so countdown is visible from start
     # This ensures countdown is visible even after container restarts
-    if settings.repeat_after_minutes > 0:
+    _LOGGER.info(
+        "DEBUG: repeat_forever=%s, repeat_after_minutes=%s",
+        settings.repeat_forever,
+        settings.repeat_after_minutes,
+    )
+
+    if settings.repeat_forever and settings.repeat_after_minutes > 0:
         tracker.set_next_run(settings.repeat_after_minutes)
-        _LOGGER.info("Next run scheduled in %d minute(s)", settings.repeat_after_minutes)
+        _LOGGER.info(
+            "✓ Next run scheduled in %d minute(s)", settings.repeat_after_minutes
+        )
+    elif settings.repeat_forever and settings.repeat_after_minutes <= 0:
+        # FALLBACK: If repeat_forever is true but repeat_after_minutes is invalid, use default
+        _LOGGER.warning(
+            "repeat_after_minutes is %d but repeat_forever is True, using default 30",
+            settings.repeat_after_minutes,
+        )
+        tracker.set_next_run(30)
+        _LOGGER.info("✓ Next run scheduled in 30 minute(s) (default)")
+    else:
+        _LOGGER.info("Manual mode: repeat_forever is disabled")
+
+    # Start background thread for periodic system health updates (NEW in v2.5.1)
+    # This ensures disk space, CPU, memory are always up-to-date in WebGUI
+    if args.webgui:
+
+        def update_system_health_loop():
+            """Background thread to update system health every 30 seconds."""
+            while True:
+                try:
+                    time.sleep(30)
+
+                    # Get 7-Zip version
+                    seven_zip_cmd = resolve_seven_zip_command(settings.seven_zip_path)
+                    seven_zip_version = "Unknown"
+                    if seven_zip_cmd:
+                        try:
+                            result = subprocess.run(
+                                [str(seven_zip_cmd)],
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                            )
+                            for pattern in [
+                                r"7-Zip.*?(\d+\.\d+)",
+                                r"p7zip Version (\d+\.\d+)",
+                                r"(\d+\.\d+\.\d+)",
+                            ]:
+                                match = re.search(
+                                    pattern, result.stdout + result.stderr
+                                )
+                                if match:
+                                    seven_zip_version = match.group(1)
+                                    break
+                        except Exception:
+                            pass
+
+                    tracker.update_system_health(
+                        downloads_path=(
+                            settings.paths.download_roots[0]
+                            if settings.paths.download_roots
+                            else None
+                        ),
+                        extracted_path=settings.paths.extracted_root,
+                        finished_path=settings.paths.finished_root,
+                        seven_zip_version=seven_zip_version,
+                    )
+                except Exception as e:
+                    _LOGGER.debug(f"Background system health update failed: {e}")
+
+        health_thread = threading.Thread(target=update_system_health_loop, daemon=True)
+        health_thread.start()
+        _LOGGER.info("✓ Background system health monitor started")
 
     # Set up logging handler to forward logs to status tracker
     class StatusLogHandler(logging.Handler):
@@ -402,7 +484,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         status_handler = StatusLogHandler()
         status_handler.setLevel(logging.INFO)
         logging.getLogger().addHandler(status_handler)
-        
+
         # Initialize system health immediately after WebGUI starts
         seven_zip_cmd = resolve_seven_zip_command(settings.seven_zip_path)
         seven_zip_version = "Unknown"
@@ -410,36 +492,46 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 import subprocess
                 import re
+
                 # Try multiple methods to get version
                 methods = [
                     # Method 1: Run without args (7zz outputs version info)
-                    lambda: subprocess.run([seven_zip_cmd], capture_output=True, text=True, timeout=5),
+                    lambda: subprocess.run(
+                        [seven_zip_cmd], capture_output=True, text=True, timeout=5
+                    ),
                     # Method 2: Run with --version flag
-                    lambda: subprocess.run([seven_zip_cmd, "--version"], capture_output=True, text=True, timeout=5),
+                    lambda: subprocess.run(
+                        [seven_zip_cmd, "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    ),
                     # Method 3: Run with -v flag
-                    lambda: subprocess.run([seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5),
+                    lambda: subprocess.run(
+                        [seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5
+                    ),
                 ]
-                
+
                 # Try multiple regex patterns for different 7-Zip output formats
                 patterns = [
-                    r'7-Zip\s+([\d.]+)',           # "7-Zip 24.09"
-                    r'7z\s+([\d.]+)',             # "7z 24.09"
-                    r'p7zip\s+([\d.]+)',          # "p7zip 16.02"
-                    r'Version\s+([\d.]+)',       # "Version 24.09"
-                    r'([\d]+\.[\d]+)',            # Just version number "24.09"
+                    r"7-Zip\s+([\d.]+)",  # "7-Zip 24.09"
+                    r"7z\s+([\d.]+)",  # "7z 24.09"
+                    r"p7zip\s+([\d.]+)",  # "p7zip 16.02"
+                    r"Version\s+([\d.]+)",  # "Version 24.09"
+                    r"([\d]+\.[\d]+)",  # Just version number "24.09"
                 ]
-                
+
                 for method in methods:
                     try:
-                        result = method()
-                        output = (result.stdout or "") + (result.stderr or "")
-                        
+                        proc_result = method()
+                        output = (proc_result.stdout or "") + (proc_result.stderr or "")
+
                         for pattern in patterns:
                             match = re.search(pattern, output, re.IGNORECASE)
                             if match:
                                 seven_zip_version = f"7-Zip {match.group(1)}"
                                 break
-                        
+
                         if seven_zip_version != "Unknown":
                             break
                     except Exception:
@@ -447,19 +539,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             except Exception as e:
                 _LOGGER.debug(f"Failed to get 7-Zip version: {e}")
                 pass
-        
+
         tracker.update_system_health(
-            downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+            downloads_path=(
+                settings.paths.download_roots[0]
+                if settings.paths.download_roots
+                else None
+            ),
             extracted_path=settings.paths.extracted_root,
             finished_path=settings.paths.finished_root,
-            seven_zip_version=seven_zip_version
+            seven_zip_version=seven_zip_version,
         )
 
     def run_once() -> tuple[int, ProcessResult | None]:
         # Display tool name and version at the start of each loop
         _LOGGER.info("CineRipR %s", __version__)
         tracker.start_processing()
-        
+
         # Update system health at start of each run (if WebGUI is enabled)
         if args.webgui:
             try:
@@ -469,52 +565,74 @@ def main(argv: Sequence[str] | None = None) -> int:
                     try:
                         import subprocess
                         import re
+
                         # Try multiple methods to get version
                         methods = [
-                            lambda: subprocess.run([seven_zip_cmd], capture_output=True, text=True, timeout=5),
-                            lambda: subprocess.run([seven_zip_cmd, "--version"], capture_output=True, text=True, timeout=5),
-                            lambda: subprocess.run([seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5),
+                            lambda: subprocess.run(
+                                [seven_zip_cmd],
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                            ),
+                            lambda: subprocess.run(
+                                [seven_zip_cmd, "--version"],
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                            ),
+                            lambda: subprocess.run(
+                                [seven_zip_cmd, "-v"],
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                            ),
                         ]
-                        
+
                         patterns = [
-                            r'7-Zip\s+([\d.]+)',
-                            r'7z\s+([\d.]+)',
-                            r'p7zip\s+([\d.]+)',
-                            r'Version\s+([\d.]+)',
-                            r'([\d]+\.[\d]+)',
+                            r"7-Zip\s+([\d.]+)",
+                            r"7z\s+([\d.]+)",
+                            r"p7zip\s+([\d.]+)",
+                            r"Version\s+([\d.]+)",
+                            r"([\d]+\.[\d]+)",
                         ]
-                        
+
                         for method in methods:
                             try:
-                                result = method()
-                                output = (result.stdout or "") + (result.stderr or "")
-                                
+                                proc_result = method()
+                                output = (proc_result.stdout or "") + (
+                                    proc_result.stderr or ""
+                                )
+
                                 for pattern in patterns:
                                     match = re.search(pattern, output, re.IGNORECASE)
                                     if match:
                                         seven_zip_version = f"7-Zip {match.group(1)}"
                                         break
-                                
+
                                 if seven_zip_version != "Unknown":
                                     break
                             except Exception:
                                 continue
                     except Exception:
                         pass
-                
+
                 tracker.update_system_health(
-                    downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+                    downloads_path=(
+                        settings.paths.download_roots[0]
+                        if settings.paths.download_roots
+                        else None
+                    ),
                     extracted_path=settings.paths.extracted_root,
                     finished_path=settings.paths.finished_root,
-                    seven_zip_version=seven_zip_version
+                    seven_zip_version=seven_zip_version,
                 )
             except Exception as e:
                 _LOGGER.debug(f"Failed to update system health at start: {e}")
-        
+
         try:
             # Define status callback for process_downloads
             current_release_name: str | None = None
-            
+
             def status_callback(
                 status: str,
                 message: str,
@@ -523,12 +641,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 archive_total: int,
             ) -> None:
                 nonlocal current_release_name
-                
+
                 # Extract release name from message if available
                 if status == "scanning" and message.startswith("Processing "):
                     current_release_name = message.replace("Processing ", "")
                     tracker.set_current_release(current_release_name)
-                
+
                 # Update release status
                 if tracker.get_status().current_release:
                     tracker.update_release_status(
@@ -564,11 +682,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.webgui:
                 try:
                     from .web.settings_db import get_settings_db
+
                     db = get_settings_db()
                     parallel_extractions = db.get("parallel_extractions", 1)
                 except Exception:
                     pass
-            
+
             result: ProcessResult = process_downloads(
                 settings.paths,
                 demo_mode=settings.demo_mode,
@@ -583,21 +702,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 failed=len(result.failed),
                 unsupported=len(result.unsupported),
             )
-            
+
             # Add to history if WebGUI is enabled
             if args.webgui:
                 # Calculate duration
                 duration = 0.0
                 if tracker._status.start_time:
                     from datetime import datetime
-                    duration = (datetime.now() - tracker._status.start_time).total_seconds()
-                
+
+                    duration = (
+                        datetime.now() - tracker._status.start_time
+                    ).total_seconds()
+
                 # Use current_release_name or a generic name
-                release_name = current_release_name if current_release_name else "Processing Run"
-                
+                release_name = (
+                    current_release_name if current_release_name else "Processing Run"
+                )
+
                 # Determine status
-                status = "completed" if result.processed > 0 and len(result.failed) == 0 else "failed"
-                
+                status = (
+                    "completed"
+                    if result.processed > 0 and len(result.failed) == 0
+                    else "failed"
+                )
+
                 # Add history entry
                 tracker.add_to_history(
                     release_name=release_name,
@@ -606,19 +734,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                     failed_archives=len(result.failed),
                     duration_seconds=duration,
                     extracted_files=[],
-                    error_messages=[str(f) for f in result.failed[:10]]  # First 10 errors
+                    error_messages=[
+                        str(f) for f in result.failed[:10]
+                    ],  # First 10 errors
                 )
-                
+
                 # Clear current release when done
                 with tracker._lock:
                     tracker._status.current_release = None
-            
+
             tracker.stop_processing()
-            
+
             # Set next run time after processing completes (if repeat mode is enabled)
-            if args.webgui and settings.repeat_forever and settings.repeat_after_minutes > 0:
+            if (
+                args.webgui
+                and settings.repeat_forever
+                and settings.repeat_after_minutes > 0
+            ):
                 tracker.set_next_run(settings.repeat_after_minutes)
-            
+
             # Update system health after processing (if WebGUI is enabled)
             if args.webgui:
                 try:
@@ -628,55 +762,83 @@ def main(argv: Sequence[str] | None = None) -> int:
                         try:
                             import subprocess
                             import re
+
                             methods = [
-                                lambda: subprocess.run([seven_zip_cmd], capture_output=True, text=True, timeout=5),
-                                lambda: subprocess.run([seven_zip_cmd, "--version"], capture_output=True, text=True, timeout=5),
-                                lambda: subprocess.run([seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5),
+                                lambda: subprocess.run(
+                                    [seven_zip_cmd],
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=5,
+                                ),
+                                lambda: subprocess.run(
+                                    [seven_zip_cmd, "--version"],
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=5,
+                                ),
+                                lambda: subprocess.run(
+                                    [seven_zip_cmd, "-v"],
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=5,
+                                ),
                             ]
-                            
+
                             patterns = [
-                                r'7-Zip\s+([\d.]+)',
-                                r'7z\s+([\d.]+)',
-                                r'p7zip\s+([\d.]+)',
-                                r'Version\s+([\d.]+)',
-                                r'([\d]+\.[\d]+)',
+                                r"7-Zip\s+([\d.]+)",
+                                r"7z\s+([\d.]+)",
+                                r"p7zip\s+([\d.]+)",
+                                r"Version\s+([\d.]+)",
+                                r"([\d]+\.[\d]+)",
                             ]
-                            
+
                             for method in methods:
                                 try:
-                                    result = method()
-                                    output = (result.stdout or "") + (result.stderr or "")
-                                    
+                                    proc_result = method()
+                                    output = (proc_result.stdout or "") + (
+                                        proc_result.stderr or ""
+                                    )
+
                                     for pattern in patterns:
-                                        match = re.search(pattern, output, re.IGNORECASE)
+                                        match = re.search(
+                                            pattern, output, re.IGNORECASE
+                                        )
                                         if match:
-                                            seven_zip_version = f"7-Zip {match.group(1)}"
+                                            seven_zip_version = (
+                                                f"7-Zip {match.group(1)}"
+                                            )
                                             break
-                                    
+
                                     if seven_zip_version != "Unknown":
                                         break
                                 except Exception:
                                     continue
                         except Exception:
                             pass
-                    
+
                     tracker.update_system_health(
-                        downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+                        downloads_path=(
+                            settings.paths.download_roots[0]
+                            if settings.paths.download_roots
+                            else None
+                        ),
                         extracted_path=settings.paths.extracted_root,
                         finished_path=settings.paths.finished_root,
-                        seven_zip_version=seven_zip_version
+                        seven_zip_version=seven_zip_version,
                     )
                 except Exception as e:
-                    _LOGGER.debug(f"Failed to update system health after processing: {e}")
-            
+                    _LOGGER.debug(
+                        f"Failed to update system health after processing: {e}"
+                    )
+
             # Send completion notification
             if args.webgui and result.processed > 0:
                 tracker.add_notification(
                     "success",
                     "Processing Complete",
-                    f"Successfully processed {result.processed} archive(s)"
+                    f"Successfully processed {result.processed} archive(s)",
                 )
-            
+
             return 0, result
         except RuntimeError as exc:
             _LOGGER.error("Processing error: %s", exc)
@@ -716,7 +878,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     cleanup_failed = []
                     skipped_cleanup = []
 
-                tracker.update_counts(deleted=len(deleted), cleanup_failed=len(cleanup_failed))
+                tracker.update_counts(
+                    deleted=len(deleted), cleanup_failed=len(cleanup_failed)
+                )
                 _LOGGER.info("Processed archives: %s", result.processed)
                 if settings.demo_mode:
                     _LOGGER.info("Demo mode: all actions were simulated only.")
@@ -745,6 +909,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _LOGGER.info("WebGUI is running. Press Ctrl+C to exit.")
                 try:
                     import time
+
                     while webgui_thread.is_alive():
                         time.sleep(1)
                 except KeyboardInterrupt:
@@ -781,50 +946,78 @@ def main(argv: Sequence[str] | None = None) -> int:
                 # Update system health every 30 seconds (for WebGUI)
                 if args.webgui and time.time() - last_system_health_update >= 30:
                     try:
-                        seven_zip_cmd = resolve_seven_zip_command(settings.seven_zip_path)
+                        seven_zip_cmd = resolve_seven_zip_command(
+                            settings.seven_zip_path
+                        )
                         seven_zip_version = "Unknown"
                         if seven_zip_cmd:
                             try:
                                 import subprocess
                                 import re
+
                                 # Try multiple methods to get version
                                 methods = [
-                                    lambda: subprocess.run([seven_zip_cmd], capture_output=True, text=True, timeout=5),
-                                    lambda: subprocess.run([seven_zip_cmd, "--version"], capture_output=True, text=True, timeout=5),
-                                    lambda: subprocess.run([seven_zip_cmd, "-v"], capture_output=True, text=True, timeout=5),
+                                    lambda: subprocess.run(
+                                        [seven_zip_cmd],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=5,
+                                    ),
+                                    lambda: subprocess.run(
+                                        [seven_zip_cmd, "--version"],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=5,
+                                    ),
+                                    lambda: subprocess.run(
+                                        [seven_zip_cmd, "-v"],
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=5,
+                                    ),
                                 ]
-                                
+
                                 patterns = [
-                                    r'7-Zip\s+([\d.]+)',
-                                    r'7z\s+([\d.]+)',
-                                    r'p7zip\s+([\d.]+)',
-                                    r'Version\s+([\d.]+)',
-                                    r'([\d]+\.[\d]+)',
+                                    r"7-Zip\s+([\d.]+)",
+                                    r"7z\s+([\d.]+)",
+                                    r"p7zip\s+([\d.]+)",
+                                    r"Version\s+([\d.]+)",
+                                    r"([\d]+\.[\d]+)",
                                 ]
-                                
+
                                 for method in methods:
                                     try:
-                                        result = method()
-                                        output = (result.stdout or "") + (result.stderr or "")
-                                        
+                                        proc_result = method()
+                                        output = (proc_result.stdout or "") + (
+                                            proc_result.stderr or ""
+                                        )
+
                                         for pattern in patterns:
-                                            match = re.search(pattern, output, re.IGNORECASE)
+                                            match = re.search(
+                                                pattern, output, re.IGNORECASE
+                                            )
                                             if match:
-                                                seven_zip_version = f"7-Zip {match.group(1)}"
+                                                seven_zip_version = (
+                                                    f"7-Zip {match.group(1)}"
+                                                )
                                                 break
-                                        
+
                                         if seven_zip_version != "Unknown":
                                             break
                                     except Exception:
                                         continue
                             except Exception:
                                 pass
-                        
+
                         tracker.update_system_health(
-                            downloads_path=settings.paths.download_roots[0] if settings.paths.download_roots else None,
+                            downloads_path=(
+                                settings.paths.download_roots[0]
+                                if settings.paths.download_roots
+                                else None
+                            ),
                             extracted_path=settings.paths.extracted_root,
                             finished_path=settings.paths.finished_root,
-                            seven_zip_version=seven_zip_version
+                            seven_zip_version=seven_zip_version,
                         )
                         last_system_health_update = time.time()
                     except Exception as e:

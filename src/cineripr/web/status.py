@@ -273,6 +273,20 @@ class StatusTracker:
                         timestamp=timestamp,
                     )
                 )
+            
+            # Load queue (NEW in v2.5.1)
+            queue_data = db.load_queue()
+            for item in queue_data:
+                self._status.queue.append(
+                    QueueItem(
+                        name=item["id"],
+                        path="",  # Path not persisted
+                        status=item["status"],
+                        archive_count=item["archive_count"],
+                        added_time=datetime.now(),  # Use current time
+                        error=item["error"],
+                    )
+                )
         except Exception as e:
             # If DB loading fails, continue with empty state
             import logging
@@ -496,6 +510,9 @@ class StatusTracker:
                 QueueItem(name=name, path=path, archive_count=archive_count)
             )
             self._status.last_update = datetime.now()
+            
+            # Save queue to DB (NEW in v2.5.1)
+            self._save_queue_to_db()
 
     def update_queue_item(
         self, name: str, status: str, error: str | None = None
@@ -508,6 +525,9 @@ class StatusTracker:
                     item.error = error
                     break
             self._status.last_update = datetime.now()
+            
+            # Save queue to DB (NEW in v2.5.1)
+            self._save_queue_to_db()
 
     def remove_from_queue(self, name: str) -> None:
         """Remove an item from the queue."""
@@ -516,6 +536,9 @@ class StatusTracker:
                 item for item in self._status.queue if item.name != name
             ]
             self._status.last_update = datetime.now()
+            
+            # Save queue to DB (NEW in v2.5.1)
+            self._save_queue_to_db()
 
     def clear_completed_queue_items(self) -> None:
         """Remove completed and failed items from queue."""
@@ -525,7 +548,30 @@ class StatusTracker:
                 for item in self._status.queue
                 if item.status not in ("completed", "failed")
             ]
-            self._status.last_update = datetime.now()
+            
+            # Save queue to DB (NEW in v2.5.1)
+            self._save_queue_to_db()
+    
+    def _save_queue_to_db(self) -> None:
+        """Save current queue to database (helper method for v2.5.1)."""
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            
+            # Convert queue items to dicts
+            queue_dicts = [
+                {
+                    'id': item.name,
+                    'status': item.status,
+                    'archive_count': item.archive_count,
+                    'error': item.error,
+                }
+                for item in self._status.queue
+            ]
+            
+            db.save_queue(queue_dicts)
+        except Exception:
+            pass  # Don't break on DB save errors
 
     # System Health
     def update_system_health(

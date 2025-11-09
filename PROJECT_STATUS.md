@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.0)
+## Aktueller Stand (Version 2.5.1)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -14,6 +14,10 @@
 9. **Progressbar Live-Updates (v2.4.1)**: Extraction Progress wird in Echtzeit aktualisiert
 10. **System Health (v2.4.1)**: CPU/Memory werden jetzt immer korrekt angezeigt
 11. **Countdown Missing After Fresh Install (v2.4.2/v2.4.3)**: DEFAULT_SETTINGS werden jetzt korrekt geladen, DB-Migration für alte Werte, Countdown ist GARANTIERT sichtbar
+12. **CompletedProcess Crash (v2.5.1)**: Variable Shadowing behoben - Container crasht nicht mehr mit `'CompletedProcess' object has no attribute 'processed'`
+13. **Countdown Missing After Restart (v2.5.1)**: Enhanced fallback logic - Countdown immer sichtbar wenn repeat mode aktiv
+14. **Disk Space Empty (v2.5.1)**: Background Health Monitor Thread - System Health Updates alle 30 Sekunden
+15. **Queue Empty After Restart (v2.5.1)**: Queue Persistenz in SQLite DB - Queue überlebt Container-Restarts
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`

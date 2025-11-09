@@ -100,6 +100,17 @@ class SettingsDB:
                         last_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # Queue table (NEW in v2.5.1)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS queue (
+                        id TEXT PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        archive_count INTEGER DEFAULT 0,
+                        error TEXT,
+                        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 
                 # MIGRATION: Fix invalid repeat_after_minutes values (v2.4.3)
@@ -383,6 +394,48 @@ class SettingsDB:
                     WHERE last_check < datetime('now', '-' || ? || ' days')
                 """, (days,))
                 conn.commit()
+            finally:
+                conn.close()
+
+    def save_queue(self, queue_items: list[dict]):
+        """Save queue to database (NEW in v2.5.1)."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                # Clear existing queue
+                conn.execute("DELETE FROM queue")
+                
+                # Insert all queue items
+                for item in queue_items:
+                    conn.execute("""
+                        INSERT INTO queue (id, status, archive_count, error, added_at, updated_at)
+                        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                    """, (item['id'], item['status'], item.get('archive_count', 0), item.get('error')))
+                
+                conn.commit()
+            finally:
+                conn.close()
+
+    def load_queue(self) -> list[dict]:
+        """Load queue from database (NEW in v2.5.1)."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.execute("""
+                    SELECT id, status, archive_count, error, added_at, updated_at
+                    FROM queue
+                    ORDER BY added_at ASC
+                """)
+                
+                queue_items = []
+                for row in cursor.fetchall():
+                    queue_items.append({
+                        'id': row[0],
+                        'status': row[1],
+                        'archive_count': row[2],
+                        'error': row[3] if row[3] else None,
+                    })
+                return queue_items
             finally:
                 conn.close()
 
