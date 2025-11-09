@@ -26,6 +26,13 @@
 - Keine TV-spezifische Umstrukturierung im `finished`-Pfad.
 - Companions (z. B. `Sample`, `Subs`) werden beim Verschieben nach `finished` unverändert übernommen.
 
+### ⚠️ KRITISCHE REGEL - NIEMALS VERGESSEN!
+**KEINE URHEBERRECHTLICH GESCHÜTZTEN INHALTE IN DOKUMENTATION!**
+- ❌ **NIEMALS** echte Film-/Serien-Titel verwenden (z.B. "Goonies", "Monster", etc.)
+- ✅ **NUR** generische Beispiele: `Release.Name.2024.1080p.BluRay.x264-GROUP`, `Show.Name.S01E01.1080p.WEB.x264-GROUP`, `Movie.Title.2024.1080p.WEB.x264-GROUP`
+- ⚠️ **VOR JEDEM COMMIT**: Alle `.md` Dateien scannen mit `grep -i "goonies|monster|ed.gein" docs/ README.md CHANGELOG.md PROJECT_STATUS.md`
+- 🔍 **AUTOMATED CHECK**: Diese Regel gilt für ALLE Dokumentationen, Kommentare, Beispiele, Release Notes, etc.
+
 ### 🔧 Aktuelle Architektur
 
 #### Core Module
