@@ -2,6 +2,80 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2025-11-10
+
+### 🎉 Major Feature - Settings UI Tab
+
+Complete WebGUI settings interface with full configuration management.
+
+### ✨ New Features
+
+#### ⚙️ Settings UI Tab
+- **Complete settings interface** in WebGUI
+- **5 setting categories:** Scheduling, Retention, Subfolders, UI Preferences, Advanced
+- **Real-time validation** with inline error messages
+- **Save all settings** button with success/error feedback
+- **Reset to defaults** with confirmation dialog
+- **Auto-load settings** when opening the tab
+
+#### 📝 Settings Categories
+
+**🕐 Scheduling:**
+- Enable/disable auto-run (repeat forever)
+- Configure check interval (1-1440 minutes)
+
+**🗑️ Retention & Cleanup:**
+- Set retention days (1-365 days)
+- Enable/disable automatic deletion
+
+**📂 Subfolder Processing:**
+- Include/exclude Sample directories
+- Include/exclude Subtitle directories
+- Include/exclude other subdirectories
+
+**🎨 UI Preferences:**
+- Enable/disable toast notifications
+- Enable/disable notification sounds
+
+**🔧 Advanced:**
+- Enable/disable demo mode
+
+### 🎨 UI/UX Improvements
+- **Modern card-based layout** with glassmorphism
+- **Color-coded categories** with emoji icons
+- **Inline help text** for each setting
+- **Visual feedback** on save/reset actions
+- **Responsive design** for all screen sizes
+
+### 🔧 Technical Changes
+- Extended `switchTab()` function to auto-load settings
+- Added validation for all numeric inputs
+- Bulk save operation for all settings
+- Graceful error handling with user feedback
+
+### 📚 Documentation
+- Updated WebGUI features list
+- Added settings UI documentation
+
+### ⚠️ Breaking Changes
+**None** - Fully backward compatible with v2.1.x
+
+[2.2.0]: https://github.com/Rokk001/CineRipR/compare/v2.1.1...v2.2.0
+
+---
+
+## [2.1.1] - 2025-11-10
+
+### 🐛 Hotfix
+
+- Fixed import error in `extraction/__init__.py`
+- Removed non-existent constants `ARCHIVE_EXTENSIONS`, `RAR_EXTENSIONS`, `ZIP_EXTENSIONS`
+- Added correct imports: `SUPPORTED_ARCHIVE_SUFFIXES`, `TV_TAG_RE`
+
+[2.1.1]: https://github.com/Rokk001/CineRipR/compare/v2.1.0...v2.1.1
+
+---
+
 ## [2.1.0] - 2025-11-10
 
 ### 🎉 Major Features - WebGUI Configuration & Live Countdown

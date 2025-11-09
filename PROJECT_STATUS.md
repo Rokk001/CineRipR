@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.1.0)
+## Aktueller Stand (Version 2.2.0)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -315,3 +315,80 @@ Finished/
   - WebGUI Settings haben Vorrang
 
 - **Backward Compatibility**: Vollständig kompatibel mit v2.0.x
+
+---
+
+## Session Notes - Version 2.2.0 (2025-11-10)
+
+### 🎯 Implementierte Features
+
+#### 1. ⚙️ Settings UI Tab (Vollständig)
+- **Komplettes Settings-Interface** im WebGUI
+- **5 Kategorien** mit allen konfigurierbaren Settings
+- **Echtzeit-Validierung** für numerische Eingaben
+- **Save All Settings** Funktion mit Bulk-API-Calls
+- **Reset to Defaults** mit Bestätigungsdialog
+- **Auto-Load** beim Tab-Wechsel
+
+### 🔧 Settings Kategorien
+
+**🕐 Scheduling:**
+- `repeat_forever` - Auto-Run aktivieren/deaktivieren
+- `repeat_after_minutes` - Check-Intervall (1-1440 Min.)
+
+**🗑️ Retention & Cleanup:**
+- `finished_retention_days` - Aufbewahrungstage (1-365)
+- `enable_delete` - Auto-Delete aktivieren
+
+**📂 Subfolder Processing:**
+- `include_sample` - Sample-Verzeichnisse verarbeiten
+- `include_sub` - Subtitle-Verzeichnisse verarbeiten
+- `include_other` - Andere Unterverzeichnisse
+
+**🎨 UI Preferences:**
+- `toast_notifications` - Toast-Benachrichtigungen
+- `toast_sound` - Benachrichtigungs-Sounds
+
+**🔧 Advanced:**
+- `demo_mode` - Demo-Modus (nur simulieren)
+
+### 📝 Code Changes
+
+**WebGUI (`webgui.py`):**
+- Neuer Navigation Tab "Settings"
+- Kompletter Settings Tab Content (HTML)
+- CSS für Settings-Kategorien und Formulare
+- JavaScript Functions:
+  - `loadSettings()` - Settings von API laden
+  - `saveAllSettings()` - Alle Settings speichern mit Validierung
+  - `resetSettings()` - Auf Defaults zurücksetzen
+  - `switchTab()` erweitert für Auto-Load
+
+### 🎨 UI/UX
+
+- **Card-basiertes Layout** mit Glassmorphism
+- **Farbcodierte Kategorien** mit Emoji-Icons
+- **Inline-Hilfe** für jedes Setting
+- **Visual Feedback** bei Save/Reset
+- **Responsive Design** für Mobile
+- **Validierungs-Messages** für ungültige Eingaben
+
+### 📊 Status
+
+✅ **Vollständig implementiert:**
+- Settings UI Tab
+- Load/Save/Reset Funktionen
+- API-Integration
+- Validation
+- User Feedback
+
+❌ **Nicht implementiert (verschoben):**
+- Parallel Extraction - Zu komplex für dieses Release
+- Hardware Auto-Detection - Bereits vorbereitet, aber noch nicht aktiviert
+
+### 🚀 Deployment
+
+- **Version:** 2.2.0
+- **Features:** Settings UI vollständig
+- **Backward Compatible:** Ja
+- **Breaking Changes:** Keine

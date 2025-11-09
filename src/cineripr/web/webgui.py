@@ -1018,6 +1018,107 @@ def get_html_template() -> str:
             width: 200px;
         }
         
+        /* Settings Tab (NEW in v2.2.0) */
+        .settings-categories {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .settings-category {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .settings-category h3 {
+            margin: 0 0 20px 0;
+            color: var(--accent-color);
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .setting-label {
+            color: var(--text-primary);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .setting-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+        
+        .setting-input {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        
+        .setting-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .setting-help {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        
+        .settings-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .settings-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .settings-status.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
+        
+        .settings-status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .header {
@@ -1092,6 +1193,9 @@ def get_html_template() -> str:
             </button>
             <button class="nav-tab" onclick="switchTab('logs')">
                 📝 Logs
+            </button>
+            <button class="nav-tab" onclick="switchTab('settings')">
+                ⚙️ Settings
             </button>
         </div>
         
@@ -1289,6 +1393,132 @@ def get_html_template() -> str:
             </div>
         </div>
         
+        <!-- Settings Tab (NEW in v2.2.0) -->
+        <div class="tab-content" id="tab-settings">
+            <div class="card">
+                <h2>⚙️ Settings</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 25px;">
+                    Configure CineRipR directly from the WebGUI. Changes are saved immediately and take effect on the next run.
+                </p>
+                
+                <!-- Settings Categories -->
+                <div class="settings-categories">
+                    <!-- Scheduling -->
+                    <div class="settings-category">
+                        <h3>🕐 Scheduling</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-repeat-forever" />
+                                    <span>Enable Auto-Run (Repeat Forever)</span>
+                                </label>
+                                <p class="setting-help">Automatically run processing in intervals</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">Check Interval (minutes)</label>
+                                <input type="number" id="setting-repeat-minutes" min="1" max="1440" class="setting-input" />
+                                <p class="setting-help">Time between automatic runs (1-1440 minutes)</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Retention -->
+                    <div class="settings-category">
+                        <h3>🗑️ Retention & Cleanup</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">Retention Days</label>
+                                <input type="number" id="setting-retention-days" min="1" max="365" class="setting-input" />
+                                <p class="setting-help">Days to keep files in finished directory</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-enable-delete" />
+                                    <span>Enable Automatic Deletion</span>
+                                </label>
+                                <p class="setting-help">⚠️ Automatically delete files after retention period</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subfolders -->
+                    <div class="settings-category">
+                        <h3>📂 Subfolder Processing</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-include-sample" />
+                                    <span>Include Sample Directories</span>
+                                </label>
+                                <p class="setting-help">Process 'Sample' folders (preview videos)</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-include-sub" />
+                                    <span>Include Subtitle Directories</span>
+                                </label>
+                                <p class="setting-help">Process 'Subs'/'Sub' folders</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-include-other" />
+                                    <span>Include Other Subdirectories</span>
+                                </label>
+                                <p class="setting-help">Process other folders (Proof, extras, etc.)</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- UI Preferences -->
+                    <div class="settings-category">
+                        <h3>🎨 UI Preferences</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-toast-notifications" />
+                                    <span>Enable Toast Notifications</span>
+                                </label>
+                                <p class="setting-help">Show pop-up notifications for events</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-toast-sound" />
+                                    <span>Enable Notification Sounds</span>
+                                </label>
+                                <p class="setting-help">Play sound with notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced -->
+                    <div class="settings-category">
+                        <h3>🔧 Advanced</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="setting-demo-mode" />
+                                    <span>Demo Mode</span>
+                                </label>
+                                <p class="setting-help">⚠️ Simulate operations without making changes</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="settings-actions">
+                    <button class="control-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="saveAllSettings()">
+                        <span>💾</span> Save All Settings
+                    </button>
+                    <button class="control-btn" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);" onclick="resetSettings()">
+                        <span>🔄</span> Reset to Defaults
+                    </button>
+                </div>
+                
+                <div id="settings-status" class="settings-status" style="display: none;"></div>
+            </div>
+        </div>
+        
         <div class="footer">
             <div style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1384,6 +1614,11 @@ def get_html_template() -> str:
             
             event.target.closest('.nav-tab').classList.add('active');
             document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Load settings when switching to settings tab (NEW in v2.2.0)
+            if (tabName === 'settings') {
+                loadSettings();
+            }
         }
         
         // Toast notifications
@@ -1606,6 +1841,125 @@ def get_html_template() -> str:
                     .catch(err => {
                         showToast('error', 'Error', 'Failed to trigger run');
                         console.error('Trigger error:', err);
+                    });
+            }
+        }
+        
+        // Settings Management (NEW in v2.2.0)
+        function loadSettings() {
+            fetch('/api/settings')
+                .then(r => r.json())
+                .then(data => {
+                    // Scheduling
+                    document.getElementById('setting-repeat-forever').checked = data.repeat_forever || false;
+                    document.getElementById('setting-repeat-minutes').value = data.repeat_after_minutes || 30;
+                    
+                    // Retention
+                    document.getElementById('setting-retention-days').value = data.finished_retention_days || 15;
+                    document.getElementById('setting-enable-delete').checked = data.enable_delete || false;
+                    
+                    // Subfolders
+                    document.getElementById('setting-include-sample').checked = data.include_sample || false;
+                    document.getElementById('setting-include-sub').checked = data.include_sub || true;
+                    document.getElementById('setting-include-other').checked = data.include_other || false;
+                    
+                    // UI Preferences
+                    document.getElementById('setting-toast-notifications').checked = data.toast_notifications !== false;
+                    document.getElementById('setting-toast-sound').checked = data.toast_sound || false;
+                    
+                    // Advanced
+                    document.getElementById('setting-demo-mode').checked = data.demo_mode || false;
+                })
+                .catch(err => {
+                    console.error('Failed to load settings:', err);
+                    showToast('error', 'Error', 'Failed to load settings');
+                });
+        }
+        
+        function saveAllSettings() {
+            const settings = {
+                repeat_forever: document.getElementById('setting-repeat-forever').checked,
+                repeat_after_minutes: parseInt(document.getElementById('setting-repeat-minutes').value),
+                finished_retention_days: parseInt(document.getElementById('setting-retention-days').value),
+                enable_delete: document.getElementById('setting-enable-delete').checked,
+                include_sample: document.getElementById('setting-include-sample').checked,
+                include_sub: document.getElementById('setting-include-sub').checked,
+                include_other: document.getElementById('setting-include-other').checked,
+                toast_notifications: document.getElementById('setting-toast-notifications').checked,
+                toast_sound: document.getElementById('setting-toast-sound').checked,
+                demo_mode: document.getElementById('setting-demo-mode').checked,
+            };
+            
+            // Validation
+            if (settings.repeat_after_minutes < 1 || settings.repeat_after_minutes > 1440) {
+                showToast('error', 'Validation Error', 'Check interval must be between 1 and 1440 minutes');
+                return;
+            }
+            if (settings.finished_retention_days < 1 || settings.finished_retention_days > 365) {
+                showToast('error', 'Validation Error', 'Retention days must be between 1 and 365');
+                return;
+            }
+            
+            // Save each setting
+            const promises = Object.entries(settings).map(([key, value]) => 
+                fetch(`/api/settings/${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value })
+                })
+            );
+            
+            Promise.all(promises)
+                .then(() => {
+                    showToast('success', 'Settings Saved', 'All settings have been saved successfully', true);
+                    const statusEl = document.getElementById('settings-status');
+                    statusEl.textContent = '✅ Settings saved successfully! Changes will take effect on next run.';
+                    statusEl.className = 'settings-status success';
+                    statusEl.style.display = 'block';
+                    setTimeout(() => statusEl.style.display = 'none', 5000);
+                })
+                .catch(err => {
+                    console.error('Failed to save settings:', err);
+                    showToast('error', 'Save Failed', 'Failed to save some settings');
+                    const statusEl = document.getElementById('settings-status');
+                    statusEl.textContent = '❌ Failed to save settings. Please try again.';
+                    statusEl.className = 'settings-status error';
+                    statusEl.style.display = 'block';
+                });
+        }
+        
+        function resetSettings() {
+            if (confirm('⚠️ Reset all settings to default values? This cannot be undone.')) {
+                // Reset to defaults (from DEFAULT_SETTINGS)
+                const defaults = {
+                    repeat_forever: true,
+                    repeat_after_minutes: 30,
+                    finished_retention_days: 15,
+                    enable_delete: false,
+                    include_sample: false,
+                    include_sub: true,
+                    include_other: false,
+                    toast_notifications: true,
+                    toast_sound: false,
+                    demo_mode: false,
+                };
+                
+                const promises = Object.entries(defaults).map(([key, value]) => 
+                    fetch(`/api/settings/${key}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ value })
+                    })
+                );
+                
+                Promise.all(promises)
+                    .then(() => {
+                        loadSettings(); // Reload to show defaults
+                        showToast('success', 'Settings Reset', 'All settings have been reset to defaults', true);
+                    })
+                    .catch(err => {
+                        console.error('Failed to reset settings:', err);
+                        showToast('error', 'Reset Failed', 'Failed to reset settings');
                     });
             }
         }
