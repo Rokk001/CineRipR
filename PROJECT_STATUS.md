@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.36)
+## Aktueller Stand (Version 1.0.37)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -90,6 +90,16 @@ Finished/
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
 ## Session Notes (2025-11-09)
+
+### Version 1.0.37 - Critical 7-Zip Detection Fix
+- **7-Zip Detection Fix**: Kritischer Fix für Docker-Container
+- Enhanced `resolve_seven_zip_command()` mit expliziten Pfad-Fallbacks
+- Docker-Container finden jetzt 7-Zip korrekt in `/usr/local/bin`
+- Behebt "No such file or directory: '/usr/bin/7z'" Fehler
+- Unterstützt offiziellen 7-Zip Binary (`/usr/local/bin/7z`, `/usr/local/bin/7zz`)
+- Unterstützt p7zip Pakete (`/usr/bin/7z`, `/usr/bin/7za`, `/usr/bin/7zr`)
+- GitHub-Link im WebGUI-Footer mit Icon hinzugefügt
+- RAR-Extraktion funktioniert jetzt zuverlässig in Docker
 
 ### Version 1.0.36 - Complete WebGUI Feature Set
 - **Release Detail View**: Detaillierte Modal-Ansicht für Queue-Items (Feature 5)
