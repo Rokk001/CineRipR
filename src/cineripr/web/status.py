@@ -97,6 +97,9 @@ class GlobalStatus:
     unsupported_count: int = 0
     deleted_count: int = 0
     cleanup_failed_count: int = 0
+    extracted_count: int = 0
+    copied_count: int = 0
+    moved_count: int = 0
     last_update: datetime = field(default_factory=datetime.now)
     current_release: ProcessingStatus | None = None
     recent_logs: list[dict[str, Any]] = field(default_factory=list)
@@ -135,6 +138,9 @@ class GlobalStatus:
             "unsupported_count": self.unsupported_count,
             "deleted_count": self.deleted_count,
             "cleanup_failed_count": self.cleanup_failed_count,
+            "extracted_count": self.extracted_count,
+            "copied_count": self.copied_count,
+            "moved_count": self.moved_count,
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "current_release": (
                 {
@@ -238,6 +244,9 @@ class StatusTracker:
             self._status.unsupported_count = stats.get("unsupported_count", 0)
             self._status.deleted_count = stats.get("deleted_count", 0)
             self._status.cleanup_failed_count = stats.get("cleanup_failed_count", 0)
+            self._status.extracted_count = stats.get("extracted_count", 0)
+            self._status.copied_count = stats.get("copied_count", 0)
+            self._status.moved_count = stats.get("moved_count", 0)
             
             # Load history
             history_data = db.load_history()
@@ -358,6 +367,81 @@ class StatusTracker:
                 "unsupported_count": self._status.unsupported_count,
                 "deleted_count": self._status.deleted_count,
                 "cleanup_failed_count": self._status.cleanup_failed_count,
+                "extracted_count": self._status.extracted_count,
+                "copied_count": self._status.copied_count,
+                "moved_count": self._status.moved_count,
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
+
+    def increment_extracted(self, count: int = 1) -> None:
+        """Increment extracted files count."""
+        with self._lock:
+            self._status.extracted_count += count
+            self._status.last_update = datetime.now()
+        
+        # Save to DB
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            db.save_statistics({
+                "processed_count": self._status.processed_count,
+                "failed_count": self._status.failed_count,
+                "unsupported_count": self._status.unsupported_count,
+                "deleted_count": self._status.deleted_count,
+                "cleanup_failed_count": self._status.cleanup_failed_count,
+                "extracted_count": self._status.extracted_count,
+                "copied_count": self._status.copied_count,
+                "moved_count": self._status.moved_count,
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
+    
+    def increment_copied(self, count: int = 1) -> None:
+        """Increment copied files count."""
+        with self._lock:
+            self._status.copied_count += count
+            self._status.last_update = datetime.now()
+        
+        # Save to DB
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            db.save_statistics({
+                "processed_count": self._status.processed_count,
+                "failed_count": self._status.failed_count,
+                "unsupported_count": self._status.unsupported_count,
+                "deleted_count": self._status.deleted_count,
+                "cleanup_failed_count": self._status.cleanup_failed_count,
+                "extracted_count": self._status.extracted_count,
+                "copied_count": self._status.copied_count,
+                "moved_count": self._status.moved_count,
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
+    
+    def increment_moved(self, count: int = 1) -> None:
+        """Increment moved files count."""
+        with self._lock:
+            self._status.moved_count += count
+            self._status.last_update = datetime.now()
+        
+        # Save to DB
+        try:
+            from .settings_db import get_settings_db
+            db = get_settings_db()
+            db.save_statistics({
+                "processed_count": self._status.processed_count,
+                "failed_count": self._status.failed_count,
+                "unsupported_count": self._status.unsupported_count,
+                "deleted_count": self._status.deleted_count,
+                "cleanup_failed_count": self._status.cleanup_failed_count,
+                "extracted_count": self._status.extracted_count,
+                "copied_count": self._status.copied_count,
+                "moved_count": self._status.moved_count,
             })
         except Exception as e:
             import logging
@@ -375,6 +459,9 @@ class StatusTracker:
                 unsupported_count=self._status.unsupported_count,
                 deleted_count=self._status.deleted_count,
                 cleanup_failed_count=self._status.cleanup_failed_count,
+                extracted_count=self._status.extracted_count,
+                copied_count=self._status.copied_count,
+                moved_count=self._status.moved_count,
                 last_update=self._status.last_update,
                 current_release=(
                     ProcessingStatus(

@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.0] - 2025-11-10
+
+### 🚀 Major Changes
+
+- **Additional Statistics:** Added tracking for extracted, copied, and moved files
+  - New statistics: "📦 Extracted", "📄 Copied", "➡️ Moved"
+  - All statistics are persisted to DB
+  - Real-time updates in WebGUI
+  - Previously only tracked processed/failed/unsupported/deleted archives
+
+- **File Stability Bug Fixed:** Fixed critical bug where files were moved despite being incomplete
+  - Files < 24h old are now correctly kept in downloads folder until stable
+  - Before: Files were moved to `_finished` even when not copied to `_extracted`
+  - After: Only files that are actually copied are marked for moving
+  - Respects `file_stability_hours` setting properly
+
+### 🎯 Improvements
+
+- **Parallel Extraction Infrastructure:** Added parameter support for future parallelization
+  - `parallel_extractions` and `cpu_cores_per_extraction` settings in WebGUI
+  - Parameters are passed through the entire call chain
+  - Currently processes sequentially (parallelization requires major refactoring)
+  - Settings are reserved for future use
+
+### 🔧 Technical Details
+
+- Added `extracted_count`, `copied_count`, `moved_count` to `GlobalStatus`
+- Added `increment_extracted()`, `increment_copied()`, `increment_moved()` to `StatusTracker`
+- Statistics are tracked during extraction, copying, and moving operations
+- Fixed logic in `archives.py` line 632: `if files_to_copy:` before `files_to_move.append()`
+- Added `parallel_extractions` parameter to `process_downloads()`
+- Parallel extraction infrastructure documented as "future feature"
+
+### 🐛 Bug Fixes
+
+- **Critical:** Files are no longer moved to `_finished` when they're still downloading (< 24h)
+- **Critical:** File stability check now actually prevents premature moving
+- Fixed empty `_extracted` folder issue
+- Statistics now show all 7 counters in WebGUI
+
 ## [2.3.5] - 2025-11-10
 
 ### 🐛 Bug Fixes

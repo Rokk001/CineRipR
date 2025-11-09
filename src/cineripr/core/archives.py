@@ -361,6 +361,7 @@ def process_downloads(
     cpu_cores: int = 2,
     debug: bool = False,
     status_callback: Callable[[str, str, str | None, int, int], None] | None = None,
+    parallel_extractions: int = 1,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -378,6 +379,9 @@ def process_downloads(
         cpu_cores: Number of CPU cores to use for extraction (default: 2)
         debug: If True, output detailed debug information (default: False)
         status_callback: Optional callback for status updates
+        parallel_extractions: Number of releases to process in parallel (default: 1)
+                            Note: Currently only sequential processing is supported.
+                            This parameter is reserved for future use.
 
     Returns:
         ProcessResult with counts and failed archives
@@ -429,6 +433,14 @@ def process_downloads(
             for rd in release_dirs:
                 _logger.info("DEBUG:   Release: %s", rd.name)
 
+        # Note: parallel_extractions parameter is currently unused.
+        # Implementing true parallelization requires refactoring of:
+        # - Logging (thread-safe)
+        # - Status tracking (thread-safe)
+        # - Progress bars (per-thread)
+        # - Error handling (aggregation across threads)
+        # For now, process sequentially.
+        
         for release_dir in release_dirs:
             try:
                 if debug:
@@ -620,6 +632,11 @@ def process_downloads(
                                             f"Copied {entry.name}",
                                             absolute=idx,
                                         )
+                                        # Track copied files
+                                        if status_callback:
+                                            from ..web.status import get_status_tracker
+                                            tracker = get_status_tracker()
+                                            tracker.increment_copied(1)
                                     except OSError:
                                         pass
 
@@ -628,14 +645,15 @@ def process_downloads(
                                     f"Finished copying {len(files_to_copy)} file(s) from {current_dir.name}",
                                 )
 
-                            # Mark for moving to finished later
-                            # Use only the release name, not the full path structure
-                            release_name = (
-                                relative_parent.parts[-1]
-                                if relative_parent.parts
-                                else "unknown"
-                            )
-                            files_to_move.append((current_dir, release_name))
+                            # Mark for moving to finished later (only if files were actually copied)
+                            if files_to_copy:
+                                # Use only the release name, not the full path structure
+                                release_name = (
+                                    relative_parent.parts[-1]
+                                    if relative_parent.parts
+                                    else "unknown"
+                                )
+                                files_to_move.append((current_dir, release_name))
                         except OSError:
                             pass
                     _logger.debug("No supported archives found in %s", current_dir)
@@ -851,6 +869,12 @@ def process_downloads(
 
                         # Count extraction as done
                         extractions_done += 1
+                        
+                        # Track extracted files (count parts as extracted files)
+                        if status_callback:
+                            from ..web.status import get_status_tracker
+                            tracker_status = get_status_tracker()
+                            tracker_status.increment_extracted(group.part_count)
 
                         # Flatten if needed
                         flatten_single_subdir(target_dir)
@@ -1007,6 +1031,11 @@ def process_downloads(
                                 # Try to move first, fallback to copy+delete if read-only filesystem
                                 try:
                                     shutil.move(str(member), str(destination))
+                                    # Track moved files
+                                    if status_callback:
+                                        from ..web.status import get_status_tracker
+                                        tracker_status = get_status_tracker()
+                                        tracker_status.increment_moved(1)
                                 except OSError as move_error:
                                     if (
                                         "Read-only file system" in str(move_error)

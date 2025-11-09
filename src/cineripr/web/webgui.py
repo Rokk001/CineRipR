@@ -1303,6 +1303,18 @@ def get_html_template() -> str:
                         <div class="stat-label">🗑 Deleted</div>
                         <div class="stat-value" id="deleted">0</div>
                     </div>
+                    <div class="stat-card success">
+                        <div class="stat-label">📦 Extracted</div>
+                        <div class="stat-value" id="extracted">0</div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-label">📄 Copied</div>
+                        <div class="stat-value" id="copied">0</div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-label">➡️ Moved</div>
+                        <div class="stat-value" id="moved">0</div>
+                    </div>
                 </div>
             </div>
             
@@ -2136,6 +2148,9 @@ def get_html_template() -> str:
                     updateValue('failed', data.failed_count || 0);
                     updateValue('unsupported', data.unsupported_count || 0);
                     updateValue('deleted', data.deleted_count || 0);
+                    updateValue('extracted', data.extracted_count || 0);
+                    updateValue('copied', data.copied_count || 0);
+                    updateValue('moved', data.moved_count || 0);
                     
                     // Notifications
                     if (previousStatus.processed_count !== undefined) {

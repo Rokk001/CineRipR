@@ -572,6 +572,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                         archive_total=archive_total,
                     )
 
+            # Get parallel extraction settings from WebGUI DB if available
+            parallel_extractions = 1
+            if args.webgui:
+                try:
+                    from .web.settings_db import get_settings_db
+                    db = get_settings_db()
+                    parallel_extractions = db.get("parallel_extractions", 1)
+                except Exception:
+                    pass
+            
             result: ProcessResult = process_downloads(
                 settings.paths,
                 demo_mode=settings.demo_mode,
@@ -579,6 +589,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 subfolders=settings.subfolders,
                 debug=args.debug,
                 status_callback=status_callback if args.webgui else None,
+                parallel_extractions=parallel_extractions,
             )
             tracker.update_counts(
                 processed=result.processed,
