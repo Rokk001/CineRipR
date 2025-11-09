@@ -6,8 +6,6 @@ from .archives import ProcessResult, process_downloads
 from .cleanup import cleanup_finished
 from .path_utils import (
     build_tv_show_path,
-    detect_show_and_season,
-    is_tv_show_release,
 )
 
 __all__ = [
@@ -18,7 +16,5 @@ __all__ = [
     "cleanup_finished",
     # Path utilities
     "build_tv_show_path",
-    "detect_show_and_season",
-    "is_tv_show_release",
 ]
 
