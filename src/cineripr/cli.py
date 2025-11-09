@@ -235,16 +235,17 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         
         # Load all settings with defaults applied automatically
         # This ensures DEFAULT_SETTINGS are used if DB values don't exist
-        db_settings = db.load_all_settings()
+        db_settings = db.get_all()
 
         # Override with WebGUI settings (with defaults already applied)
         repeat_forever = bool(db_settings.get("repeat_forever", repeat_forever))
         repeat_after_minutes = int(db_settings.get("repeat_after_minutes", 30))
         
         # Ensure minimum delay of 1 minute to prevent infinite loops
+        # CRITICAL: If DB has 0 (from old version), use default 30
         if repeat_after_minutes < 1:
-            _LOGGER.warning("repeat_after_minutes must be >= 1, setting to 1")
-            repeat_after_minutes = 1
+            _LOGGER.warning("repeat_after_minutes was %d, setting to 30 (default)", repeat_after_minutes)
+            repeat_after_minutes = 30
 
         retention_days = int(db_settings.get("finished_retention_days", retention_days))
         enable_delete = bool(db_settings.get("enable_delete", enable_delete))

@@ -101,6 +101,29 @@ class SettingsDB:
                     )
                 """)
                 conn.commit()
+                
+                # MIGRATION: Fix invalid repeat_after_minutes values (v2.4.3)
+                # Old versions could have 0, which breaks countdown
+                cursor = conn.execute(
+                    "SELECT value FROM settings WHERE key = 'repeat_after_minutes'"
+                )
+                row = cursor.fetchone()
+                if row:
+                    try:
+                        current_value = json.loads(row[0])
+                        if isinstance(current_value, (int, float)) and current_value < 1:
+                            # Invalid value, fix it
+                            conn.execute(
+                                "UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'repeat_after_minutes'",
+                                (json.dumps(30),)
+                            )
+                            conn.commit()
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "Migrated repeat_after_minutes from %s to 30 (default)", current_value
+                            )
+                    except (json.JSONDecodeError, ValueError):
+                        pass  # Ignore malformed values
             finally:
                 conn.close()
 

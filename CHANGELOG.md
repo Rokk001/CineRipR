@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.3] - 2025-11-10
+
+### 🐛 Critical Fixes (The Real Fix This Time!)
+
+- **Method Name Error:** Fixed `AttributeError` - `db.load_all_settings()` → `db.get_all()`
+  - v2.4.2 introduced a bug: called non-existent method
+  - Container would crash on startup
+  
+- **DB Migration for Invalid Values:** Auto-fix `repeat_after_minutes = 0` in database
+  - Old versions could save `repeat_after_minutes = 0`
+  - This broke countdown even with correct code
+  - Migration runs on startup, sets invalid values to 30 (default)
+  
+- **Fallback Logic:** Ensure `repeat_after_minutes >= 1` always
+  - If DB has 0: Set to 30 (default)
+  - If DB has negative: Set to 30 (default)
+  - Countdown now **GUARANTEED** to be visible
+
+### 🔧 Technical Details
+
+- `cli.py`: Fixed method name, improved fallback logic
+- `settings_db.py`: Added migration in `_init_db()` to fix invalid DB values
+- Migration logs warning when old values are corrected
+
 ## [2.4.2] - 2025-11-10
 
 ### 🐛 Critical Fix
