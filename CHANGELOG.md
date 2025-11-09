@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.2] - 2025-11-10
+
+### 🐛 Hotfix
+
+- Fixed import error in `core/__init__.py`
+- Removed non-existent function imports: `chmod_recursive`, `copy_file_with_metadata`, `delete_empty_directories`, `move_directory_contents`
+- These functions are not used anywhere in the codebase
+- Fixes container startup error
+
+[2.2.2]: https://github.com/Rokk001/CineRipR/compare/v2.2.1...v2.2.2
+
+---
+
 ## [2.2.1] - 2025-11-10
 
 ### 🐛 Hotfix
