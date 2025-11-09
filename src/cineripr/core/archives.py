@@ -386,14 +386,16 @@ def process_downloads(
     Returns:
         ProcessResult with counts and failed archives
     """
-    # Optional: Import StatusTracker if WebGUI is enabled
+    # Optional: Import StatusTracker if WebGUI is enabled (FIX v2.5.3)
+    # Try to get tracker regardless of status_callback to enable queue population
     tracker = None
-    if status_callback:
-        try:
-            from ..web.status import get_status_tracker
-            tracker = get_status_tracker()
-        except Exception:
-            pass  # WebGUI not available
+    try:
+        from ..web.status import get_status_tracker
+        tracker = get_status_tracker()
+    except Exception as e:
+        # WebGUI not available - this is fine, we'll just skip queue updates
+        _logger.debug(f"WebGUI status tracker not available: {e}")
+        pass
     """Process all downloads: extract archives and organize files.
 
     Main workflow:

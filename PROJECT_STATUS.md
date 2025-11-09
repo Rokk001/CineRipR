@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.2)
+## Aktueller Stand (Version 2.5.3)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -19,6 +19,8 @@
 14. **Disk Space Empty (v2.5.1)**: Background Health Monitor Thread - System Health Updates alle 30 Sekunden
 15. **Queue Empty After Restart (v2.5.1)**: Queue Persistenz in SQLite DB - Queue überlebt Container-Restarts
 16. **Countdown Live-Update (v2.5.2)**: Settings-Änderungen aktualisieren Countdown sofort ohne Container-Restart
+17. **Settings Race Condition (v2.5.3)**: THE REAL FIX - DB-Werte werden nach JEDEM Setting-Save neu geladen, Countdown/Progressbar erscheinen sofort
+18. **Queue Empty Bug (v2.5.3)**: Tracker wird immer initialisiert wenn WebGUI aktiv ist, Queue wird korrekt befüllt
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`

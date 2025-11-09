@@ -2586,18 +2586,21 @@ def create_app() -> Flask:
                 return jsonify({"error": "Missing 'value' in request body"}), 400
             db.set(key, data["value"])
             
-            # Update countdown if scheduling settings changed (NEW in v2.5.1 hotfix)
-            if key == "repeat_after_minutes":
-                minutes = int(data["value"])
-                if minutes > 0:
-                    tracker.set_next_run(minutes)
-            elif key == "repeat_forever":
-                tracker.set_repeat_mode(bool(data["value"]))
-                if bool(data["value"]):
-                    # Re-apply current interval
-                    minutes = db.get("repeat_after_minutes", 30)
-                    if minutes > 0:
-                        tracker.set_next_run(minutes)
+            # Update countdown/repeat mode after EVERY setting save (FIX v2.5.3)
+            # This ensures countdown is always in sync with DB, regardless of race conditions
+            try:
+                # Always reload from DB to get the latest values
+                repeat_forever = db.get("repeat_forever", False)
+                repeat_after_minutes = db.get("repeat_after_minutes", 30)
+                
+                # Update tracker with current DB state
+                tracker.set_repeat_mode(bool(repeat_forever))
+                if repeat_forever and repeat_after_minutes > 0:
+                    tracker.set_next_run(int(repeat_after_minutes))
+            except Exception as e:
+                # Don't break on tracker update errors
+                import logging
+                logging.getLogger(__name__).debug(f"Failed to update tracker after settings save: {e}")
             
             tracker.add_notification("success", "Setting Updated", f"'{key}' has been updated")
             return jsonify({"status": "saved", "key": key, "value": data["value"]})

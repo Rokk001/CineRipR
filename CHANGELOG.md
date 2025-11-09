@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.3] - 2025-11-10
+
+### 🐛 Critical Fixes
+
+- **Settings Live-Update (THE REAL FIX):** Countdown now ACTUALLY updates immediately when settings change
+  - After EVERY setting save, DB values are reloaded and tracker is updated
+  - Fixes race condition when multiple settings are saved simultaneously
+  - `repeat_forever` and `repeat_after_minutes` are always read from DB after save
+  - No more "Manual Mode" after changing settings - countdown appears immediately
+  - Progressbar shows up instantly after enabling auto-run
+
+- **Queue Population Fix:** Queue is now populated even when status_callback exists
+  - Tracker initialization no longer depends on status_callback
+  - Queue shows releases immediately during processing
+  - Fixed: "No items in queue" despite active processing
+
+### 🔧 Technical Changes
+
+- `webgui.py`: Refactored `/api/settings/<key>` endpoint to reload DB values after every save (lines 2589-2603)
+- `archives.py`: Tracker is now always initialized if WebGUI is available, regardless of status_callback (lines 389-398)
+
 ## [2.5.2] - 2025-11-10
 
 ### 🐛 Hotfix
