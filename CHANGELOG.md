@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.1] - 2025-11-10
+
+### 🐛 Hotfix
+
+- Fixed import error in `extraction/__init__.py`
+- Removed non-existent function imports: `detect_archives`, `group_related_archives`, `is_archive`
+- Added correct imports: `split_directory_entries`, `build_archive_groups`, `is_supported_archive`
+- Fixes 502 Bad Gateway error when starting container
+
+[2.2.1]: https://github.com/Rokk001/CineRipR/compare/v2.2.0...v2.2.1
+
+---
+
 ## [2.2.0] - 2025-11-10
 
 ### 🎉 Major Feature - Settings UI Tab

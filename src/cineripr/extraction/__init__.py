@@ -8,10 +8,10 @@ from .archive_constants import (
 )
 from .archive_detection import (
     ArchiveGroup,
-    detect_archives,
-    group_related_archives,
-    is_archive,
+    split_directory_entries,
+    build_archive_groups,
     validate_archive_group,
+    is_supported_archive,
 )
 from .archive_extraction import (
     extract_archive,
@@ -25,10 +25,10 @@ __all__ = [
     "TV_TAG_RE",
     # Detection
     "ArchiveGroup",
-    "detect_archives",
-    "group_related_archives",
-    "is_archive",
+    "split_directory_entries",
+    "build_archive_groups",
     "validate_archive_group",
+    "is_supported_archive",
     # Extraction
     "extract_archive",
     "get_rar_volume_count",
