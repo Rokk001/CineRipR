@@ -836,6 +836,17 @@ def process_downloads(
                             0,
                             group.part_count,
                         )
+                    
+                    # Create progress callback for extraction
+                    def extraction_progress_callback(current: int, total: int) -> None:
+                        if status_callback:
+                            status_callback(
+                                "extracting",
+                                f"Extracting {group.primary.name} ({current}/{total})",
+                                group.primary.name,
+                                current,
+                                total,
+                            )
 
                     try:
                         # Copy companion files
@@ -865,6 +876,7 @@ def process_downloads(
                             progress=extraction_progress,
                             logger=_logger,
                             part_count=group.part_count,
+                            progress_callback=extraction_progress_callback if status_callback else None,
                         )
 
                         # Count extraction as done

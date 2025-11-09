@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.1] - 2025-11-10
+
+### 🐛 Critical Bug Fixes
+
+- **Settings-Konsistenz:** DB-Settings (WebGUI) haben jetzt garantiert höchste Priorität
+  - `repeat_forever` und `repeat_after_minutes` aus DB überschreiben immer CLI/TOML
+  - Verhindert Settings-Konflikte zwischen Container-Restarts
+  - Minimum-Delay von 1 Minute erzwungen (verhindert Infinite Loops)
+
+- **Countdown nach Container-Restart:** Countdown wird jetzt immer beim Start gesetzt
+  - Vorher: Nur sichtbar nach erstem Run
+  - Jetzt: Sofort sichtbar, auch nach Container-Restart
+  - `tracker.set_next_run()` wird nach DB-Settings-Load aufgerufen
+
+- **"Run Now" Container-Crash behoben:** Infinite Loop bei `delay <= 0` gefixt
+  - Minimum-Delay von 1 Minute erzwungen
+  - `continue` ohne Sleep führte zu 100% CPU → OOM-Kill
+  - Warnung wird geloggt wenn Delay < 1 Minute
+
+- **Progressbar Live-Updates:** Extraction Progress wird jetzt in Echtzeit aktualisiert
+  - Vorher: `archive_progress` war immer 0
+  - Jetzt: `progress_callback` sendet Live-Updates während Extraktion
+  - WebGUI zeigt echten Fortschritt (z.B. "Extracting part 5/50")
+
+- **System Health Monitoring:** CPU/Memory werden jetzt immer aktualisiert
+  - Vorher: Nur wenn Disk-Pfade funktionieren
+  - Jetzt: CPU/Memory unabhängig von Disk-Pfaden
+  - Besseres Logging für Diagnose
+
+### 🔧 Technical Details
+
+- `cli.py`: Settings-Reihenfolge und Minimum-Delay-Prüfungen
+- `cli.py`: Countdown-Initialisierung nach DB-Settings
+- `archives.py`: `extraction_progress_callback` für Live-Updates
+- `status.py`: CPU/Memory immer aktualisieren, besseres Logging
+
+### 📋 Known Issues
+
+- **Queue & History:** Bleiben leer bis erster erfolgreicher Run abgeschlossen
+- **System Health Disk Space:** Zeigt 0% wenn Docker-Pfade nicht gemountet
+- **Parallel Extraction:** Settings vorhanden aber nicht implementiert (v2.5.0)
+
 ## [2.4.0] - 2025-11-10
 
 ### 🚀 Major Changes

@@ -227,7 +227,7 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         repeat_after_minutes = int(args.repeat_after_minutes)
 
     # Step 5: Load WebGUI settings from SQLite database (NEW in v2.3.0)
-    # These override TOML/CLI settings
+    # These override TOML/CLI settings (HIGHEST PRIORITY)
     try:
         from .web.settings_db import get_settings_db
 
@@ -241,6 +241,10 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
         repeat_after_minutes_db = db.get("repeat_after_minutes")
         if repeat_after_minutes_db is not None:
             repeat_after_minutes = int(repeat_after_minutes_db)
+            # Ensure minimum delay of 1 minute to prevent infinite loops
+            if repeat_after_minutes < 1:
+                _LOGGER.warning("repeat_after_minutes must be >= 1, setting to 1")
+                repeat_after_minutes = 1
 
         retention_days_db = db.get("finished_retention_days")
         if retention_days_db is not None:
@@ -392,12 +396,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     tracker = get_status_tracker()
 
-    # Set repeat mode in tracker (NEW in v2.1.0)
+    # Set repeat mode and countdown in tracker (NEW in v2.1.0, FIXED in v2.4.1)
+    # Always set these, even if repeat_forever is False initially
+    # WebGUI settings might override this later
     tracker.set_repeat_mode(settings.repeat_forever)
     
     # Set initial next run time so countdown is visible from start
-    if settings.repeat_forever and settings.repeat_after_minutes > 0:
+    # This ensures countdown is visible even after container restarts
+    if settings.repeat_after_minutes > 0:
         tracker.set_next_run(settings.repeat_after_minutes)
+        _LOGGER.info("Next run scheduled in %d minute(s)", settings.repeat_after_minutes)
 
     # Set up logging handler to forward logs to status tracker
     class StatusLogHandler(logging.Handler):
@@ -765,9 +773,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             break
 
         # sleep before next iteration
-        delay = max(0, int(settings.repeat_after_minutes))
-        if delay <= 0:
-            continue
+        delay = max(1, int(settings.repeat_after_minutes))  # Minimum 1 minute
+        if delay < 1:
+            _LOGGER.warning("Delay must be >= 1 minute, using 1 minute")
+            delay = 1
         try:
             import time
 
