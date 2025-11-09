@@ -807,10 +807,12 @@ class StatusTracker:
             self._status.next_run_time = None
             self._status.last_update = datetime.now()
 
-    def set_repeat_mode(self, enabled: bool) -> None:
+    def set_repeat_mode(self, enabled: bool, interval_minutes: int | None = None) -> None:
         """Set repeat mode."""
         with self._lock:
             self._status.repeat_mode = enabled
+            if interval_minutes is not None:
+                self._status.repeat_interval_minutes = interval_minutes
             self._status.last_update = datetime.now()
 
     def trigger_run_now(self) -> None:

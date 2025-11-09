@@ -2616,8 +2616,8 @@ def create_app() -> Flask:
                 _logger.info(f"🔧 [DEBUG] DB values: repeat_forever={repeat_forever}, repeat_after_minutes={repeat_after_minutes}")
                 
                 # Update tracker with current DB state
-                _logger.info(f"🔧 [DEBUG] Calling tracker.set_repeat_mode({repeat_forever})...")
-                tracker.set_repeat_mode(bool(repeat_forever))
+                _logger.info(f"🔧 [DEBUG] Calling tracker.set_repeat_mode({repeat_forever}, interval={repeat_after_minutes})...")
+                tracker.set_repeat_mode(bool(repeat_forever), interval_minutes=int(repeat_after_minutes))
                 
                 if repeat_forever and repeat_after_minutes > 0:
                     _logger.info(f"🔧 [DEBUG] Calling tracker.set_next_run({repeat_after_minutes})...")
