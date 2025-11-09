@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.2.0)
+## Aktueller Stand (Version 2.2.3)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -388,7 +388,55 @@ Finished/
 
 ### 🚀 Deployment
 
-- **Version:** 2.2.0
-- **Features:** Settings UI vollständig
+- **Version:** 2.2.3
+- **Features:** Settings UI vollständig + Alle Import-Fehler behoben
 - **Backward Compatible:** Ja
 - **Breaking Changes:** Keine
+
+---
+
+## Session Notes - Version 2.2.1-2.2.3 (2025-11-10) - Import-Fehler Fixes
+
+### 🐛 Problem
+
+Nach dem v2.0.0 Refactoring gab es mehrere Import-Fehler in den `__init__.py` Dateien, die nicht-existierende Funktionen importierten.
+
+### ✅ Behobene Import-Fehler
+
+#### v2.1.1 - extraction/__init__.py
+- **Entfernt:** `ARCHIVE_EXTENSIONS`, `RAR_EXTENSIONS`, `ZIP_EXTENSIONS` (existierten nicht)
+- **Hinzugefügt:** `SUPPORTED_ARCHIVE_SUFFIXES`, `TV_TAG_RE` (korrekte Constants)
+
+#### v2.2.1 - extraction/__init__.py
+- **Entfernt:** `detect_archives`, `group_related_archives`, `is_archive` (existierten nicht)
+- **Hinzugefügt:** `split_directory_entries`, `build_archive_groups`, `is_supported_archive` (korrekte Funktionen)
+
+#### v2.2.2 - core/__init__.py
+- **Entfernt:** `chmod_recursive`, `copy_file_with_metadata`, `delete_empty_directories`, `move_directory_contents` (existierten nicht)
+- Diese Funktionen werden nirgendwo verwendet
+
+#### v2.2.3 - core/__init__.py
+- **Entfernt:** `detect_show_and_season`, `is_tv_show_release` (existierten nicht)
+- **Behalten:** `build_tv_show_path` (wird verwendet)
+
+### 📊 Finale Validierung
+
+**Alle `__init__.py` Dateien validiert:**
+- ✅ `core/__init__.py` - Alle Imports korrekt
+- ✅ `extraction/__init__.py` - Alle Imports korrekt
+- ✅ `web/__init__.py` - Alle Imports korrekt
+- ✅ `cli.py` - Alle Imports korrekt
+
+**Alle importierten Funktionen existieren:**
+- ✅ `ProcessResult`, `process_downloads` - existieren in `archives.py`
+- ✅ `cleanup_finished` - existiert in `cleanup.py`
+- ✅ `build_tv_show_path` - existiert in `path_utils.py`
+- ✅ `resolve_seven_zip_command` - existiert in `archive_extraction.py`
+- ✅ `get_status_tracker` - existiert in `status.py`
+- ✅ `create_app`, `run_webgui` - existieren in `webgui.py`
+
+### 🎯 Ergebnis
+
+**Alle Import-Fehler aus dem v2.0.0 Refactoring sind jetzt behoben!**
+
+Der Container sollte jetzt ohne Fehler starten.
