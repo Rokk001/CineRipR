@@ -437,7 +437,8 @@ class StatusTracker:
                     (usage.used / usage.total) * 100 if usage.total > 0 else 0
                 )
 
-            if seven_zip_version:
+            # Always update 7-Zip version if provided (even if "Unknown")
+            if seven_zip_version is not None:
                 self._status.system_health.seven_zip_version = seven_zip_version
 
             # CPU and Memory monitoring

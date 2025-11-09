@@ -1318,7 +1318,7 @@ def get_html_template() -> str:
                             Progress: <span id="progress-text" style="color: var(--text-primary); font-weight: 600;">0%</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill" style="width: 0%">0%</div>
+                            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
                         </div>
                     </div>
                     <div class="progress-section">
@@ -1640,7 +1640,7 @@ def get_html_template() -> str:
                             <strong>Current:</strong> <span id="modal-current-archive">-</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="modal-progress-fill" style="width: 0%">0%</div>
+                            <div class="progress-fill" id="modal-progress-fill" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
@@ -1825,7 +1825,6 @@ def get_html_template() -> str:
                 document.getElementById('modal-current-archive').textContent = item.current_archive;
                 const progress = item.progress || 0;
                 document.getElementById('modal-progress-fill').style.width = progress + '%';
-                document.getElementById('modal-progress-fill').textContent = progress + '%';
             } else {
                 document.getElementById('modal-progress-section').style.display = 'none';
             }
@@ -2216,14 +2215,12 @@ def get_html_template() -> str:
                             ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
                         
                         document.getElementById('progress-fill').style.width = progress + '%';
-                        document.getElementById('progress-fill').textContent = progress + '%';
                         document.getElementById('progress-text').textContent = progress + '%';
                     } else {
                         document.getElementById('release-name').textContent = '-';
                         document.getElementById('archive-name').textContent = '-';
                         document.getElementById('status-message').textContent = isRunning ? 'Initializing...' : 'Waiting for files...';
                         document.getElementById('progress-fill').style.width = '0%';
-                        document.getElementById('progress-fill').textContent = '0%';
                         document.getElementById('progress-text').textContent = '0%';
                     }
                     
