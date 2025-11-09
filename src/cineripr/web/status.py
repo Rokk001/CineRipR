@@ -792,9 +792,14 @@ class StatusTracker:
     def set_next_run(self, minutes: int) -> None:
         """Set the next run time."""
         with self._lock:
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.info(f"🔧 [DEBUG] set_next_run({minutes}) called")
             self._status.next_run_time = datetime.now() + timedelta(minutes=minutes)
             self._status.repeat_interval_minutes = minutes
             self._status.last_update = datetime.now()
+            _logger.info(f"🔧 [DEBUG] next_run_time set to: {self._status.next_run_time}")
+            _logger.info(f"🔧 [DEBUG] get_seconds_until_next_run() = {self.get_seconds_until_next_run()}")
 
     def clear_next_run(self) -> None:
         """Clear next run time."""

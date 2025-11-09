@@ -985,20 +985,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.webgui and time.time() - last_settings_check >= 5:
                     try:
                         from .web.settings_db import get_settings_db
+
                         db = get_settings_db()
-                        db_repeat_forever = db.get("repeat_forever", settings.repeat_forever)
-                        db_repeat_after_minutes = db.get("repeat_after_minutes", settings.repeat_after_minutes)
-                        
+                        db_repeat_forever = db.get(
+                            "repeat_forever", settings.repeat_forever
+                        )
+                        db_repeat_after_minutes = db.get(
+                            "repeat_after_minutes", settings.repeat_after_minutes
+                        )
+
                         # If settings changed, update tracker and recalculate end_time
                         if db_repeat_after_minutes != delay:
-                            _LOGGER.info(f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes")
+                            _LOGGER.info(
+                                f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes"
+                            )
                             settings.repeat_after_minutes = int(db_repeat_after_minutes)
                             delay = max(1, int(db_repeat_after_minutes))
                             tracker.set_repeat_mode(bool(db_repeat_forever))
                             tracker.set_next_run(delay)
                             # Recalculate end_time with new delay
                             end_time = time.time() + (delay * 60)
-                            _LOGGER.info(f"💤 Next run rescheduled in %s minute(s)...", delay)
+                            _LOGGER.info(
+                                f"💤 Next run rescheduled in %s minute(s)...", delay
+                            )
                     except Exception as e:
                         _LOGGER.debug(f"Failed to check settings during sleep: {e}")
                     last_settings_check = time.time()

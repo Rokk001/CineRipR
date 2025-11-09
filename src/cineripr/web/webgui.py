@@ -2228,14 +2228,17 @@ def get_html_template() -> str:
                     
                     const isIdle = !isRunning && !isPaused;
                     const hasNextRun = data.seconds_until_next_run !== null && data.seconds_until_next_run >= 0;
+                    // CRITICAL FIX v2.5.5: Show progressbar if repeat mode is enabled, even if seconds_until_next_run is null
+                    const hasRepeatMode = data.repeat_mode && data.repeat_interval_minutes > 0;
                     
-                    if (isIdle && hasNextRun) {
+                    if (isIdle && (hasNextRun || hasRepeatMode)) {
                         // Show countdown progressbar
                         countdownContainer.style.display = 'flex';
                         
                         // Calculate percentage (inverse: 100% = just finished, 0% = starting now)
                         const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
-                        const remainingSeconds = data.seconds_until_next_run;
+                        // If seconds_until_next_run is null but repeat mode is active, show 100% (just started)
+                        const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
                         const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
                         
                         // Update progressbar
