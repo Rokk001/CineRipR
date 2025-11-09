@@ -2585,6 +2585,20 @@ def create_app() -> Flask:
             if not data or "value" not in data:
                 return jsonify({"error": "Missing 'value' in request body"}), 400
             db.set(key, data["value"])
+            
+            # Update countdown if scheduling settings changed (NEW in v2.5.1 hotfix)
+            if key == "repeat_after_minutes":
+                minutes = int(data["value"])
+                if minutes > 0:
+                    tracker.set_next_run(minutes)
+            elif key == "repeat_forever":
+                tracker.set_repeat_mode(bool(data["value"]))
+                if bool(data["value"]):
+                    # Re-apply current interval
+                    minutes = db.get("repeat_after_minutes", 30)
+                    if minutes > 0:
+                        tracker.set_next_run(minutes)
+            
             tracker.add_notification("success", "Setting Updated", f"'{key}' has been updated")
             return jsonify({"status": "saved", "key": key, "value": data["value"]})
 

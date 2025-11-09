@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.2] - 2025-11-10
+
+### 🐛 Hotfix
+
+- **Countdown Live-Update:** Countdown now updates immediately when changing settings in WebGUI
+  - When `repeat_after_minutes` is changed, `tracker.set_next_run()` is called immediately
+  - When `repeat_forever` is toggled, repeat mode and countdown are updated immediately
+  - No container restart required for countdown to reflect new settings
+  - Fix applied in `/api/settings/<key>` endpoint in `webgui.py`
+
+### 🔧 Technical Changes
+
+- `webgui.py`: Added countdown update logic in settings API endpoint (lines 2589-2600)
+
 ## [2.5.1] - 2025-11-10
 
 ### 🐛 Critical Bug Fixes
