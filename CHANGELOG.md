@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.33] - 2025-01-27
+
+### Fixed
+- **Critical RAR extraction fix**: Replaced p7zip-full with official 7-Zip binary
+  - p7zip-full does not support all RAR compression methods (caused "Unsupported Method" errors)
+  - Official 7-Zip 24.09 Linux binary now supports all RAR formats including RAR5
+  - Multi-volume RAR archives now extract correctly in Docker container
+
+### Changed
+- Dockerfile now downloads and installs official 7-Zip binary instead of p7zip-full package
+- Created symlink from `7zz` to `7z` for compatibility
+
 ## [1.0.32] - 2025-01-27
 
 ### Changed

@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.29)
+## Aktueller Stand (Version 1.0.33)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -90,8 +90,10 @@ Finished/
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
 ## Session Notes (2025-01-27)
-- Version 1.0.29 veröffentlicht mit WebGUI-Unterstützung
-- WebGUI auf Port 8080 verfügbar mit Live-Status-Updates
+- Version 1.0.33 veröffentlicht mit kritischem RAR-Extraktion-Fix
+- p7zip-full durch offizielle 7-Zip Binary ersetzt (behebt "Unsupported Method" Fehler)
+- Alle RAR-Formate inkl. RAR5 werden jetzt korrekt extrahiert
+- WebGUI standardmäßig aktiviert auf Port 8080
 - Multi-Volume RAR-Validierung hinzugefügt (prüft auf fehlende Volumes)
 - Klarstellung: `extracted` ist der finale Zielpfad für extrahierte Inhalte; `finished` spiegelt die Download-Quelle 1:1 pro Release-Root.
 - Companion-Ordner (`Sample`, `Subs`, …) werden beim Verschieben nach `finished` unverändert übernommen.
