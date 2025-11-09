@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from .archive_constants import (
-    ARCHIVE_EXTENSIONS,
-    RAR_EXTENSIONS,
-    ZIP_EXTENSIONS,
+    SUPPORTED_ARCHIVE_SUFFIXES,
+    TV_TAG_RE,
 )
 from .archive_detection import (
     ArchiveGroup,
@@ -22,9 +21,8 @@ from .archive_extraction import (
 
 __all__ = [
     # Constants
-    "ARCHIVE_EXTENSIONS",
-    "RAR_EXTENSIONS",
-    "ZIP_EXTENSIONS",
+    "SUPPORTED_ARCHIVE_SUFFIXES",
+    "TV_TAG_RE",
     # Detection
     "ArchiveGroup",
     "detect_archives",
