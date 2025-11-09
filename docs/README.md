@@ -29,7 +29,7 @@ Deployment and operational guides.
 Detailed release notes for all versions.
 
 - **[All Release Notes](releases/)** - Chronological list of all releases
-- **[Latest: v2.3.3](releases/v2.3.3.md)** - Most recent release
+- **[Latest: v2.3.4](releases/v2.3.4.md)** - Most recent release
 
 ## 🔗 Quick Links
 

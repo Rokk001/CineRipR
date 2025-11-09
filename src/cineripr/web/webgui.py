@@ -1567,7 +1567,7 @@ def get_html_template() -> str:
                             <div class="setting-item">
                                 <label class="setting-label">File Stability Hours</label>
                                 <input type="number" id="setting-file-stability-hours" min="1" max="168" class="setting-input" />
-                                <p class="setting-help">Hours a file must be unchanged before processing (default: 24)</p>
+                                <p class="setting-help">Hours an already extracted file (e.g., MKV) must be unchanged before processing. Only applies to non-archive files. Archives are processed immediately. (default: 24)</p>
                             </div>
                         </div>
                     </div>
@@ -2179,13 +2179,39 @@ def get_html_template() -> str:
                         headerControlIcon.textContent = '▶';
                         headerControlBtn.title = 'Resume Processing';
                     } else if (isRunning) {
-                        // Running: Pause Button, kein Countdown
-                        headerCountdown.style.display = 'none';
+                        // Running: Pause Button + Countdown (if available)
                         headerControlBtn.style.display = 'flex';
                         headerControlBtn.classList.remove('run-now', 'resume');
                         headerControlBtn.classList.add('pause');
                         headerControlIcon.textContent = '⏸';
                         headerControlBtn.title = 'Pause Processing';
+                        
+                        // Show countdown if available (for next scheduled run)
+                        if (data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
+                            headerCountdown.style.display = 'flex';
+                            
+                            const seconds = data.seconds_until_next_run;
+                            const hours = Math.floor(seconds / 3600);
+                            const minutes = Math.floor((seconds % 3600) / 60);
+                            const secs = seconds % 60;
+                            
+                            const timeStr = hours > 0 
+                                ? `${hours}h ${minutes}m`
+                                : minutes > 0
+                                    ? `${minutes}m ${secs}s`
+                                    : `${secs}s`;
+                            
+                            headerCountdownTime.textContent = timeStr;
+                            
+                            // Pulse if < 1 minute
+                            if (seconds < 60) {
+                                headerCountdownTime.classList.add('pulse');
+                            } else {
+                                headerCountdownTime.classList.remove('pulse');
+                            }
+                        } else {
+                            headerCountdown.style.display = 'none';
+                        }
                     } else {
                         // Idle: Countdown + Run Now Button (immer wenn next_run geplant ist)
                         if (data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {

@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.4] - 2025-11-10
+
+### 🚀 Major Changes
+
+- **Queue Functionality Activated:** Processing queue is now fully functional
+  - Shows all found releases with archive counts
+  - Displays status for each release (pending, processing, completed, failed)
+  - Queue is populated when releases are found during scanning
+  - Status updates in real-time during processing
+
+### 🎯 Improvements
+
+- **Countdown During Processing:** Countdown for next run is now visible during processing
+  - Previously only shown in idle state
+  - Now displayed whenever `seconds_until_next_run` is available
+  - Better visibility of scheduled runs even during active processing
+
+- **System Health Updates:** System health metrics are now updated more frequently
+  - Updates at start of each processing run
+  - Updates after processing completes
+  - Updates every 30 seconds during idle periods
+  - Ensures system information is always current
+
+- **File Stability Hours Description:** Clarified that this setting only applies to already extracted files
+  - Updated description to explicitly state it only applies to non-archive files
+  - Archives are processed immediately regardless of this setting
+  - Prevents confusion about when the setting is used
+
+### 🔧 Technical Details
+
+- Queue items are added when releases are found during scanning
+- Queue status is updated during processing (pending → processing → completed/failed)
+- System health updates are triggered at multiple points in the processing cycle
+- Countdown display logic extended to show during processing state
+
+### 🐛 Bug Fixes
+
+- Fixed empty queue display - queue is now populated with found releases
+- Fixed system health showing empty values - updates are now more frequent
+- Fixed countdown not showing during processing - now visible in all states when available
+- Fixed File Stability Hours description - now clearly states it only applies to non-archive files
+
 ## [2.3.3] - 2025-11-10
 
 ### 🚀 Major Changes

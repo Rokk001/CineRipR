@@ -377,6 +377,34 @@ def process_downloads(
         subfolders: Policy for which subfolders to process
         cpu_cores: Number of CPU cores to use for extraction (default: 2)
         debug: If True, output detailed debug information (default: False)
+        status_callback: Optional callback for status updates
+
+    Returns:
+        ProcessResult with counts and failed archives
+    """
+    # Optional: Import StatusTracker if WebGUI is enabled
+    tracker = None
+    if status_callback:
+        try:
+            from ..web.status import get_status_tracker
+            tracker = get_status_tracker()
+        except Exception:
+            pass  # WebGUI not available
+    """Process all downloads: extract archives and organize files.
+
+    Main workflow:
+    1. For each release, process subdirectories first (Subs, Sample, etc.)
+    2. Then process main archive last
+    3. On success, move all archives to finished
+    4. On main archive failure, cleanup all extracted content
+
+    Args:
+        paths: Configuration paths (downloads, extracted, finished)
+        demo_mode: If True, don't actually extract/move files
+        seven_zip_path: Path to 7-Zip executable (for RAR files)
+        subfolders: Policy for which subfolders to process
+        cpu_cores: Number of CPU cores to use for extraction (default: 2)
+        debug: If True, output detailed debug information (default: False)
 
     Returns:
         ProcessResult with counts and failed archives
@@ -405,6 +433,30 @@ def process_downloads(
             try:
                 if debug:
                     _logger.info("DEBUG: Processing release: %s", release_dir)
+                
+                # Add to queue when release is found (if WebGUI is enabled)
+                if tracker:
+                    # Count archives in this release first
+                    archive_count = 0
+                    try:
+                        # Quick scan to count archives
+                        contexts_preview = _iter_release_directories(
+                            release_dir, download_root, subfolders, debug=False
+                        )
+                        for current_dir, _, _ in contexts_preview:
+                            archives, _ = split_directory_entries(current_dir)
+                            groups = build_archive_groups(archives)
+                            archive_count += sum(group.part_count for group in groups)
+                    except Exception:
+                        pass  # Will be counted during actual processing
+                    
+                    tracker.add_to_queue(
+                        name=release_dir.name,
+                        path=str(release_dir),
+                        archive_count=archive_count
+                    )
+                    tracker.update_queue_item(release_dir.name, "pending")
+                
                 # Update status tracker if callback provided
                 if status_callback:
                     status_callback("scanning", f"Processing {release_dir.name}", None, 0, 0)
@@ -599,6 +651,11 @@ def process_downloads(
                     )
                     failed.append(current_dir)
                     continue
+                
+                # Update queue status to processing (if WebGUI is enabled and this is the main context)
+                if tracker and is_main_context:
+                    tracker.update_queue_item(release_dir.name, "processing")
+                
                 target_dir = paths.extracted_root / relative_parent
                 # Use only the release name, not the full path structure
                 release_name = (
@@ -1054,6 +1111,13 @@ def process_downloads(
                     _remove_empty_tree(release_dir, stop=download_root)
                 except OSError:
                     pass
+            
+            # Update queue status after processing (if WebGUI is enabled)
+            if tracker:
+                if release_failed:
+                    tracker.update_queue_item(release_dir.name, "failed", error="Extraction failed")
+                else:
+                    tracker.update_queue_item(release_dir.name, "completed")
 
     return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
 
