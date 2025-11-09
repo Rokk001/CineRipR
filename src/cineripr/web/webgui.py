@@ -2472,8 +2472,16 @@ def get_html_template() -> str:
         }
         
         // Initial load and auto-refresh
-        updateStatus();
-        setInterval(updateStatus, 1000); // Updated to 1s for live countdown (v2.1.0)
+        // FIX v2.5.5: Ensure only ONE interval runs, use 2s as shown in footer
+        let statusInterval = null;
+        function startStatusUpdates() {
+            if (statusInterval) {
+                clearInterval(statusInterval); // Clear any existing interval
+            }
+            updateStatus(); // Initial call
+            statusInterval = setInterval(updateStatus, 2000); // 2 seconds as shown in footer
+        }
+        startStatusUpdates();
     </script>
 </body>
 </html>'''
