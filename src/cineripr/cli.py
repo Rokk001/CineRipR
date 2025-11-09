@@ -108,8 +108,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--webgui",
-        action="store_true",
-        help="Start WebGUI server on port 8080 (default: disabled)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Start WebGUI server on port 8080 (default: enabled, use --no-webgui to disable)",
     )
     parser.add_argument(
         "--webgui-port",
@@ -265,25 +266,40 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif not settings.enable_delete:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
-    # Start WebGUI if requested
+    # Start WebGUI (enabled by default, can be disabled with --no-webgui)
     webgui_thread = None
     if args.webgui:
         import threading
         import time
 
+        # Check if Flask is available
+        try:
+            from flask import Flask
+            _LOGGER.info("Flask is available, starting WebGUI...")
+        except ImportError as exc:
+            _LOGGER.error(
+                "Flask is not installed. Install it with: pip install flask>=3.0.0"
+            )
+            _LOGGER.error("WebGUI cannot start: %s", exc)
+            return 1
+
         def start_webgui() -> None:
             try:
+                _LOGGER.info("WebGUI thread starting...")
                 run_webgui(host=args.webgui_host, port=args.webgui_port, debug=False)
             except Exception as exc:
-                _LOGGER.error("WebGUI error: %s", exc)
+                _LOGGER.error("WebGUI error: %s", exc, exc_info=True)
 
         webgui_thread = threading.Thread(target=start_webgui, daemon=False)
         webgui_thread.start()
         # Give WebGUI time to start
-        time.sleep(1)
-        _LOGGER.info(
-            "WebGUI started on http://%s:%d", args.webgui_host, args.webgui_port
-        )
+        time.sleep(2)
+        if webgui_thread.is_alive():
+            _LOGGER.info(
+                "WebGUI started on http://%s:%d", args.webgui_host, args.webgui_port
+            )
+        else:
+            _LOGGER.error("WebGUI thread died unexpectedly. Check logs above for errors.")
 
     tracker = get_status_tracker()
 

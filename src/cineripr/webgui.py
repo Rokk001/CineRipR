@@ -291,6 +291,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
+    # Suppress Flask's default logging to avoid noise
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
     tracker = get_status_tracker()
 
     @app.route("/")
@@ -314,9 +316,20 @@ def create_app() -> Flask:
 
 def run_webgui(host: str = "0.0.0.0", port: int = 8080, debug: bool = False) -> None:
     """Run the WebGUI server."""
-    app = create_app()
-    _LOGGER.info(f"Starting WebGUI on http://{host}:{port}")
-    app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
+    try:
+        app = create_app()
+        _LOGGER.info(f"Starting WebGUI on http://{host}:{port}")
+        # Flask's run() is blocking, so this will keep running
+        app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
+    except OSError as exc:
+        if "Address already in use" in str(exc) or "address is already in use" in str(exc):
+            _LOGGER.error(f"Port {port} is already in use. Try a different port with --webgui-port")
+        else:
+            _LOGGER.error(f"Failed to start WebGUI: {exc}", exc_info=True)
+        raise
+    except Exception as exc:
+        _LOGGER.error(f"Failed to start WebGUI: {exc}", exc_info=True)
+        raise
 
 
 __all__ = ["create_app", "run_webgui"]

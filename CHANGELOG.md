@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.32] - 2025-01-27
+
+### Changed
+- WebGUI is now enabled by default (no --webgui flag required)
+- Use --no-webgui to disable WebGUI if needed
+- Improved WebGUI error handling and logging
+
 ## [1.0.31] - 2025-01-27
 
 ### Fixed
