@@ -530,3 +530,98 @@ volumes:
 **Für TOML-User:**
 - TOML-Dateien funktionieren weiterhin (backward compatible)
 - WebGUI-Settings überschreiben TOML-Settings, wenn konfiguriert
+
+---
+
+## 🔴 Offene Probleme (Stand: 2025-11-10)
+
+### ❌ KRITISCH: Progressbar erscheint nicht
+
+**Problem:**
+- Progressbar wird nicht angezeigt obwohl "Enable Auto-Run (Repeat Forever)" aktiviert ist
+- Header zeigt "Idle (Manual Mode)" statt Countdown-Progressbar
+- `data.seconds_until_next_run` ist `null` obwohl `repeat_mode` aktiv ist
+
+**Ursache:**
+- `set_repeat_mode()` setzt jetzt `repeat_interval_minutes` (v2.5.5 Fix)
+- ABER: `next_run_time` wird nicht gesetzt wenn Settings geändert werden
+- Frontend zeigt Progressbar nur wenn `seconds_until_next_run !== null`
+
+**Status:**
+- ✅ Code geändert: `set_repeat_mode()` akzeptiert jetzt `interval_minutes` Parameter
+- ✅ Code geändert: Progressbar-Logik zeigt Progressbar wenn `repeat_mode && repeat_interval_minutes > 0`
+- ❌ **NOCH NICHT GETESTET** - Container zeigt 502 Bad Gateway Errors
+
+**Nächste Schritte:**
+1. Container-Logs prüfen: `docker logs cineripr`
+2. Prüfen ob Container läuft: `docker ps`
+3. Falls Container crasht: Logs analysieren und Runtime-Fehler fixen
+4. Falls Container läuft: Prüfen ob `repeat_interval_minutes` im API-Response enthalten ist
+
+---
+
+### ⚠️ Container zeigt 502 Bad Gateway Errors
+
+**Problem:**
+- Browser Console zeigt: `GET https://cineripr.zhome.ch/api/status 502 (Bad Gateway)`
+- `SyntaxError: Unexpected token '<', "<html>... is not valid JSON"`
+- Flask-App crasht oder startet nicht
+
+**Mögliche Ursachen:**
+1. Container läuft noch alte Version (v2.5.4 oder älter)
+2. Runtime-Fehler beim Start (Syntax OK, aber Import/Logic-Fehler)
+3. Flask-App crasht beim Initialisieren
+
+**Status:**
+- ✅ Syntax-Checks: Alle Dateien kompilieren ohne Fehler
+- ❌ **Container-Logs nicht geprüft** - Runtime-Fehler unbekannt
+
+**Nächste Schritte:**
+1. Container-Logs prüfen: `docker logs cineripr --tail 100`
+2. Prüfen ob neue Version deployed: `docker ps` → Image-Version
+3. Falls alte Version: `docker pull ghcr.io/rokk001/cineripr:2.5.5`
+4. Falls neue Version: Logs analysieren und Runtime-Fehler fixen
+
+---
+
+### 📋 Was heute gemacht wurde (v2.5.5)
+
+**Versuche:**
+1. ✅ Main Loop liest jetzt Settings aus DB (nicht mehr aus `settings` object)
+2. ✅ Settings werden während Sleep-Loop geprüft (alle 5 Sekunden)
+3. ✅ `set_repeat_mode()` setzt jetzt `repeat_interval_minutes`
+4. ✅ Progressbar-Logik zeigt Progressbar wenn `repeat_mode && repeat_interval_minutes > 0`
+5. ✅ Debug-Logging hinzugefügt für Settings-Update
+6. ✅ JavaScript Interval auf 2 Sekunden reduziert (Performance)
+
+**Commits:**
+- `f229b0f`: Main Loop reads from DB
+- `c1b3fd2`: Fix excessive API calls
+- `2296824`: Fix JavaScript scope issue
+- `4020dc9`: Check settings during sleep
+- `500840c`: Progressbar MUST show when Auto-Run enabled
+- `fd97c37`: set_repeat_mode now sets repeat_interval_minutes
+
+**Status:**
+- ❌ **NOCH NICHT FUNKTIONIEREND** - Container zeigt 502 Errors
+- ❌ **NOCH NICHT GETESTET** - Progressbar erscheint nicht
+
+---
+
+### 🔧 Technische Details
+
+**Geänderte Dateien:**
+- `src/cineripr/cli.py`: Main Loop liest Settings aus DB, prüft Settings während Sleep
+- `src/cineripr/web/webgui.py`: Settings-Update setzt `repeat_interval_minutes`, Progressbar-Logik erweitert
+- `src/cineripr/web/status.py`: `set_repeat_mode()` akzeptiert `interval_minutes` Parameter
+
+**Offene Fragen:**
+1. Warum crasht der Container? (502 Bad Gateway)
+2. Warum ist `seconds_until_next_run` null obwohl `repeat_mode` aktiv ist?
+3. Wird `set_next_run()` aufgerufen wenn Settings gespeichert werden?
+4. Funktioniert der Settings-Update-Mechanismus überhaupt?
+
+**Debug-Info:**
+- Debug-Logging in `webgui.py` Line 2591-2631
+- Debug-Logging in `status.py` Line 797-802
+- Logs sollten zeigen ob `set_next_run()` aufgerufen wird
