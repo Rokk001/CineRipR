@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.33)
+## Aktueller Stand (Version 1.0.35)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -89,12 +89,17 @@ Finished/
 3. **Move**: QUELL-DATEIEN aus dem Download-Release 1:1 nach `finished/<ReleaseName>/` verschieben (Spiegelung der Struktur)
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
-## Session Notes (2025-01-27)
-- Version 1.0.33 veröffentlicht mit kritischem RAR-Extraktion-Fix
-- p7zip-full durch offizielle 7-Zip Binary ersetzt (behebt "Unsupported Method" Fehler)
-- Alle RAR-Formate inkl. RAR5 werden jetzt korrekt extrahiert
-- WebGUI standardmäßig aktiviert auf Port 8080
-- Multi-Volume RAR-Validierung hinzugefügt (prüft auf fehlende Volumes)
+## Session Notes (2025-11-09)
+- Version 1.0.35 veröffentlicht mit Major WebGUI Overhaul
+- Toast Notifications für Echtzeit-Feedback
+- Processing Queue Display zeigt anstehende Arbeit
+- Log-Filtering & Search für einfaches Debugging
+- System Health Monitoring mit Disk Space Tracking
+- Tab-basierte Navigation (Overview, Queue, Health, Logs)
+- Favicon mit CineRipR Branding hinzugefügt
+- 7-Zip Version wird angezeigt
+- Status-Display-Inkonsistenzen behoben
+- Komplette Interface-Restrukturierung
 - Klarstellung: `extracted` ist der finale Zielpfad für extrahierte Inhalte; `finished` spiegelt die Download-Quelle 1:1 pro Release-Root.
 - Companion-Ordner (`Sample`, `Subs`, …) werden beim Verschieben nach `finished` unverändert übernommen.
 - UNC-/Docker-Pfade: Safe-Move mit Fallback (copy+delete) bleibt aktiv; chmod 777, kein chown.
