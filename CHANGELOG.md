@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2025-11-10
+
+### 🚀 Major Changes
+
+- **TOML Configuration Optional:** `--config` is now optional
+  - If not provided, paths must be set via CLI args (`--download-root`, `--extracted-root`, `--finished-root`)
+  - All other settings can be managed via WebGUI
+  - TOML file is no longer required for Docker deployments
+
+- **WebGUI Settings Priority:** WebGUI settings now override TOML/CLI settings
+  - Settings from SQLite database have highest priority
+  - Priority order: WebGUI (SQLite) > CLI args > TOML file > Defaults
+  - Fixes issue where TOML settings were overriding WebGUI settings
+
+### 🎯 Improvements
+
+- **Docker Deployment:** Simplified Docker setup
+  - No TOML file required
+  - Paths configured via CLI args
+  - All settings managed via WebGUI
+  - Settings database stored in `/config` volume
+
+### 🔧 Technical Details
+
+- `load_and_merge_settings()` now loads WebGUI settings from SQLite database
+- WebGUI settings override TOML/CLI settings for:
+  - `repeat_forever` / `repeat_after_minutes`
+  - `finished_retention_days`
+  - `enable_delete`
+  - `include_sample` / `include_sub` / `include_other`
+  - `demo_mode`
+
+### 📝 Migration
+
+**For Docker users:**
+- Remove TOML file from Dockerfile
+- Use CLI args for paths: `--download-root`, `--extracted-root`, `--finished-root`
+- Configure all other settings via WebGUI
+
+**For TOML users:**
+- TOML files still work (backward compatible)
+- WebGUI settings will override TOML settings if configured
+
+[2.3.0]: https://github.com/Rokk001/CineRipR/compare/v2.2.5...v2.3.0
+
+---
+
 ## [2.2.5] - 2025-11-10
 
 ### 🎨 UI/UX Improvements

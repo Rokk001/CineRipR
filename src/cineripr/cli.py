@@ -23,8 +23,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG,
-        help=f"Path to configuration file (default: {DEFAULT_CONFIG})",
+        default=None,
+        help="Path to configuration file (optional - if not provided, use CLI args only)",
     )
     parser.add_argument(
         "--download-root",
@@ -126,78 +126,160 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def load_and_merge_settings(args: argparse.Namespace) -> Settings:
-    try:
-        settings = load_settings(args.config)
-    except FileNotFoundError:
-        raise
-    except ConfigurationError:
-        raise
+    """Load settings from TOML (if provided), CLI args, and WebGUI database.
+    
+    Priority order:
+    1. WebGUI settings (SQLite) - highest priority
+    2. CLI args
+    3. TOML file (if provided)
+    4. Defaults
+    """
+    # Step 1: Load from TOML if provided, otherwise use defaults
+    settings = None
+    if args.config is not None and args.config.exists():
+        try:
+            settings = load_settings(args.config)
+        except (FileNotFoundError, ConfigurationError) as exc:
+            _LOGGER.warning(f"Could not load config file {args.config}: {exc}")
+            settings = None
 
-    paths = settings.paths
-    if args.download_root is not None:
-        override_roots = tuple(Path(p).resolve() for p in args.download_root)
-        paths = Paths(
-            download_roots=override_roots,
-            extracted_root=paths.extracted_root,
-            finished_root=paths.finished_root,
-        )
-    if args.extracted_root is not None:
-        paths = Paths(
-            download_roots=paths.download_roots,
-            extracted_root=args.extracted_root.resolve(),
-            finished_root=paths.finished_root,
-        )
-    if args.finished_root is not None:
-        paths = Paths(
-            download_roots=paths.download_roots,
-            extracted_root=paths.extracted_root,
-            finished_root=args.finished_root.resolve(),
-        )
+    # Step 2: Build paths from CLI args (required if no TOML)
+    if args.download_root is None or len(args.download_root) == 0:
+        if settings is None:
+            raise ConfigurationError(
+                "Either --config file or --download-root must be provided"
+            )
+        download_roots = settings.paths.download_roots
+    else:
+        download_roots = tuple(Path(p).resolve() for p in args.download_root)
 
-    retention_days = settings.retention_days
+    if args.extracted_root is None:
+        if settings is None:
+            raise ConfigurationError(
+                "Either --config file or --extracted-root must be provided"
+            )
+        extracted_root = settings.paths.extracted_root
+    else:
+        extracted_root = args.extracted_root.resolve()
+
+    if args.finished_root is None:
+        if settings is None:
+            raise ConfigurationError(
+                "Either --config file or --finished-root must be provided"
+            )
+        finished_root = settings.paths.finished_root
+    else:
+        finished_root = args.finished_root.resolve()
+
+    paths = Paths(
+        download_roots=download_roots,
+        extracted_root=extracted_root,
+        finished_root=finished_root,
+    )
+
+    # Step 3: Load other settings from TOML (if available) or use defaults
+    retention_days = settings.retention_days if settings else 14
+    enable_delete = settings.enable_delete if settings else False
+    demo_mode = settings.demo_mode if settings else False
+    subfolders = settings.subfolders if settings else SubfolderPolicy()
+    seven_zip_path = settings.seven_zip_path if settings else None
+    repeat_forever = settings.repeat_forever if settings else False
+    repeat_after_minutes = settings.repeat_after_minutes if settings else 0
+
+    # Step 4: Override with CLI args if provided
     if args.retention_days is not None:
         if args.retention_days < 0:
             raise ConfigurationError("Retention days cannot be negative")
         retention_days = args.retention_days
 
-    enable_delete = settings.enable_delete
     if args.enable_delete is not None:
         enable_delete = args.enable_delete
 
-    demo_mode = settings.demo_mode
     if args.demo_mode is not None:
         demo_mode = args.demo_mode
 
-    subfolders = settings.subfolders
     include_sample = subfolders.include_sample
     include_sub = subfolders.include_sub
     include_other = subfolders.include_other
+
     if args.include_sample is not None:
         include_sample = args.include_sample
     if args.include_sub is not None:
         include_sub = args.include_sub
     if args.include_other is not None:
         include_other = args.include_other
+
     subfolders = SubfolderPolicy(
         include_sample=include_sample,
         include_sub=include_sub,
         include_other=include_other,
     )
 
-    seven_zip_path = settings.seven_zip_path
     if args.seven_zip is not None:
         seven_zip_path = args.seven_zip
 
-    # Repeat overrides from CLI
-    repeat_forever = settings.repeat_forever
     if getattr(args, "repeat_forever", None) is not None:
         repeat_forever = bool(args.repeat_forever)
 
-    repeat_after_minutes = settings.repeat_after_minutes
     if getattr(args, "repeat_after_minutes", None) is not None:
         if args.repeat_after_minutes < 0:
             raise ConfigurationError("repeat-after-minutes cannot be negative")
         repeat_after_minutes = int(args.repeat_after_minutes)
+
+    # Step 5: Load WebGUI settings from SQLite database (NEW in v2.3.0)
+    # These override TOML/CLI settings
+    try:
+        from .web.settings_db import get_settings_db
+
+        db = get_settings_db()
+
+        # Override with WebGUI settings if they exist
+        repeat_forever_db = db.get("repeat_forever")
+        if repeat_forever_db is not None:
+            repeat_forever = bool(repeat_forever_db)
+
+        repeat_after_minutes_db = db.get("repeat_after_minutes")
+        if repeat_after_minutes_db is not None:
+            repeat_after_minutes = int(repeat_after_minutes_db)
+
+        retention_days_db = db.get("finished_retention_days")
+        if retention_days_db is not None:
+            retention_days = int(retention_days_db)
+
+        enable_delete_db = db.get("enable_delete")
+        if enable_delete_db is not None:
+            enable_delete = bool(enable_delete_db)
+
+        include_sample_db = db.get("include_sample")
+        if include_sample_db is not None:
+            subfolders = SubfolderPolicy(
+                include_sample=bool(include_sample_db),
+                include_sub=subfolders.include_sub,
+                include_other=subfolders.include_other,
+            )
+
+        include_sub_db = db.get("include_sub")
+        if include_sub_db is not None:
+            subfolders = SubfolderPolicy(
+                include_sample=subfolders.include_sample,
+                include_sub=bool(include_sub_db),
+                include_other=subfolders.include_other,
+            )
+
+        include_other_db = db.get("include_other")
+        if include_other_db is not None:
+            subfolders = SubfolderPolicy(
+                include_sample=subfolders.include_sample,
+                include_sub=subfolders.include_sub,
+                include_other=bool(include_other_db),
+            )
+
+        demo_mode_db = db.get("demo_mode")
+        if demo_mode_db is not None:
+            demo_mode = bool(demo_mode_db)
+    except Exception as e:
+        # If database is not available, fall back to TOML/CLI settings
+        _LOGGER.debug(f"Could not load WebGUI settings: {e}")
 
     return Settings(
         paths=paths,
@@ -236,14 +318,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Helpful startup log to verify which config was loaded and key options
-    _LOGGER.info(
-        "Using config: %s | repeat_forever=%s, repeat_after_minutes=%s, demo=%s, delete=%s",
-        args.config,
-        settings.repeat_forever,
-        settings.repeat_after_minutes,
-        settings.demo_mode,
-        settings.enable_delete,
-    )
+    if args.config is not None and args.config.exists():
+        _LOGGER.info(
+            "Using config: %s | repeat_forever=%s, repeat_after_minutes=%s, demo=%s, delete=%s",
+            args.config,
+            settings.repeat_forever,
+            settings.repeat_after_minutes,
+            settings.demo_mode,
+            settings.enable_delete,
+        )
+    else:
+        _LOGGER.info(
+            "Using CLI args only | repeat_forever=%s, repeat_after_minutes=%s, demo=%s, delete=%s",
+            settings.repeat_forever,
+            settings.repeat_after_minutes,
+            settings.demo_mode,
+            settings.enable_delete,
+        )
 
     if resolve_seven_zip_command(settings.seven_zip_path) is None:
         _LOGGER.error(
