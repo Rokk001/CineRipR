@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.0] - 2025-11-10
+
+### 🎨 Major UI/UX Improvements
+
+- **Visual Countdown Progressbar:** Replaced text countdown with visual progressbar in header
+  - Shows progress until next run (100% = just finished, 0% = starting now)
+  - Color-coded: Purple (>50%), Orange (20-50%), Red (<20%)
+  - Integrated "Run Now" button in progressbar
+  - Live updates every second
+  - Only visible when idle and repeat mode enabled
+
+### 🐛 Critical Bug Fixes
+
+- **History Display Bug:** Fixed field name mismatches preventing history from showing
+  - `item.end_time` → `item.timestamp`
+  - `item.success` → `item.status === 'completed'`
+  - `item.archive_count` → `item.processed_archives` / `item.failed_archives`
+  - Added error message display in history timeline
+  - Changed date format from German (de-DE) to English (en-US)
+
+### 🔧 Technical Changes
+
+- `webgui.py`: Complete countdown UI overhaul (~150 lines changed)
+  - New CSS classes: `.countdown-progressbar-container`, `.countdown-progressbar-fill`, etc.
+  - New JavaScript: `updateCountdownProgressbar()` function
+  - Removed old header-countdown and header-control-btn code
+- `webgui.py`: History timeline now shows detailed error messages
+- `webgui.py`: Added `/api/queue/preview` endpoint (stub for future implementation)
+
+### 📋 Known Issues
+
+- **Queue Preview:** API endpoint exists but returns empty (requires path access refactor)
+- **History per Release:** Currently one entry per run, not per release (planned for v2.6.0)
+
 ## [2.4.3] - 2025-11-10
 
 ### 🐛 Critical Fixes (The Real Fix This Time!)

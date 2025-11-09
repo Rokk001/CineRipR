@@ -200,56 +200,83 @@ def get_html_template() -> str:
             transform: scale(1.1) rotate(15deg);
         }
         
-        .header-status {
+        .header-status-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-status-basic {
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
-        /* Header Countdown (NEW in v2.2.5) */
-        .header-countdown {
-            margin-left: 15px;
+        /* Countdown Progressbar (NEW in v2.5.0) */
+        .countdown-progressbar-container {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.85em;
-            color: var(--text-secondary);
+            gap: 12px;
+            min-width: 320px;
         }
         
-        .header-countdown-separator {
-            opacity: 0.3;
-            margin: 0 5px;
-        }
-        
-        .header-countdown-label {
-            opacity: 0.7;
-        }
-        
-        .header-countdown-time {
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
-            color: var(--accent-color);
-            min-width: 50px;
-        }
-        
-        .header-countdown-time.pulse {
-            animation: pulse 1s ease-in-out infinite;
-        }
-        
-        /* Header Control Button (NEW in v2.2.5) */
-        .header-control-btn {
-            margin-left: 10px;
-            padding: 6px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
+        .countdown-progressbar {
+            position: relative;
+            flex: 1;
+            height: 28px;
             background: rgba(255, 255, 255, 0.05);
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.3s;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+        
+        .countdown-progressbar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-color) 0%, rgba(139, 92, 246, 0.7) 100%);
+            transition: width 1s linear, background 0.5s ease;
+            border-radius: 14px;
+        }
+        
+        .countdown-progressbar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
+            font-size: 0.8em;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            white-space: nowrap;
+        }
+        
+        .countdown-separator {
+            opacity: 0.5;
+        }
+        
+        .countdown-run-now-btn {
+            padding: 6px 12px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            color: var(--accent-color);
+            cursor: pointer;
+            font-size: 0.75em;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .countdown-run-now-btn:hover {
+            background: var(--accent-color);
+            color: white;
+            transform: scale(1.05);
         }
         
         .header-control-btn:hover {
@@ -976,6 +1003,14 @@ def get_html_template() -> str:
             gap: 5px;
         }
         
+        .timeline-errors {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+            border-radius: 4px;
+        }
+        
         .history-empty {
             text-align: center;
             padding: 60px 20px;
@@ -1242,19 +1277,25 @@ def get_html_template() -> str:
                 <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span>
                 </button>
-                <div class="header-status">
-                    <div class="status-dot" id="status-dot"></div>
-                    <div id="status-text">Idle</div>
-                    <!-- Countdown in header (when next run is scheduled) -->
-                    <div class="header-countdown" id="header-countdown" style="display: none;">
-                        <span class="header-countdown-separator">|</span>
-                        <span class="header-countdown-label">Next:</span>
-                        <span class="header-countdown-time" id="header-countdown-time">--:--</span>
+                <div class="header-status-wrapper">
+                    <div class="header-status-basic">
+                        <div class="status-dot" id="status-dot"></div>
+                        <div id="status-text">Idle</div>
                     </div>
-                    <!-- Dynamischer Control Button -->
-                    <button class="header-control-btn" id="header-control-btn" onclick="handleHeaderControl()" style="display: none;">
-                        <span id="header-control-icon">⏭️</span>
-                    </button>
+                    <!-- Countdown Progressbar (only visible when idle) -->
+                    <div class="countdown-progressbar-container" id="countdown-container" style="display: none;">
+                        <div class="countdown-progressbar">
+                            <div class="countdown-progressbar-fill" id="countdown-fill" style="width: 0%;"></div>
+                            <div class="countdown-progressbar-text">
+                                <span id="countdown-percentage">0%</span>
+                                <span class="countdown-separator">|</span>
+                                <span id="countdown-time">--:--</span>
+                            </div>
+                        </div>
+                        <button class="countdown-run-now-btn" id="run-now-btn" onclick="triggerRunNow()" title="Start processing now">
+                            ⏭️ Run Now
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1925,8 +1966,8 @@ def get_html_template() -> str:
                     .then(r => r.json())
                     .then(data => {
                         showToast('success', 'Run Triggered', 'Starting processing now...', true);
-                        // Hide countdown immediately
-                        document.getElementById('next-run-card').style.display = 'none';
+                        // Hide countdown progressbar immediately
+                        document.getElementById('countdown-container').style.display = 'none';
                     })
                     .catch(err => {
                         showToast('error', 'Error', 'Failed to trigger run');
@@ -2179,95 +2220,56 @@ def get_html_template() -> str:
                         statusText.textContent = 'Idle';
                     }
                     
-                    // Header Countdown & Control Button (NEW in v2.2.5)
-                    const headerCountdown = document.getElementById('header-countdown');
-                    const headerCountdownTime = document.getElementById('header-countdown-time');
-                    const headerControlBtn = document.getElementById('header-control-btn');
-                    const headerControlIcon = document.getElementById('header-control-icon');
+                    // Countdown Progressbar (NEW in v2.5.0)
+                    const countdownContainer = document.getElementById('countdown-container');
+                    const countdownFill = document.getElementById('countdown-fill');
+                    const countdownPercentage = document.getElementById('countdown-percentage');
+                    const countdownTime = document.getElementById('countdown-time');
                     
-                    if (isPaused) {
-                        // Paused: Resume Button, kein Countdown
-                        headerCountdown.style.display = 'none';
-                        headerControlBtn.style.display = 'flex';
-                        headerControlBtn.classList.remove('run-now', 'pause');
-                        headerControlBtn.classList.add('resume');
-                        headerControlIcon.textContent = '▶';
-                        headerControlBtn.title = 'Resume Processing';
-                    } else if (isRunning) {
-                        // Running: Pause Button + Countdown (if available)
-                        headerControlBtn.style.display = 'flex';
-                        headerControlBtn.classList.remove('run-now', 'resume');
-                        headerControlBtn.classList.add('pause');
-                        headerControlIcon.textContent = '⏸';
-                        headerControlBtn.title = 'Pause Processing';
+                    const isIdle = !isRunning && !isPaused;
+                    const hasNextRun = data.seconds_until_next_run !== null && data.seconds_until_next_run >= 0;
+                    
+                    if (isIdle && hasNextRun) {
+                        // Show countdown progressbar
+                        countdownContainer.style.display = 'flex';
                         
-                        // Show countdown if available (for next scheduled run)
-                        if (data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
-                            headerCountdown.style.display = 'flex';
-                            
-                            const seconds = data.seconds_until_next_run;
-                            const hours = Math.floor(seconds / 3600);
-                            const minutes = Math.floor((seconds % 3600) / 60);
-                            const secs = seconds % 60;
-                            
-                            const timeStr = hours > 0 
-                                ? `${hours}h ${minutes}m`
-                                : minutes > 0
-                                    ? `${minutes}m ${secs}s`
-                                    : `${secs}s`;
-                            
-                            headerCountdownTime.textContent = timeStr;
-                            
-                            // Pulse if < 1 minute
-                            if (seconds < 60) {
-                                headerCountdownTime.classList.add('pulse');
-                            } else {
-                                headerCountdownTime.classList.remove('pulse');
-                            }
+                        // Calculate percentage (inverse: 100% = just finished, 0% = starting now)
+                        const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
+                        const remainingSeconds = data.seconds_until_next_run;
+                        const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
+                        
+                        // Update progressbar
+                        countdownFill.style.width = percentage + '%';
+                        countdownPercentage.textContent = Math.round(percentage) + '%';
+                        
+                        // Format time
+                        const hours = Math.floor(remainingSeconds / 3600);
+                        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+                        const seconds = remainingSeconds % 60;
+                        
+                        let timeString;
+                        if (hours > 0) {
+                            timeString = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                         } else {
-                            headerCountdown.style.display = 'none';
+                            timeString = `${minutes}:${String(seconds).padStart(2, '0')}`;
                         }
+                        countdownTime.textContent = timeString;
+                        
+                        // Color based on time remaining
+                        if (percentage < 20) {
+                            countdownFill.style.background = 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'; // Red
+                        } else if (percentage < 50) {
+                            countdownFill.style.background = 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'; // Orange
+                        } else {
+                            countdownFill.style.background = 'linear-gradient(90deg, var(--accent-color) 0%, rgba(139, 92, 246, 0.7) 100%)'; // Purple
+                        }
+                    } else if (isIdle) {
+                        // Idle but no next run (manual mode)
+                        countdownContainer.style.display = 'none';
+                        statusText.textContent = 'Idle (Manual Mode)';
                     } else {
-                        // Idle: Countdown + Run Now Button (immer wenn next_run geplant ist)
-                        if (data.seconds_until_next_run !== null && data.seconds_until_next_run > 0) {
-                            // Countdown anzeigen
-                            headerCountdown.style.display = 'flex';
-                            
-                            const seconds = data.seconds_until_next_run;
-                            const hours = Math.floor(seconds / 3600);
-                            const minutes = Math.floor((seconds % 3600) / 60);
-                            const secs = seconds % 60;
-                            
-                            const timeStr = hours > 0 
-                                ? `${hours}h ${minutes}m`
-                                : minutes > 0
-                                    ? `${minutes}m ${secs}s`
-                                    : `${secs}s`;
-                            
-                            headerCountdownTime.textContent = timeStr;
-                            
-                            // Pulse wenn < 1 Minute
-                            if (seconds < 60) {
-                                headerCountdownTime.classList.add('pulse');
-                            } else {
-                                headerCountdownTime.classList.remove('pulse');
-                            }
-                            
-                            // Run Now Button anzeigen
-                            headerControlBtn.style.display = 'flex';
-                            headerControlBtn.classList.remove('pause', 'resume');
-                            headerControlBtn.classList.add('run-now');
-                            headerControlIcon.textContent = '⏭️';
-                            headerControlBtn.title = 'Run Now';
-                        } else {
-                            // Kein Countdown: Nur Run Now Button
-                            headerCountdown.style.display = 'none';
-                            headerControlBtn.style.display = 'flex';
-                            headerControlBtn.classList.remove('pause', 'resume');
-                            headerControlBtn.classList.add('run-now');
-                            headerControlIcon.textContent = '⏭️';
-                            headerControlBtn.title = 'Run Now';
-                        }
+                        // Processing or Paused
+                        countdownContainer.style.display = 'none';
                     }
                     
                     // Control panel (REMOVED in v2.2.5 - replaced by header button)
@@ -2354,16 +2356,17 @@ def get_html_template() -> str:
                         `;
                     } else {
                         historyTimeline.innerHTML = history.map(item => {
-                            const endTime = new Date(item.end_time);
-                            const timeStr = endTime.toLocaleString('de-DE');
+                            const endTime = new Date(item.timestamp);
+                            const timeStr = endTime.toLocaleString('en-US');
                             const duration = item.duration_seconds || 0;
                             const hours = Math.floor(duration / 3600);
                             const minutes = Math.floor((duration % 3600) / 60);
-                            const seconds = duration % 60;
+                            const seconds = Math.floor(duration % 60);
                             const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
                             
-                            const markerClass = item.success ? 'success' : 'failed';
-                            const borderColor = item.success ? '#10b981' : '#ef4444';
+                            const isSuccess = item.status === 'completed';
+                            const markerClass = isSuccess ? 'success' : 'failed';
+                            const borderColor = isSuccess ? '#10b981' : '#ef4444';
                             
                             return `
                                 <div class="timeline-item">
@@ -2378,12 +2381,18 @@ def get_html_template() -> str:
                                                 <span>⏱</span> ${durationStr}
                                             </div>
                                             <div class="timeline-meta-item">
-                                                <span>📦</span> ${item.archive_count || 0} archives
+                                                <span>📦</span> Processed: ${item.processed_archives || 0} | Failed: ${item.failed_archives || 0}
                                             </div>
                                             <div class="timeline-meta-item">
-                                                <span>${item.success ? '✓' : '✗'}</span> ${item.success ? 'Success' : 'Failed'}
+                                                <span>${isSuccess ? '✓' : '✗'}</span> ${isSuccess ? 'Completed' : 'Failed'}
                                             </div>
                                         </div>
+                                        ${item.error_messages && item.error_messages.length > 0 ? `
+                                        <div class="timeline-errors">
+                                            <div style="color: #ef4444; font-weight: 600; margin-bottom: 5px;">⚠️ Errors:</div>
+                                            ${item.error_messages.slice(0, 3).map(err => `<div style="font-size: 0.85em; opacity: 0.8;">• ${err}</div>`).join('')}
+                                        </div>
+                                        ` : ''}
                                     </div>
                                 </div>
                             `;
@@ -2530,6 +2539,25 @@ def create_app() -> Flask:
         status = tracker.get_status()
         return jsonify(status.to_dict().get("history", []))
 
+    @app.route("/api/queue/preview")
+    def api_queue_preview() -> Any:
+        """Get queue preview - what will be processed in next run."""
+        try:
+            from ..core.archives import _find_release_directories
+            from ..config import Settings
+            from .settings_db import get_settings_db
+            from pathlib import Path
+            
+            # Get download paths from settings
+            db = get_settings_db()
+            # For now, return empty list until we can properly access the paths
+            # This would require passing settings to the webgui or storing paths in DB
+            preview_items = []
+            
+            return jsonify({"items": preview_items, "count": len(preview_items)})
+        except Exception as e:
+            return jsonify({"items": [], "count": 0, "error": str(e)})
+
     @app.route("/api/health")
     def api_health() -> Any:
         """Health check endpoint."""
@@ -2674,3 +2702,4 @@ def run_webgui(host: str = "0.0.0.0", port: int = 8080, debug: bool = False) -> 
 
 
 __all__ = ["create_app", "run_webgui"]
+
