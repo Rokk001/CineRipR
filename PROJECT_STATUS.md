@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.24)
+## Aktueller Stand (Version 1.0.29)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -34,16 +34,19 @@
 ### 📁 Projektstruktur
 ```
 src/cineripr/
-├── __init__.py              # Version 1.0.23
-├── archives.py              # Hauptorchestrierung (981 Zeilen)
-├── file_operations.py       # Datei-Operationen (589 Zeilen)
+├── __init__.py              # Version 1.0.29
+├── archives.py              # Hauptorchestrierung
+├── file_operations.py       # Datei-Operationen
 ├── path_utils.py            # Pfad-Utilities
 ├── archive_extraction.py    # Extraktionslogik
 ├── archive_detection.py     # Archive-Erkennung
 ├── archive_constants.py     # Konstanten und Regex
 ├── config.py                # Konfiguration
 ├── cli.py                   # Command-Line-Interface
-└── progress.py              # Progress-Tracking
+├── progress.py              # Progress-Tracking
+├── status.py                # Status-Tracking für WebGUI
+├── webgui.py                # WebGUI für Status-Monitoring
+└── cleanup.py               # Finished-Directory-Cleanup
 ```
 
 ### 🎯 TV-Show-Organisation (Funktioniert)
@@ -86,8 +89,10 @@ Finished/
 3. **Move**: QUELL-DATEIEN aus dem Download-Release 1:1 nach `finished/<ReleaseName>/` verschieben (Spiegelung der Struktur)
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
-## Session Notes (2025-10-10)
-- Version 1.0.25 veröffentlicht (Tag `v1.0.25`) mit Fix: Serien landen unter `<finished>/<Serie>/Season XX` statt direkt unter `<finished>/Season XX`.
+## Session Notes (2025-01-27)
+- Version 1.0.29 veröffentlicht mit WebGUI-Unterstützung
+- WebGUI auf Port 8080 verfügbar mit Live-Status-Updates
+- Multi-Volume RAR-Validierung hinzugefügt (prüft auf fehlende Volumes)
 - Klarstellung: `extracted` ist der finale Zielpfad für extrahierte Inhalte; `finished` spiegelt die Download-Quelle 1:1 pro Release-Root.
 - Companion-Ordner (`Sample`, `Subs`, …) werden beim Verschieben nach `finished` unverändert übernommen.
 - UNC-/Docker-Pfade: Safe-Move mit Fallback (copy+delete) bleibt aktiv; chmod 777, kein chown.
@@ -106,11 +111,10 @@ Finished/
 - **Safe Move**: Mehrere Retry-Strategien
 
 ### 📋 Nächste Schritte (TODO)
-1. **Testing**: Aktuelle Version 1.0.23 testen
+1. **Testing**: Aktuelle Version 1.0.29 testen
 2. **Performance**: Große Archive-Performance optimieren
-3. **Logging**: Verbesserte Debug-Ausgaben
-4. **Error Handling**: Robustere Fehlerbehandlung
-5. **Documentation**: API-Dokumentation erweitern
+3. **Error Handling**: Robustere Fehlerbehandlung
+4. **Documentation**: API-Dokumentation erweitern
 
 ### 🚨 Bekannte Issues
 - **Linting Warnings**: Einige "too general exception" Warnings

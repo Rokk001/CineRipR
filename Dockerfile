@@ -24,6 +24,9 @@ RUN python -m pip install --no-cache-dir /tmp/dist/*.whl && rm -rf /tmp/dist
 # Set proper umask for file permissions (readable/writable by owner and group)
 ENV UMASK=002
 
+# Expose WebGUI port
+EXPOSE 8080
+
 WORKDIR /work
 USER cineripr
 ENTRYPOINT ["python","-m","cineripr.cli"]

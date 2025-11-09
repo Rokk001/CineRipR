@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cineripr"
-version = "1.0.29"
+version = "1.0.30"
 description = "Automate extraction of multi-part downloads and finished-folder cleanup for media libraries"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -12,7 +12,9 @@ authors = [
     { name = "Rokk001" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "flask>=3.0.0",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",

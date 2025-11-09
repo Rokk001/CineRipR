@@ -14,7 +14,11 @@ from .archive_detection import (
     build_archive_groups,
     validate_archive_group,
 )
-from .archive_extraction import can_extract_archive, extract_archive
+from .archive_extraction import (
+    can_extract_archive,
+    extract_archive,
+    get_rar_volume_count,
+)
 from .file_operations import (
     copy_non_archives_to_extracted,
     flatten_single_subdir,
@@ -355,6 +359,7 @@ def process_downloads(
     subfolders: SubfolderPolicy,
     cpu_cores: int = 2,
     debug: bool = False,
+    status_callback: Callable[[str, str, str | None, int, int], None] | None = None,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -399,6 +404,9 @@ def process_downloads(
             try:
                 if debug:
                     _logger.info("DEBUG: Processing release: %s", release_dir)
+                # Update status tracker if callback provided
+                if status_callback:
+                    status_callback("scanning", f"Processing {release_dir.name}", None, 0, 0)
                 # Indicate reading start (use a fresh color here; context_color comes later)
                 read_color = next_progress_color()
                 # Start with unknown total; increase dynamically so (k/N) is exact, not guessed
@@ -631,6 +639,36 @@ def process_downloads(
                             failed.append(group.primary)
                             continue
 
+                        # For RAR archives, check if all volumes are present
+                        # Check if this is a RAR archive (by key or primary file extension)
+                        is_rar = (
+                            group.key.endswith(".rar")
+                            or group.primary.suffix.lower() == ".rar"
+                        )
+                        if is_rar and not demo_mode:
+                            volume_count, volume_error = get_rar_volume_count(
+                                group.primary, seven_zip_path=seven_zip_path
+                            )
+                            if volume_count is not None and volume_count > 1:
+                                # Multi-volume RAR detected
+                                if group.part_count < volume_count:
+                                    _logger.warning(
+                                        "%s Skipping %s: found %d volume(s) but archive requires %d volume(s)",
+                                        progress_before,
+                                        group.primary,
+                                        group.part_count,
+                                        volume_count,
+                                    )
+                                    failed.append(group.primary)
+                                    continue
+                            elif volume_error:
+                                # Log warning but continue (might be a single-volume RAR)
+                                _logger.debug(
+                                    "Could not verify volume count for %s: %s",
+                                    group.primary,
+                                    volume_error,
+                                )
+
                         if should_extract:
                             if demo_mode:
                                 # Read all parts silently (no progress updates)
@@ -700,6 +738,16 @@ def process_downloads(
                 for index, group in groups_to_extract:
                     pre_existing_target = target_dir.exists()
                     extracted_ok = False
+
+                    # Update status tracker if callback provided
+                    if status_callback:
+                        status_callback(
+                            "extracting",
+                            f"Extracting {group.primary.name}",
+                            group.primary.name,
+                            0,
+                            group.part_count,
+                        )
 
                     try:
                         # Copy companion files

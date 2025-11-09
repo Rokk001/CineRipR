@@ -102,6 +102,54 @@ def resolve_seven_zip_command(seven_zip_path: Path | None) -> str | None:
     return None
 
 
+def get_rar_volume_count(
+    archive: Path, *, seven_zip_path: Path | None
+) -> tuple[int | None, str | None]:
+    """Get the total number of volumes for a RAR archive from its header.
+
+    Args:
+        archive: RAR archive file to check
+        seven_zip_path: Path to 7-Zip executable
+
+    Returns:
+        Tuple of (volume_count, error_message)
+        - volume_count: Number of volumes if successfully read, None otherwise
+        - error_message: Error description if failed, None if successful
+    """
+    command = resolve_seven_zip_command(seven_zip_path)
+    if command is None:
+        return None, "7-Zip executable not found"
+
+    try:
+        # Use 7-Zip 'l' command to list archive information
+        result = subprocess.run(
+            [command, "l", str(archive)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            return None, f"7-Zip list failed (exit code {result.returncode})"
+
+        # Parse output for volume count
+        # Look for "Volumes: 92" or "Volumes: 1" in the output
+        output = result.stdout + result.stderr
+        volume_match = re.search(r"Volumes:\s*(\d+)", output, re.IGNORECASE)
+        if volume_match:
+            return int(volume_match.group(1)), None
+
+        # If no volume count found, assume single volume
+        return 1, None
+
+    except subprocess.TimeoutExpired:
+        return None, "7-Zip list command timed out"
+    except Exception as exc:
+        return None, f"Failed to read RAR volume count: {exc}"
+
+
 def can_extract_archive(
     archive: Path, *, seven_zip_path: Path | None
 ) -> tuple[bool, str | None]:
@@ -412,6 +460,7 @@ def extract_archive(
 __all__ = [
     "detect_archive_format",
     "resolve_seven_zip_command",
+    "get_rar_volume_count",
     "can_extract_archive",
     "extract_archive",
     "fix_file_permissions",

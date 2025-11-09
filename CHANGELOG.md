@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.30] - 2025-01-27
+
+### Added
+- WebGUI for status monitoring and progress tracking (default port 8080)
+- Multi-volume RAR validation: checks if all volumes are present before extraction
+- Status tracking API endpoints (`/api/status`, `/api/health`)
+- Real-time progress updates in WebGUI dashboard
+- CLI options: `--webgui`, `--webgui-port`, `--webgui-host`
+
+### Fixed
+- Multi-volume RAR extraction now properly validates volume count before attempting extraction
+- Prevents "Unsupported Method" errors when volumes are missing
+
+### Changed
+- Added Flask dependency for WebGUI functionality
+- Dockerfile exposes port 8080 for WebGUI access
+
+### Removed
+- Debug scripts: `debug_extraction_issue.py`, `debug_move_issue.py`, `METADATA_INTEGRATION_EXAMPLE.py`
+- Unused imports cleaned up across codebase
+
 ## [1.0.29] - 2025-10-10
 
 ### Fixed

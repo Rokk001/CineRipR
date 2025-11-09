@@ -11,6 +11,8 @@ from .archives import ProcessResult, process_downloads
 from .archive_extraction import resolve_seven_zip_command
 from .cleanup import cleanup_finished
 from .config import ConfigurationError, Paths, Settings, SubfolderPolicy, load_settings
+from .status import get_status_tracker
+from .webgui import run_webgui
 
 DEFAULT_CONFIG = Path("cineripr.toml")
 _LOGGER = logging.getLogger(__name__)
@@ -103,6 +105,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    parser.add_argument(
+        "--webgui",
+        action="store_true",
+        help="Start WebGUI server on port 8080 (default: disabled)",
+    )
+    parser.add_argument(
+        "--webgui-port",
+        type=int,
+        default=8080,
+        help="Port for WebGUI server (default: 8080)",
+    )
+    parser.add_argument(
+        "--webgui-host",
+        type=str,
+        default="0.0.0.0",
+        help="Host for WebGUI server (default: 0.0.0.0)",
     )
     return parser.parse_args(argv)
 
@@ -246,20 +265,93 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif not settings.enable_delete:
         _LOGGER.info("Delete switch disabled: finished cleanup will not remove files.")
 
+    # Start WebGUI if requested
+    webgui_thread = None
+    if args.webgui:
+        import threading
+
+        def start_webgui() -> None:
+            try:
+                run_webgui(host=args.webgui_host, port=args.webgui_port, debug=False)
+            except Exception as exc:
+                _LOGGER.error("WebGUI error: %s", exc)
+
+        webgui_thread = threading.Thread(target=start_webgui, daemon=True)
+        webgui_thread.start()
+        _LOGGER.info(
+            "WebGUI started on http://%s:%d", args.webgui_host, args.webgui_port
+        )
+
+    tracker = get_status_tracker()
+
+    # Set up logging handler to forward logs to status tracker
+    class StatusLogHandler(logging.Handler):
+        """Logging handler that forwards logs to the status tracker."""
+
+        def emit(self, record: logging.LogRecord) -> None:
+            try:
+                level = record.levelname
+                message = self.format(record)
+                tracker.add_log(level, message)
+            except Exception:
+                pass  # Ignore errors in logging handler
+
+    if args.webgui:
+        status_handler = StatusLogHandler()
+        status_handler.setLevel(logging.INFO)
+        logging.getLogger().addHandler(status_handler)
+
     def run_once() -> tuple[int, ProcessResult | None]:
         # Display tool name and version at the start of each loop
         _LOGGER.info("CineRipR %s", __version__)
+        tracker.start_processing()
         try:
+            # Define status callback for process_downloads
+            def status_callback(
+                status: str,
+                message: str,
+                current_archive: str | None,
+                archive_progress: int,
+                archive_total: int,
+            ) -> None:
+                if tracker.get_status().current_release:
+                    tracker.update_release_status(
+                        status=status,
+                        message=message,
+                        current_archive=current_archive,
+                        archive_progress=archive_progress,
+                        archive_total=archive_total,
+                    )
+                else:
+                    # Create a dummy release for status updates
+                    tracker.set_current_release("Processing...")
+                    tracker.update_release_status(
+                        status=status,
+                        message=message,
+                        current_archive=current_archive,
+                        archive_progress=archive_progress,
+                        archive_total=archive_total,
+                    )
+
             result: ProcessResult = process_downloads(
                 settings.paths,
                 demo_mode=settings.demo_mode,
                 seven_zip_path=settings.seven_zip_path,
                 subfolders=settings.subfolders,
                 debug=args.debug,
+                status_callback=status_callback if args.webgui else None,
             )
+            tracker.update_counts(
+                processed=result.processed,
+                failed=len(result.failed),
+                unsupported=len(result.unsupported),
+            )
+            tracker.stop_processing()
             return 0, result
         except RuntimeError as exc:
             _LOGGER.error("Processing error: %s", exc)
+            tracker.add_log("ERROR", f"Processing error: {exc}")
+            tracker.stop_processing()
             return 1, None
 
     _LOGGER.info(
@@ -294,6 +386,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     cleanup_failed = []
                     skipped_cleanup = []
 
+                tracker.update_counts(deleted=len(deleted), cleanup_failed=len(cleanup_failed))
                 _LOGGER.info("Processed archives: %s", result.processed)
                 if settings.demo_mode:
                     _LOGGER.info("Demo mode: all actions were simulated only.")
