@@ -40,6 +40,24 @@ class SystemHealth:
     disk_finished_free_gb: float = 0.0
     disk_finished_percent: float = 0.0
     seven_zip_version: str = "Unknown"
+    cpu_percent: float = 0.0
+    memory_used_gb: float = 0.0
+    memory_total_gb: float = 0.0
+    memory_percent: float = 0.0
+
+
+@dataclass
+class ReleaseHistory:
+    """Historical record of a processed release."""
+
+    release_name: str
+    status: str  # completed, failed
+    processed_archives: int
+    failed_archives: int
+    timestamp: datetime
+    duration_seconds: float = 0.0
+    extracted_files: list[str] = field(default_factory=list)
+    error_messages: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -72,6 +90,7 @@ class GlobalStatus:
     """Global status tracking for the entire application."""
 
     is_running: bool = False
+    is_paused: bool = False
     current_operation: str = "idle"
     processed_count: int = 0
     failed_count: int = 0
@@ -86,11 +105,14 @@ class GlobalStatus:
     queue: list[QueueItem] = field(default_factory=list)
     system_health: SystemHealth = field(default_factory=SystemHealth)
     notifications: list[Notification] = field(default_factory=list)
+    history: list[ReleaseHistory] = field(default_factory=list)
+    theme_preference: str = "dark"  # dark, light, auto
 
     def to_dict(self) -> dict[str, Any]:
         """Convert status to dictionary for JSON serialization."""
         return {
             "is_running": self.is_running,
+            "is_paused": self.is_paused,
             "current_operation": self.current_operation,
             "processed_count": self.processed_count,
             "failed_count": self.failed_count,
@@ -143,6 +165,10 @@ class GlobalStatus:
                 "disk_finished_free_gb": self.system_health.disk_finished_free_gb,
                 "disk_finished_percent": self.system_health.disk_finished_percent,
                 "seven_zip_version": self.system_health.seven_zip_version,
+                "cpu_percent": self.system_health.cpu_percent,
+                "memory_used_gb": self.system_health.memory_used_gb,
+                "memory_total_gb": self.system_health.memory_total_gb,
+                "memory_percent": self.system_health.memory_percent,
             },
             "notifications": [
                 {
@@ -155,6 +181,20 @@ class GlobalStatus:
                 }
                 for notif in self.notifications[-20:]  # Last 20 notifications
             ],
+            "history": [
+                {
+                    "release_name": h.release_name,
+                    "status": h.status,
+                    "processed_archives": h.processed_archives,
+                    "failed_archives": h.failed_archives,
+                    "timestamp": h.timestamp.isoformat(),
+                    "duration_seconds": h.duration_seconds,
+                    "extracted_files": h.extracted_files[:50],  # Limit to 50 files
+                    "error_messages": h.error_messages,
+                }
+                for h in self.history[-50:]  # Last 50 releases
+            ],
+            "theme_preference": self.theme_preference,
         }
 
 
@@ -379,6 +419,21 @@ class StatusTracker:
             if seven_zip_version:
                 self._status.system_health.seven_zip_version = seven_zip_version
 
+            # CPU and Memory monitoring
+            try:
+                import psutil
+                self._status.system_health.cpu_percent = psutil.cpu_percent(interval=0.1)
+                mem = psutil.virtual_memory()
+                self._status.system_health.memory_used_gb = mem.used / (1024**3)
+                self._status.system_health.memory_total_gb = mem.total / (1024**3)
+                self._status.system_health.memory_percent = mem.percent
+            except ImportError:
+                # psutil not available
+                pass
+            except Exception:
+                # Ignore errors in monitoring
+                pass
+
             self._status.last_update = datetime.now()
 
     # Notifications
@@ -412,6 +467,67 @@ class StatusTracker:
         with self._lock:
             return [notif for notif in self._status.notifications if not notif.read]
 
+    # History Management
+    def add_to_history(
+        self,
+        release_name: str,
+        status: str,
+        processed_archives: int,
+        failed_archives: int,
+        duration_seconds: float = 0.0,
+        extracted_files: list[str] | None = None,
+        error_messages: list[str] | None = None,
+    ) -> None:
+        """Add a release to the history."""
+        with self._lock:
+            self._status.history.append(
+                ReleaseHistory(
+                    release_name=release_name,
+                    status=status,
+                    processed_archives=processed_archives,
+                    failed_archives=failed_archives,
+                    timestamp=datetime.now(),
+                    duration_seconds=duration_seconds,
+                    extracted_files=extracted_files or [],
+                    error_messages=error_messages or [],
+                )
+            )
+            # Keep only last 100 releases
+            if len(self._status.history) > 100:
+                self._status.history = self._status.history[-100:]
+            self._status.last_update = datetime.now()
+
+    # Theme Management
+    def set_theme(self, theme: str) -> None:
+        """Set theme preference (dark, light, auto)."""
+        with self._lock:
+            if theme in ("dark", "light", "auto"):
+                self._status.theme_preference = theme
+                self._status.last_update = datetime.now()
+
+    def get_theme(self) -> str:
+        """Get current theme preference."""
+        with self._lock:
+            return self._status.theme_preference
+
+    # Control Commands
+    def pause_processing(self) -> None:
+        """Pause processing (note: actual pause logic must be implemented in CLI)."""
+        with self._lock:
+            self._status.is_paused = True
+            self._status.last_update = datetime.now()
+
+    def resume_processing(self) -> None:
+        """Resume processing."""
+        with self._lock:
+            self._status.is_paused = False
+            self._status.last_update = datetime.now()
+
+    def is_paused(self) -> bool:
+        """Check if processing is paused."""
+        with self._lock:
+            return self._status.is_paused
+
 
 # Global status tracker instance
 _status_tracker = StatusTracker()
@@ -429,6 +545,7 @@ __all__ = [
     "QueueItem",
     "SystemHealth",
     "Notification",
+    "ReleaseHistory",
     "get_status_tracker",
 ]
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 from .status import get_status_tracker
 
@@ -1015,6 +1015,37 @@ def create_app() -> Flask:
         """Mark a notification as read."""
         tracker.mark_notification_read(notif_id)
         return jsonify({"status": "ok"})
+
+    @app.route("/api/theme", methods=["GET", "POST"])
+    def api_theme() -> Any:
+        """Get or set theme preference."""
+        if request.method == "POST":
+            data = request.get_json()
+            theme = data.get("theme", "dark")
+            tracker.set_theme(theme)
+            return jsonify({"status": "ok", "theme": theme})
+        else:
+            return jsonify({"theme": tracker.get_theme()})
+
+    @app.route("/api/control/pause", methods=["POST"])
+    def api_pause() -> Any:
+        """Pause processing."""
+        tracker.pause_processing()
+        tracker.add_notification("info", "Processing Paused", "Processing has been paused by user")
+        return jsonify({"status": "ok"})
+
+    @app.route("/api/control/resume", methods=["POST"])
+    def api_resume() -> Any:
+        """Resume processing."""
+        tracker.resume_processing()
+        tracker.add_notification("info", "Processing Resumed", "Processing has been resumed")
+        return jsonify({"status": "ok"})
+
+    @app.route("/api/history")
+    def api_history() -> Any:
+        """Get processing history."""
+        status = tracker.get_status()
+        return jsonify(status.to_dict().get("history", []))
 
     @app.route("/api/health")
     def api_health() -> Any:
