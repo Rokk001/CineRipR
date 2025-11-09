@@ -1,17 +1,93 @@
-.git
+# Git
+.git/
 .gitignore
+.github/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 *.pyo
 *.pyd
-*.egg-info/
-dist/
-build/
+
+# Virtual environments
 .venv/
-.env
-.env.local
-.cache/
-.tests/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Examples (not needed in container)
+examples/
+
+# Scripts (not needed in container)
+scripts/
+
+# Tests (not needed in production container)
 tests/
-**/.DS_Store
-**/Thumbs.db
+
+# Configuration examples
+*.toml.example
+*.yml
+*.yaml
+docker-compose*.yml
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Build artifacts
+*.whl
+*.tar.gz
+
+# Project-specific
+cineripr.toml

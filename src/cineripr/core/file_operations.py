@@ -8,8 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Sequence
 
-from .archive_detection import is_supported_archive
-from .progress import ProgressTracker
+from ..extraction.archive_detection import is_supported_archive
+from ..progress import ProgressTracker
 
 
 def _set_file_permissions(path: Path) -> None:

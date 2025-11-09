@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
-from .archives import ProcessResult, process_downloads
-from .archive_extraction import resolve_seven_zip_command
-from .cleanup import cleanup_finished
 from .config import ConfigurationError, Paths, Settings, SubfolderPolicy, load_settings
-from .status import get_status_tracker
-from .webgui import run_webgui
+from .core import ProcessResult, cleanup_finished, process_downloads
+from .extraction import resolve_seven_zip_command
+from .web import get_status_tracker, run_webgui
 
 DEFAULT_CONFIG = Path("cineripr.toml")
 _LOGGER = logging.getLogger(__name__)

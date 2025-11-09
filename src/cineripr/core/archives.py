@@ -7,14 +7,14 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from .archive_constants import TV_TAG_RE, SUPPORTED_ARCHIVE_SUFFIXES
-from .archive_detection import (
+from ..extraction.archive_constants import TV_TAG_RE, SUPPORTED_ARCHIVE_SUFFIXES
+from ..extraction.archive_detection import (
     ArchiveGroup,
     split_directory_entries,
     build_archive_groups,
     validate_archive_group,
 )
-from .archive_extraction import (
+from ..extraction.archive_extraction import (
     can_extract_archive,
     extract_archive,
     get_rar_volume_count,
@@ -33,11 +33,11 @@ from .path_utils import (
     normalize_special_subdir,
     looks_like_tv_show,
 )
-from .config import Paths, SubfolderPolicy
+from ..config import Paths, SubfolderPolicy
 from typing import Callable, Optional
 
 # from .cleanup import cleanup_finished  # re-export usage parity
-from .progress import ProgressTracker, format_progress, next_progress_color
+from ..progress import ProgressTracker, format_progress, next_progress_color
 
 
 _logger = logging.getLogger(__name__)

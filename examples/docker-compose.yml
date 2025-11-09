@@ -1,0 +1,101 @@
+# Docker Compose Example for CineRipR
+#
+# This example shows how to run CineRipR in a Docker container with all recommended settings.
+#
+# Usage:
+#   1. Copy this file to your preferred location
+#   2. Adjust the volume paths to match your system
+#   3. Run: docker-compose up -d
+#
+# For more details, see: https://github.com/Rokk001/CineRipR
+
+version: "3.8"
+
+services:
+  cineripr:
+    image: ghcr.io/rokk001/cineripr:latest
+    container_name: cineripr
+    
+    # Network configuration (optional - adjust to your needs)
+    networks:
+      - media_network
+    # Uncomment for static IP:
+    # networks:
+    #   eth0.6:
+    #     ipv4_address: 192.168.6.164
+    
+    # Port mapping for WebGUI
+    ports:
+      - "8080:8080"
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # User and group IDs (adjust to match your system)
+    # Example: user 99 (nobody), group 100 (users) - common for Unraid
+    user: "99:100"
+    
+    # Entrypoint with proper umask
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["umask 000 && exec python -m cineripr.cli --config /config/cineripr.toml"]
+    
+    # Volume mappings
+    volumes:
+      # Download directory (where archives are found)
+      - /path/to/downloads:/data/downloads
+      
+      # Extracted content directory (final destination for extracted files)
+      - /path/to/extracted:/data/extracted
+      
+      # Finished directory (where original archives are moved after processing)
+      - /path/to/finished:/data/finished
+      
+      # Configuration file (read-only)
+      - /path/to/cineripr.toml:/config/cineripr.toml:ro
+    
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "cineripr"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    
+    # Environment variables (optional)
+    environment:
+      # Timezone
+      - TZ=Europe/Berlin
+      
+      # Python buffering (recommended)
+      - PYTHONUNBUFFERED=1
+
+# Networks (optional)
+networks:
+  media_network:
+    driver: bridge
+  # For static IP configuration:
+  # eth0.6:
+  #   external: true
+
+---
+# Alternative: Minimal Configuration
+#
+# If you just want to get started quickly:
+#
+# services:
+#   cineripr:
+#     image: ghcr.io/rokk001/cineripr:latest
+#     ports:
+#       - "8080:8080"
+#     volumes:
+#       - ./downloads:/data/downloads
+#       - ./extracted:/data/extracted
+#       - ./finished:/data/finished
+#       - ./cineripr.toml:/config/cineripr.toml:ro
+

@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 from .archive_constants import UNWANTED_EXTRACTED_SUFFIXES
-from .progress import ProgressTracker
+from ..progress import ProgressTracker
 
 
 def fix_file_permissions(directory: Path) -> None:

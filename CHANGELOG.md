@@ -2,6 +2,130 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2025-11-09
+
+### 🎉 Major Release - Complete Project Modernization
+
+This is a **major restructuring release** that modernizes the entire project structure, improves maintainability, and enhances the development experience. While the core functionality remains unchanged, the codebase has been completely reorganized.
+
+### 📁 Project Structure Overhaul
+
+**New Directory Structure:**
+- `docs/` - Organized documentation (architecture/, development/, operations/, releases/)
+- `examples/` - Configuration examples and Docker Compose templates
+- `scripts/` - Helper scripts for building, testing, and releasing
+- `src/cineripr/` - Modular codebase with clear separation of concerns
+  - `core/` - Business logic (archives, file operations, cleanup)
+  - `extraction/` - Archive detection and extraction
+  - `web/` - WebGUI and status tracking
+- `tests/` - Organized test suite (unit/, integration/)
+
+**Improvements:**
+- ✅ 27 documentation files moved to organized `docs/` structure
+- ✅ All 17 release notes moved to `docs/releases/`
+- ✅ Example files in dedicated `examples/` directory
+- ✅ Build scripts in `scripts/` directory
+- ✅ Source code organized into logical modules
+- ✅ Test suite restructured with unit/ and integration/ separation
+
+### 🔧 Development Improvements
+
+**New Scripts:**
+- `scripts/build-docker.sh` - Automated Docker image building
+- `scripts/run-tests.sh` - Test runner with coverage support
+- `scripts/create-release.sh` - Automated release process
+
+**Enhanced Docker:**
+- `.dockerignore` file for optimized image builds
+- Reduced image size by excluding docs, tests, and examples
+
+**Documentation:**
+- Complete README overhaul with modern design
+- Organized documentation with clear navigation
+- Examples directory with Docker Compose templates
+
+### 🏗️ Code Organization
+
+**Module Structure:**
+- `cineripr.core` - Core business logic
+  - `archives.py` - Main orchestration
+  - `file_operations.py` - File handling
+  - `path_utils.py` - Path utilities
+  - `cleanup.py` - Cleanup logic
+
+- `cineripr.extraction` - Archive handling
+  - `archive_detection.py` - Archive discovery
+  - `archive_extraction.py` - Extraction logic
+  - `archive_constants.py` - Constants and patterns
+
+- `cineripr.web` - WebGUI components
+  - `webgui.py` - Flask application
+  - `status.py` - Status tracking
+
+**Import Updates:**
+- All imports updated to reflect new module structure
+- Cleaner, more maintainable import paths
+- Better separation of concerns
+
+### 📚 Documentation
+
+**New Documentation Structure:**
+- `docs/README.md` - Documentation index
+- `docs/architecture/` - System design documents
+- `docs/development/` - Developer guides
+- `docs/operations/` - Operational guides
+- `docs/releases/` - All release notes
+
+**Enhanced README:**
+- Modern, professional design
+- Feature showcase with tables
+- Quick start guides
+- WebGUI screenshots section
+- Comprehensive troubleshooting
+- Clear contribution guidelines
+
+### 🧪 Testing
+
+**Improved Test Structure:**
+- `tests/unit/` - Unit tests for individual components
+- `tests/integration/` - Integration tests for workflows
+- `tests/conftest.py` - Shared fixtures
+- Better test organization and maintainability
+
+### 🎯 Breaking Changes
+
+**For Developers Only:**
+- Import paths have changed (e.g., `from cineripr.archives` → `from cineripr.core`)
+- Project structure is different (documentation, examples, scripts moved)
+
+**For End Users:**
+- ✅ **NO breaking changes** - All functionality works exactly as before
+- ✅ Configuration files unchanged
+- ✅ CLI interface unchanged
+- ✅ Docker images fully compatible
+- ✅ WebGUI unchanged
+
+### 📦 What's Unchanged
+
+- Core functionality
+- Configuration format
+- CLI interface
+- WebGUI features
+- Docker deployment
+- Archive processing logic
+
+### 🔗 Migration Guide
+
+**Developers:**
+- Update imports to new module structure
+- Check [Architecture Overview](docs/architecture/overview.md) for new structure
+- See [Contributing Guide](docs/development/contributing.md) for development setup
+
+**Users:**
+- No changes required!
+- Simply pull the new Docker image or update via pip
+- All existing configurations work without modification
+
 ## [1.0.37] - 2025-11-09
 
 ### Fixed

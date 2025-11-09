@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 import os
 
-from .archive_constants import (
+from ..extraction.archive_constants import (
     TV_CATEGORY,
     MOVIES_CATEGORY,
     TV_TAG_RE,
