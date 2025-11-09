@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.2] - 2025-11-10
+
+### 🐛 Critical Fix
+
+- **Countdown Missing After Fresh Install:** Fixed settings loading to use `DEFAULT_SETTINGS` properly
+  - Vorher: `db.get()` ohne Default → `repeat_after_minutes = 0` → Countdown nie gesetzt
+  - Jetzt: `db.load_all_settings()` verwendet `DEFAULT_SETTINGS` automatisch
+  - Countdown ist jetzt **IMMER** sichtbar (auch nach Fresh Install ohne DB-Einträge)
+  - Alle WebGUI-Settings verwenden jetzt korrekte Defaults (30min, 15d, etc.)
+
+### 🔧 Technical Details
+
+- `cli.py`: Refactored settings loading to use `db.load_all_settings()` instead of individual `db.get()` calls
+- Ensures all settings have proper defaults from `DEFAULT_SETTINGS` when DB is fresh/empty
+- Simplified code: 54 lines → 31 lines
+
 ## [2.4.1] - 2025-11-10
 
 ### 🐛 Critical Bug Fixes

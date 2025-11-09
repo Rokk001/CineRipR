@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.4.1)
+## Aktueller Stand (Version 2.4.2)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -13,6 +13,7 @@
 8. **"Run Now" Crash (v2.4.1)**: Container crasht nicht mehr bei "Run Now" Button
 9. **Progressbar Live-Updates (v2.4.1)**: Extraction Progress wird in Echtzeit aktualisiert
 10. **System Health (v2.4.1)**: CPU/Memory werden jetzt immer korrekt angezeigt
+11. **Countdown Missing After Fresh Install (v2.4.2)**: DEFAULT_SETTINGS werden jetzt korrekt geladen - Countdown ist immer sichtbar
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`

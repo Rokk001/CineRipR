@@ -229,58 +229,36 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     # Step 5: Load WebGUI settings from SQLite database (NEW in v2.3.0)
     # These override TOML/CLI settings (HIGHEST PRIORITY)
     try:
-        from .web.settings_db import get_settings_db
+        from .web.settings_db import get_settings_db, DEFAULT_SETTINGS
 
         db = get_settings_db()
+        
+        # Load all settings with defaults applied automatically
+        # This ensures DEFAULT_SETTINGS are used if DB values don't exist
+        db_settings = db.load_all_settings()
 
-        # Override with WebGUI settings if they exist
-        repeat_forever_db = db.get("repeat_forever")
-        if repeat_forever_db is not None:
-            repeat_forever = bool(repeat_forever_db)
+        # Override with WebGUI settings (with defaults already applied)
+        repeat_forever = bool(db_settings.get("repeat_forever", repeat_forever))
+        repeat_after_minutes = int(db_settings.get("repeat_after_minutes", 30))
+        
+        # Ensure minimum delay of 1 minute to prevent infinite loops
+        if repeat_after_minutes < 1:
+            _LOGGER.warning("repeat_after_minutes must be >= 1, setting to 1")
+            repeat_after_minutes = 1
 
-        repeat_after_minutes_db = db.get("repeat_after_minutes")
-        if repeat_after_minutes_db is not None:
-            repeat_after_minutes = int(repeat_after_minutes_db)
-            # Ensure minimum delay of 1 minute to prevent infinite loops
-            if repeat_after_minutes < 1:
-                _LOGGER.warning("repeat_after_minutes must be >= 1, setting to 1")
-                repeat_after_minutes = 1
+        retention_days = int(db_settings.get("finished_retention_days", retention_days))
+        enable_delete = bool(db_settings.get("enable_delete", enable_delete))
+        demo_mode = bool(db_settings.get("demo_mode", demo_mode))
 
-        retention_days_db = db.get("finished_retention_days")
-        if retention_days_db is not None:
-            retention_days = int(retention_days_db)
-
-        enable_delete_db = db.get("enable_delete")
-        if enable_delete_db is not None:
-            enable_delete = bool(enable_delete_db)
-
-        include_sample_db = db.get("include_sample")
-        if include_sample_db is not None:
-            subfolders = SubfolderPolicy(
-                include_sample=bool(include_sample_db),
-                include_sub=subfolders.include_sub,
-                include_other=subfolders.include_other,
-            )
-
-        include_sub_db = db.get("include_sub")
-        if include_sub_db is not None:
-            subfolders = SubfolderPolicy(
-                include_sample=subfolders.include_sample,
-                include_sub=bool(include_sub_db),
-                include_other=subfolders.include_other,
-            )
-
-        include_other_db = db.get("include_other")
-        if include_other_db is not None:
-            subfolders = SubfolderPolicy(
-                include_sample=subfolders.include_sample,
-                include_sub=subfolders.include_sub,
-                include_other=bool(include_other_db),
-            )
-
-        demo_mode_db = db.get("demo_mode")
-        if demo_mode_db is not None:
-            demo_mode = bool(demo_mode_db)
+        # Subfolders
+        include_sample = bool(db_settings.get("include_sample", subfolders.include_sample))
+        include_sub = bool(db_settings.get("include_sub", subfolders.include_sub))
+        include_other = bool(db_settings.get("include_other", subfolders.include_other))
+        subfolders = SubfolderPolicy(
+            include_sample=include_sample,
+            include_sub=include_sub,
+            include_other=include_other,
+        )
     except Exception as e:
         # If database is not available, fall back to TOML/CLI settings
         _LOGGER.debug(f"Could not load WebGUI settings: {e}")

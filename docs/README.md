@@ -29,7 +29,8 @@ Deployment and operational guides.
 Detailed release notes for all versions.
 
 - **[All Release Notes](releases/)** - Chronological list of all releases
-- **[Latest: v2.4.1](releases/v2.4.1.md)** - Most recent release (Critical Bug Fixes)
+- **[Latest: v2.4.2](releases/v2.4.2.md)** - Most recent release (Critical Countdown Fix)
+- [v2.4.1](releases/v2.4.1.md) - Critical Bug Fixes
 
 ## 🔗 Quick Links
 
