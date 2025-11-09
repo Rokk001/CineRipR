@@ -908,11 +908,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.webgui:
             try:
                 from .web.settings_db import get_settings_db
+
                 db = get_settings_db()
-                repeat_forever_check = bool(db.get("repeat_forever", settings.repeat_forever))
+                repeat_forever_check = bool(
+                    db.get("repeat_forever", settings.repeat_forever)
+                )
             except Exception:
                 pass
-        
+
         if not repeat_forever_check:
             # If WebGUI is running, keep the main thread alive
             if args.webgui and webgui_thread and webgui_thread.is_alive():
@@ -933,23 +936,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.webgui:
             try:
                 from .web.settings_db import get_settings_db
+
                 db = get_settings_db()
                 # Read fresh from DB
                 db_repeat_forever = db.get("repeat_forever", settings.repeat_forever)
-                db_repeat_after_minutes = db.get("repeat_after_minutes", settings.repeat_after_minutes)
-                
+                db_repeat_after_minutes = db.get(
+                    "repeat_after_minutes", settings.repeat_after_minutes
+                )
+
                 # Update settings object for this iteration
                 settings.repeat_forever = bool(db_repeat_forever)
                 settings.repeat_after_minutes = int(db_repeat_after_minutes)
-                
+
                 # Use DB value for delay
                 delay = max(1, int(db_repeat_after_minutes))
-                
+
                 # Update tracker with DB values
                 tracker.set_repeat_mode(settings.repeat_forever)
             except Exception as e:
                 _LOGGER.debug(f"Failed to read settings from DB in loop: {e}")
-        
+
         if delay < 1:
             _LOGGER.warning("Delay must be >= 1 minute, using 1 minute")
             delay = 1
@@ -965,6 +971,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             # Sleep with live countdown updates
             end_time = time.time() + (delay * 60)
             last_system_health_update = 0
+            last_settings_check = 0
 
             while time.time() < end_time:
                 # Check for manual trigger (NEW in v2.1.0)
@@ -972,6 +979,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                     _LOGGER.info("⚡ Manual trigger received - starting run now!")
                     tracker.add_log("INFO", "Manual trigger - starting immediately")
                     break
+
+                # Check if settings changed during sleep (FIX v2.5.5)
+                # This ensures WebGUI changes are immediately reflected
+                if args.webgui and time.time() - last_settings_check >= 5:
+                    try:
+                        from .web.settings_db import get_settings_db
+                        db = get_settings_db()
+                        db_repeat_forever = db.get("repeat_forever", settings.repeat_forever)
+                        db_repeat_after_minutes = db.get("repeat_after_minutes", settings.repeat_after_minutes)
+                        
+                        # If settings changed, update tracker and recalculate end_time
+                        if db_repeat_after_minutes != delay:
+                            _LOGGER.info(f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes")
+                            settings.repeat_after_minutes = int(db_repeat_after_minutes)
+                            delay = max(1, int(db_repeat_after_minutes))
+                            tracker.set_repeat_mode(bool(db_repeat_forever))
+                            tracker.set_next_run(delay)
+                            # Recalculate end_time with new delay
+                            end_time = time.time() + (delay * 60)
+                            _LOGGER.info(f"💤 Next run rescheduled in %s minute(s)...", delay)
+                    except Exception as e:
+                        _LOGGER.debug(f"Failed to check settings during sleep: {e}")
+                    last_settings_check = time.time()
 
                 remaining = end_time - time.time()
 
