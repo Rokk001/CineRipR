@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template_string, request
 
+from .settings_db import get_settings_db
 from .status import get_status_tracker
 
 _LOGGER = logging.getLogger(__name__)
@@ -977,6 +978,46 @@ def get_html_template() -> str:
             color: #fbbf24;
         }
         
+        /* Next Run Display (NEW in v2.1.0) */
+        .next-run-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+        }
+        
+        .countdown-time {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--accent-color);
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+            letter-spacing: 0.05em;
+        }
+        
+        .countdown-time.pulse {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+        
+        .countdown-text {
+            font-size: 1.1em;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        .control-btn.trigger {
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+            color: white;
+            margin-top: 10px;
+            width: 200px;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .header {
@@ -1104,6 +1145,18 @@ def get_html_template() -> str:
                             Waiting for files...
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Next Run Countdown (NEW in v2.1.0) -->
+            <div class="card" id="next-run-card" style="display: none;">
+                <h2>⏰ Next Run</h2>
+                <div class="next-run-display">
+                    <div class="countdown-time" id="next-run-countdown">--:--:--</div>
+                    <div class="countdown-text" id="next-run-text">Calculating...</div>
+                    <button class="control-btn trigger" onclick="triggerRunNow()">
+                        <span>⏭️</span> Run Now
+                    </button>
                 </div>
             </div>
             
@@ -1540,6 +1593,23 @@ def get_html_template() -> str:
                 });
         }
         
+        // NEW in v2.1.0: Trigger run now
+        function triggerRunNow() {
+            if (confirm('⚠️ Start processing now and skip wait?')) {
+                fetch('/api/control/trigger-now', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        showToast('success', 'Run Triggered', 'Starting processing now...', true);
+                        // Hide countdown immediately
+                        document.getElementById('next-run-card').style.display = 'none';
+                    })
+                    .catch(err => {
+                        showToast('error', 'Error', 'Failed to trigger run');
+                        console.error('Trigger error:', err);
+                    });
+            }
+        }
+        
         // Theme toggle
         let currentTheme = 'dark';
         
@@ -1770,6 +1840,47 @@ def get_html_template() -> str:
                         document.getElementById('last-update').textContent = new Date(data.last_update).toLocaleString('de-DE');
                     }
                     
+                    // Next Run Countdown (NEW in v2.1.0)
+                    const nextRunCard = document.getElementById('next-run-card');
+                    if (data.repeat_mode && data.seconds_until_next_run !== null && !isRunning) {
+                        const seconds = data.seconds_until_next_run;
+                        
+                        if (seconds > 0) {
+                            nextRunCard.style.display = 'block';
+                            
+                            const hours = Math.floor(seconds / 3600);
+                            const minutes = Math.floor((seconds % 3600) / 60);
+                            const secs = seconds % 60;
+                            
+                            const timeStr = hours > 0 
+                                ? `${hours}h ${minutes}m ${secs}s`
+                                : minutes > 0
+                                    ? `${minutes}m ${secs}s`
+                                    : `${secs}s`;
+                            
+                            document.getElementById('next-run-countdown').textContent = timeStr;
+                            
+                            if (data.next_run_time) {
+                                const nextRunDate = new Date(data.next_run_time);
+                                document.getElementById('next-run-text').textContent = 
+                                    `at ${nextRunDate.toLocaleTimeString('de-DE')}`;
+                            }
+                            
+                            const countdownEl = document.getElementById('next-run-countdown');
+                            if (seconds < 60) {
+                                countdownEl.classList.add('pulse');
+                            } else {
+                                countdownEl.classList.remove('pulse');
+                            }
+                        } else if (seconds === 0) {
+                            nextRunCard.style.display = 'block';
+                            document.getElementById('next-run-countdown').textContent = 'Starting now...';
+                            document.getElementById('next-run-text').textContent = '';
+                        }
+                    } else {
+                        nextRunCard.style.display = 'none';
+                    }
+                    
                     previousStatus = data;
                 })
                 .catch(err => console.error('Error:', err));
@@ -1798,7 +1909,7 @@ def get_html_template() -> str:
         
         // Initial load and auto-refresh
         updateStatus();
-        setInterval(updateStatus, 2000);
+        setInterval(updateStatus, 1000); // Updated to 1s for live countdown (v2.1.0)
     </script>
 </body>
 </html>'''
@@ -1867,6 +1978,124 @@ def create_app() -> Flask:
     def api_health() -> Any:
         """Health check endpoint."""
         return jsonify({"status": "ok", "service": "cineripr-webgui"})
+
+    # NEW API Endpoints for v2.1.0
+
+    @app.route("/api/settings", methods=["GET"])
+    def api_settings_get_all() -> Any:
+        """Get all settings."""
+        db = get_settings_db()
+        return jsonify(db.get_all())
+
+    @app.route("/api/settings/<key>", methods=["GET", "POST"])
+    def api_settings_item(key: str) -> Any:
+        """Get or update a specific setting."""
+        db = get_settings_db()
+
+        if request.method == "GET":
+            value = db.get(key)
+            return jsonify({"key": key, "value": value})
+
+        elif request.method == "POST":
+            data = request.get_json()
+            if not data or "value" not in data:
+                return jsonify({"error": "Missing 'value' in request body"}), 400
+            db.set(key, data["value"])
+            tracker.add_notification("success", "Setting Updated", f"'{key}' has been updated")
+            return jsonify({"status": "saved", "key": key, "value": data["value"]})
+
+        return jsonify({"error": "Method not allowed"}), 405
+
+    @app.route("/api/settings/performance", methods=["GET", "POST"])
+    def api_settings_performance() -> Any:
+        """Get or update performance settings."""
+        db = get_settings_db()
+
+        if request.method == "GET":
+            return jsonify({
+                "parallel_extractions": db.get("parallel_extractions", 1),
+                "cpu_cores_per_extraction": db.get("cpu_cores_per_extraction", 2),
+                "auto_detect_hardware": db.get("auto_detect_hardware", True),
+                "max_ram_usage_percent": db.get("max_ram_usage_percent", 75),
+                "min_free_ram_gb": db.get("min_free_ram_gb", 4.0),
+                "ssd_only_parallel": db.get("ssd_only_parallel", True),
+            })
+
+        elif request.method == "POST":
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+
+            # Update performance settings
+            for key in [
+                "parallel_extractions",
+                "cpu_cores_per_extraction",
+                "auto_detect_hardware",
+                "max_ram_usage_percent",
+                "min_free_ram_gb",
+                "ssd_only_parallel",
+            ]:
+                if key in data:
+                    db.set(key, data[key])
+
+            tracker.add_notification("success", "Performance Settings Updated", "Settings will apply on next run")
+            return jsonify({"status": "saved"})
+
+        return jsonify({"error": "Method not allowed"}), 405
+
+    @app.route("/api/control/trigger-now", methods=["POST"])
+    def api_trigger_now() -> Any:
+        """Skip sleep and trigger next run immediately."""
+        tracker.trigger_run_now()
+        tracker.add_notification("info", "Manual Trigger", "Starting next run immediately...")
+        return jsonify({"status": "triggered"})
+
+    @app.route("/api/system/hardware", methods=["GET"])
+    def api_system_hardware() -> Any:
+        """Get hardware information."""
+        try:
+            import psutil
+
+            # Detect disk type (simplified - returns unknown on Windows)
+            disk_type = "unknown"
+            try:
+                # This would need platform-specific logic
+                # For now, we'll just return unknown
+                disk_type = "SSD"  # TODO: Implement proper detection
+            except Exception:
+                pass
+
+            return jsonify({
+                "cpu_count": psutil.cpu_count(),
+                "ram_total_gb": round(psutil.virtual_memory().total / (1024**3), 1),
+                "ram_available_gb": round(psutil.virtual_memory().available / (1024**3), 1),
+                "disk_type": disk_type,
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/setup/wizard", methods=["POST"])
+    def api_setup_wizard() -> Any:
+        """Complete setup wizard."""
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        profile = data.get("profile", "conservative")
+        db = get_settings_db()
+
+        if profile == "power":
+            db.set("parallel_extractions", 2)
+            db.set("repeat_after_minutes", 15)
+            db.set("finished_retention_days", 14)
+            db.set("enable_delete", True)
+            db.set("include_other", True)
+        # conservative profile uses DEFAULT_SETTINGS
+
+        db.mark_initialized()
+        tracker.add_notification("success", "Setup Complete", f"Profile '{profile}' has been applied")
+
+        return jsonify({"status": "completed", "profile": profile})
 
     return app
 

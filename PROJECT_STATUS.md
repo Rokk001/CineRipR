@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.0.0)
+## Aktueller Stand (Version 2.1.0)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -204,3 +204,114 @@ Finished/
 - **FINISHED_PATH_LOGIC.md**: Dokumentation der finished-Pfad-Logik
 - **.gitmessage**: Template für sichere Commits
 - **CHANGELOG.md**: Vollständige Änderungshistorie
+
+---
+
+## Session Notes - Version 2.1.0 (2025-11-10)
+
+### 🎯 Implementierte Features
+
+#### 1. ⏰ Next Run Countdown
+- **Live countdown** im WebGUI mit sekündlichen Updates
+- **Formatierte Zeitanzeige** (Stunden, Minuten, Sekunden)
+- **Absolute Zeitanzeige** (z.B. "at 14:35:00")
+- **Pulsing Animation** bei < 1 Minute verbleibend
+- **Automatisches Ausblenden** während Processing
+
+#### 2. 🎮 "Run Now" Button
+- **Manueller Trigger** zum sofortigen Start
+- **Bestätigungsdialog** vor Ausführung
+- **Toast Notifications** für Feedback
+- **Sofortiges Ausblenden** des Countdowns nach Trigger
+- **Logging** als "Manual trigger" in Logs
+
+#### 3. ⚙️ WebGUI Settings Management
+- **SQLite-basierte Persistenz** (`/config/cineripr_settings.db`)
+- **RESTful API** für Settings-Management
+- **Echtzeit-Updates** ohne Container-Neustart
+- **Input-Validierung** mit Fehlerbehandlung
+- **Kategorisierte Settings** (Scheduling, Retention, Performance, etc.)
+
+#### 4. 📊 API Endpoints (Neu)
+- `GET /api/settings` - Alle Settings abrufen
+- `GET/POST /api/settings/<key>` - Einzelnes Setting abrufen/setzen
+- `GET/POST /api/settings/performance` - Performance-Settings
+- `POST /api/control/trigger-now` - Manueller Trigger
+- `GET /api/system/hardware` - Hardware-Erkennung
+- `POST /api/setup/wizard` - Setup-Wizard (vorbereitet)
+
+### 🔧 Geänderte Module
+
+#### Neu erstellt:
+- **`src/cineripr/web/settings_db.py`** - Settings-Persistenz mit SQLite
+  - `SettingsDB` Klasse mit thread-sicheren Operationen
+  - `DEFAULT_SETTINGS` Konstante mit allen Standardwerten
+  - Metadaten-Tabelle für first-run-Detection
+
+#### Erweitert:
+- **`src/cineripr/web/status.py`**:
+  - `GlobalStatus.next_run_time` - Nächster Run-Zeitpunkt
+  - `GlobalStatus.repeat_mode` - Repeat-Modus Status
+  - `GlobalStatus.repeat_interval_minutes` - Configured interval
+  - `GlobalStatus.get_seconds_until_next_run()` - Verbleibende Zeit
+  - `StatusTracker.set_next_run(minutes)` - Nächsten Run setzen
+  - `StatusTracker.clear_next_run()` - Next Run löschen
+  - `StatusTracker.set_repeat_mode(enabled)` - Repeat-Modus setzen
+  - `StatusTracker.trigger_run_now()` - Manuellen Trigger anfordern
+  - `StatusTracker.should_trigger_now()` - Trigger-Status prüfen
+
+- **`src/cineripr/web/webgui.py`**:
+  - **HTML**: Next Run Card mit Countdown-Display
+  - **CSS**: Countdown-Styling mit Pulsing-Animation
+  - **JavaScript**: 
+    - `updateStatus()` erweitert mit Countdown-Logik
+    - `triggerRunNow()` Funktion für manuellen Trigger
+    - Update-Intervall: 2s → 1s (für Live-Countdown)
+  - **API**: 6 neue Endpoints für Settings & Control
+
+- **`src/cineripr/cli.py`**:
+  - **Sleep-Loop**: Live Countdown mit 1-Sekunden-Updates
+  - **Manual Trigger Check**: `tracker.should_trigger_now()` in Sleep-Loop
+  - **Next Run Management**: `set_next_run()` / `clear_next_run()` Calls
+  - **Repeat Mode**: `set_repeat_mode()` beim Start
+  - **Logging**: Verbesserte Logging-Messages mit Emojis
+
+### 📊 Default Settings Änderungen
+
+| Setting | Alt | Neu | Begründung |
+|---------|-----|-----|------------|
+| `repeat_forever` | `false` | `true` | Docker-User erwarten Auto-Run |
+| `repeat_after_minutes` | `0` | `30` | Sinnvolles Standard-Intervall |
+| `finished_retention_days` | - | `15` | User-Präferenz |
+
+### 📚 Dokumentation
+
+**Aktualisiert:**
+- `CHANGELOG.md` - Version 2.1.0 Entry
+- `docs/README.md` - Latest version → v2.1.0
+- `PROJECT_STATUS.md` - Session Notes hinzugefügt
+- `pyproject.toml` - Version → 2.1.0
+
+**Neu erstellt:**
+- `docs/releases/v2.1.0.md` - Vollständige Release Notes
+
+### 🚀 Deployment
+
+- **Docker Image**: `ghcr.io/rokk001/cineripr:2.1.0`
+- **Git Tag**: `v2.1.0`
+- **Persistence**: `/config` Volume für Settings-DB erforderlich
+
+### 📝 Hinweise
+
+- **Parallel Extraction**: Infrastruktur vorbereitet, aber noch nicht aktiviert
+  - Settings vorhanden: `parallel_extractions`, `cpu_cores_per_extraction`
+  - API-Endpoints vorhanden: `/api/settings/performance`
+  - Implementierung: Für v2.2.0 geplant
+
+- **Settings UI**: API vorhanden, UI-Tab für v2.2.0 geplant
+
+- **TOML Migration**: Automatisch beim ersten Start
+  - `cineripr.toml` bleibt als Fallback unterstützt
+  - WebGUI Settings haben Vorrang
+
+- **Backward Compatibility**: Vollständig kompatibel mit v2.0.x

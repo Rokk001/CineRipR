@@ -6,7 +6,7 @@ import os
 import shutil
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -107,6 +107,22 @@ class GlobalStatus:
     notifications: list[Notification] = field(default_factory=list)
     history: list[ReleaseHistory] = field(default_factory=list)
     theme_preference: str = "dark"  # dark, light, auto
+    # Next run tracking (NEW in v2.1.0)
+    next_run_time: datetime | None = None
+    repeat_mode: bool = False
+    repeat_interval_minutes: int = 0
+
+    def get_seconds_until_next_run(self) -> int | None:
+        """Calculate seconds until next run."""
+        if not self.next_run_time:
+            return None
+
+        now = datetime.now()
+        if now >= self.next_run_time:
+            return 0
+
+        delta = self.next_run_time - now
+        return int(delta.total_seconds())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert status to dictionary for JSON serialization."""
@@ -195,6 +211,11 @@ class GlobalStatus:
                 for h in self.history[-50:]  # Last 50 releases
             ],
             "theme_preference": self.theme_preference,
+            # Next run tracking (NEW in v2.1.0)
+            "next_run_time": self.next_run_time.isoformat() if self.next_run_time else None,
+            "seconds_until_next_run": self.get_seconds_until_next_run(),
+            "repeat_mode": self.repeat_mode,
+            "repeat_interval_minutes": self.repeat_interval_minutes,
         }
 
 
@@ -527,6 +548,38 @@ class StatusTracker:
         """Check if processing is paused."""
         with self._lock:
             return self._status.is_paused
+
+    def set_next_run(self, minutes: int) -> None:
+        """Set the next run time."""
+        with self._lock:
+            self._status.next_run_time = datetime.now() + timedelta(minutes=minutes)
+            self._status.repeat_interval_minutes = minutes
+            self._status.last_update = datetime.now()
+
+    def clear_next_run(self) -> None:
+        """Clear next run time."""
+        with self._lock:
+            self._status.next_run_time = None
+            self._status.last_update = datetime.now()
+
+    def set_repeat_mode(self, enabled: bool) -> None:
+        """Set repeat mode."""
+        with self._lock:
+            self._status.repeat_mode = enabled
+            self._status.last_update = datetime.now()
+
+    def trigger_run_now(self) -> None:
+        """Trigger immediate run (skip sleep)."""
+        with self._lock:
+            self._trigger_now = True
+            self.clear_next_run()
+
+    def should_trigger_now(self) -> bool:
+        """Check if manual trigger was requested."""
+        with self._lock:
+            triggered = getattr(self, "_trigger_now", False)
+            self._trigger_now = False
+            return triggered
 
 
 # Global status tracker instance

@@ -301,6 +301,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     tracker = get_status_tracker()
 
+    # Set repeat mode in tracker (NEW in v2.1.0)
+    tracker.set_repeat_mode(settings.repeat_forever)
+
     # Set up logging handler to forward logs to status tracker
     class StatusLogHandler(logging.Handler):
         """Logging handler that forwards logs to the status tracker."""
@@ -518,10 +521,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             import time
 
-            _LOGGER.info("Sleeping for %s minute(s) before next run...", delay)
-            time.sleep(delay * 60)
+            # Set next run time in tracker (NEW in v2.1.0)
+            tracker.set_next_run(delay)
+
+            _LOGGER.info("💤 Next run scheduled in %s minute(s)...", delay)
+            tracker.add_log("INFO", f"Next run in {delay} minute(s)")
+
+            # Sleep with live countdown updates
+            end_time = time.time() + (delay * 60)
+
+            while time.time() < end_time:
+                # Check for manual trigger (NEW in v2.1.0)
+                if tracker.should_trigger_now():
+                    _LOGGER.info("⚡ Manual trigger received - starting run now!")
+                    tracker.add_log("INFO", "Manual trigger - starting immediately")
+                    break
+
+                remaining = end_time - time.time()
+
+                # Log every minute
+                if int(remaining) % 60 == 0 and remaining > 0:
+                    mins_left = int(remaining / 60)
+                    if mins_left > 0:
+                        _LOGGER.info(f"⏳ {mins_left} minute(s) until next run...")
+
+                # Sleep in 1-second chunks to allow interruption
+                time.sleep(1)
+
+            # Clear next run time
+            tracker.clear_next_run()
+            _LOGGER.info("⏰ Starting next run now!")
+
         except KeyboardInterrupt:
             _LOGGER.info("Interrupted during sleep; exiting.")
+            tracker.clear_next_run()
             break
 
     return exit_code

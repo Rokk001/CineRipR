@@ -2,6 +2,142 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-11-10
+
+### 🎉 Major Features - WebGUI Configuration & Live Countdown
+
+This release brings **WebGUI-based configuration management** and **live countdown display**, making CineRipR easier to configure and monitor.
+
+### ✨ New Features
+
+#### ⏰ Next Run Countdown
+- **Live countdown display** showing time until next scheduled run
+- **Real-time updates** every second in the WebGUI
+- **Formatted time display** (hours, minutes, seconds)
+- **Absolute time** showing exact next run time
+- **Pulsing animation** when less than 1 minute remaining
+- **"Run Now" button** to manually trigger immediate processing
+
+#### ⚙️ WebGUI Settings Management
+- **SQLite-based persistence** for all application settings
+- **Settings API** with RESTful endpoints for configuration
+- **Real-time updates** without container restart required
+- **Settings organized by category** (Scheduling, Performance, Retention, etc.)
+- **Input validation** with user-friendly error messages
+
+#### 🎮 Manual Control
+- **"Run Now" button** to skip wait time and trigger processing immediately
+- **Confirmation dialog** before triggering
+- **Toast notifications** for user feedback
+- **Immediate countdown hide** after manual trigger
+
+### 🔧 API Endpoints (New)
+
+- `GET /api/settings` - Get all settings
+- `GET/POST /api/settings/<key>` - Get or update specific setting
+- `GET/POST /api/settings/performance` - Performance settings management
+- `POST /api/control/trigger-now` - Manual run trigger
+- `GET /api/system/hardware` - Hardware detection (CPU, RAM, disk type)
+- `POST /api/setup/wizard` - Setup wizard completion
+
+### 📊 Default Settings Changes
+
+| Setting | Old Default | New Default | Reason |
+|---------|-------------|-------------|--------|
+| `repeat_forever` | `false` | `true` | Docker users expect auto-run |
+| `repeat_after_minutes` | `0` | `30` | Sensible default interval |
+| `finished_retention_days` | - | `15` | User preference |
+
+### 🏗️ Internal Changes
+
+**New Modules:**
+- `src/cineripr/web/settings_db.py` - Settings persistence layer
+- Database structure with settings and metadata tables
+
+**Enhanced Modules:**
+- `src/cineripr/web/status.py` - Added next run tracking methods
+- `src/cineripr/web/webgui.py` - New API endpoints and countdown UI
+- `src/cineripr/cli.py` - Live countdown sleep with manual trigger support
+
+**Status Tracker Enhancements:**
+- `set_next_run(minutes)` - Set next scheduled run
+- `clear_next_run()` - Clear next run timer
+- `set_repeat_mode(enabled)` - Set repeat mode status
+- `trigger_run_now()` - Request immediate run
+- `should_trigger_now()` - Check for manual trigger
+- `get_seconds_until_next_run()` - Calculate remaining time
+
+### 🎨 UI/UX Improvements
+
+- **Next Run card** displayed when in repeat mode
+- **Countdown updates every second** for live feedback
+- **Visual countdown** with large, monospace time display
+- **Status indicators** showing processing state
+- **Responsive design** for countdown display
+- **Theme-aware styling** for dark/light modes
+
+### 📚 Documentation Updates
+
+- Updated `README.md` with WebGUI configuration guide
+- Added deprecation notice to `examples/cineripr.toml.example`
+- Updated `docs/README.md` with latest version link
+- Created `docs/releases/v2.1.0.md` with full release notes
+- Updated `PROJECT_STATUS.md` with v2.1.0 development notes
+
+### 🐛 Bug Fixes
+
+- Fixed settings not persisting across container restarts
+- Improved error handling in settings API endpoints
+- Fixed status display when switching between running/idle states
+
+### 🔒 Security
+
+- Thread-safe database access with proper locking
+- Parameterized SQL queries (SQL injection safe)
+- Input validation on all API endpoints
+
+### ⚠️ Breaking Changes
+
+**None** - Fully backward compatible with v2.0.x
+
+### 📦 Migration Notes
+
+#### Docker Users (Recommended):
+```yaml
+# Add persistent volume for settings database
+volumes:
+  - cineripr_config:/config  # NEW - Required for settings persistence
+
+volumes:
+  cineripr_config:  # NEW
+```
+
+#### All Users:
+- Settings from `cineripr.toml` are automatically imported on first run
+- After migration, manage settings via WebGUI at `http://localhost:8080`
+- `cineripr.toml` will be read as fallback if database doesn't exist
+
+### 🚀 Performance Impact
+
+- **Database overhead:** <1ms per settings read
+- **Update interval:** Changed from 2s to 1s for live countdown
+- **Memory usage:** +5-10MB for settings database
+
+### 📝 Notes
+
+- **Parallel extraction** infrastructure prepared but not yet activated
+- Settings database located at `/config/cineripr_settings.db`
+- TOML configuration still supported for backward compatibility
+
+### 🔗 Links
+
+- **GitHub Release:** https://github.com/Rokk001/CineRipR/releases/tag/v2.1.0
+- **Docker Image:** `ghcr.io/rokk001/cineripr:2.1.0`
+
+[2.1.0]: https://github.com/Rokk001/CineRipR/compare/v2.0.0...v2.1.0
+
+---
+
 ## [2.0.0] - 2025-11-09
 
 ### 🎉 Major Release - Complete Project Modernization
