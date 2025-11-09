@@ -5,11 +5,15 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from ..extraction.archive_detection import is_supported_archive
 from ..progress import ProgressTracker
+
+if TYPE_CHECKING:
+    from ..web.settings_db import SettingsDB
 
 
 def _set_file_permissions(path: Path) -> None:
@@ -290,7 +294,7 @@ def flatten_new_top_level_dirs(target_dir: Path, previous_names: set[str]) -> No
     except OSError:
         return
 
-    from .archive_constants import EPISODE_ONLY_TAG_RE
+    from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
 
     # Prefer newly created directories, but also flatten episode-named folders that may already exist
     candidates = set()
@@ -335,7 +339,7 @@ def flatten_episode_like_dirs(target_dir: Path) -> None:
     directly contains at least one video file. Moves files up and removes the
     directory if it becomes empty.
     """
-    from .archive_constants import EPISODE_ONLY_TAG_RE
+    from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
 
     try:
         top = list(target_dir.iterdir())
@@ -569,6 +573,63 @@ def move_extracted_to_finished(
         pass
 
 
+def is_file_complete(file_path: Path, db: "SettingsDB", stability_hours: int = 24) -> bool:
+    """Check if a file is complete by comparing with previous run.
+    
+    This function checks if a file is completely downloaded by:
+    1. Comparing file size with previous run (stored in DB)
+    2. Checking if file hasn't been modified recently (stability_hours)
+    
+    Works for all file types.
+    
+    Args:
+        file_path: Path to the file to check
+        db: SettingsDB instance for storing/retrieving file status
+        stability_hours: Hours file must be unchanged to be considered complete (default: 24)
+    
+    Returns:
+        True if file appears to be complete, False if still downloading
+    """
+    if not file_path.exists() or not file_path.is_file():
+        return False
+    
+    try:
+        stat = file_path.stat()
+        current_size = stat.st_size
+        current_mtime = stat.st_mtime
+        
+        # Get previous status from DB
+        prev_status = db.get_file_status(str(file_path))
+        
+        if prev_status is None:
+            # First time seeing this file - save status and assume incomplete
+            db.save_file_status(str(file_path), current_size)
+            return False
+        
+        prev_size, last_check = prev_status
+        
+        # If size changed, still downloading
+        if current_size != prev_size:
+            db.save_file_status(str(file_path), current_size)
+            return False
+        
+        # Size unchanged - check if file hasn't been modified recently (stability_hours)
+        time_since_modification = time.time() - current_mtime
+        stability_seconds = stability_hours * 3600
+        
+        if time_since_modification < stability_seconds:
+            # File was modified recently, likely still downloading
+            return False
+        
+        # Size unchanged and file stable for stability_hours - complete
+        return True
+        
+    except (OSError, PermissionError) as e:
+        import logging
+        logging.getLogger(__name__).debug(f"Failed to check file completeness: {e}")
+        return False
+
+
 __all__ = [
     "ensure_unique_destination",
     "cleanup_failed_extraction_dir",
@@ -579,6 +640,7 @@ __all__ = [
     "move_archive_group",
     "move_remaining_to_finished",
     "move_extracted_to_finished",
+    "is_file_complete",
 ]
 
 
@@ -593,7 +655,7 @@ def move_related_episode_artifacts(
 
     This avoids leaving behind subtitles or samples stored in sibling folders.
     """
-    from .archive_constants import EPISODE_ONLY_TAG_RE
+    from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
 
     match = EPISODE_ONLY_TAG_RE.search(episode_dir.name)
     if not match:

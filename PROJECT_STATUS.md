@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.3.0)
+## Aktueller Stand (Version 2.3.3)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -9,6 +9,8 @@
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`
+7. **File Completeness Check (v2.3.3)**: Dateien werden nur verarbeitet, wenn sie für konfigurierbare Stunden (Standard: 24h) unverändert sind. Verhindert Verarbeitung von noch nicht vollständig heruntergeladenen Dateien (z.B. MKV-Dateien bei TV-Shows)
+8. **Import-Fehler behoben**: `from .archive_constants` → `from ..extraction.archive_constants` in `archives.py` und `file_operations.py`
 
 ### 🔖 Entscheidungen (wichtig fürs nächste Mal)
 - `extracted` ist der finale, endgültige Zielpfad für extrahierte Inhalte.

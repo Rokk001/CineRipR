@@ -24,6 +24,8 @@ DEFAULT_SETTINGS = {
     "max_ram_usage_percent": 75,
     "min_free_ram_gb": 4.0,
     "ssd_only_parallel": True,
+    # File Processing
+    "file_stability_hours": 24,
     # UI
     "theme": "dark",
     "toast_notifications": True,
@@ -88,6 +90,14 @@ class SettingsDB:
                         extracted_files TEXT,
                         error_messages TEXT,
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                # File status table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS file_status (
+                        file_path TEXT PRIMARY KEY,
+                        file_size INTEGER,
+                        last_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
                 conn.commit()
@@ -296,6 +306,60 @@ class SettingsDB:
                         "timestamp": row[7],
                     })
                 return history
+            finally:
+                conn.close()
+
+    def save_file_status(self, file_path: str, file_size: int):
+        """Save file status for comparison on next run."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                conn.execute("""
+                    INSERT INTO file_status (file_path, file_size, last_check)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(file_path) DO UPDATE SET
+                        file_size = excluded.file_size,
+                        last_check = CURRENT_TIMESTAMP
+                """, (file_path, file_size))
+                conn.commit()
+            finally:
+                conn.close()
+
+    def get_file_status(self, file_path: str) -> tuple[int, float] | None:
+        """Get previous file status."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.execute("""
+                    SELECT file_size, last_check
+                    FROM file_status
+                    WHERE file_path = ?
+                """, (file_path,))
+                row = cursor.fetchone()
+                if row:
+                    # Parse timestamp
+                    import time
+                    from datetime import datetime
+                    last_check_str = row[1]
+                    try:
+                        last_check = datetime.fromisoformat(last_check_str.replace("Z", "+00:00")).timestamp()
+                    except (ValueError, AttributeError):
+                        last_check = time.time()
+                    return (row[0], last_check)
+                return None
+            finally:
+                conn.close()
+
+    def cleanup_old_file_status(self, days: int = 7):
+        """Remove file status entries older than specified days."""
+        with self._lock:
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                conn.execute("""
+                    DELETE FROM file_status
+                    WHERE last_check < datetime('now', '-' || ? || ' days')
+                """, (days,))
+                conn.commit()
             finally:
                 conn.close()
 

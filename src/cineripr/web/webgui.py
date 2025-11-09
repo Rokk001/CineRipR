@@ -1560,6 +1560,18 @@ def get_html_template() -> str:
                         </div>
                     </div>
                     
+                    <!-- File Processing -->
+                    <div class="settings-category">
+                        <h3>📁 File Processing</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label class="setting-label">File Stability Hours</label>
+                                <input type="number" id="setting-file-stability-hours" min="1" max="168" class="setting-input" />
+                                <p class="setting-help">Hours a file must be unchanged before processing (default: 24)</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Advanced -->
                     <div class="settings-category">
                         <h3>🔧 Advanced</h3>
@@ -1955,6 +1967,10 @@ def get_html_template() -> str:
                     // Default: toast_sound = false
                     document.getElementById('setting-toast-sound').checked = data.toast_sound === true;
                     
+                    // File Processing
+                    // Default: file_stability_hours = 24
+                    document.getElementById('setting-file-stability-hours').value = data.file_stability_hours !== undefined ? data.file_stability_hours : 24;
+                    
                     // Advanced
                     // Default: demo_mode = false
                     document.getElementById('setting-demo-mode').checked = data.demo_mode === true;
@@ -1976,6 +1992,7 @@ def get_html_template() -> str:
                 include_other: document.getElementById('setting-include-other').checked,
                 toast_notifications: document.getElementById('setting-toast-notifications').checked,
                 toast_sound: document.getElementById('setting-toast-sound').checked,
+                file_stability_hours: parseInt(document.getElementById('setting-file-stability-hours').value),
                 demo_mode: document.getElementById('setting-demo-mode').checked,
             };
             
@@ -1986,6 +2003,10 @@ def get_html_template() -> str:
             }
             if (settings.finished_retention_days < 1 || settings.finished_retention_days > 365) {
                 showToast('error', 'Validation Error', 'Retention days must be between 1 and 365');
+                return;
+            }
+            if (settings.file_stability_hours < 1 || settings.file_stability_hours > 168) {
+                showToast('error', 'Validation Error', 'File stability hours must be between 1 and 168 (7 days)');
                 return;
             }
             
@@ -2030,6 +2051,7 @@ def get_html_template() -> str:
                     include_other: false,
                     toast_notifications: true,
                     toast_sound: false,
+                    file_stability_hours: 24,
                     demo_mode: false,
                 };
                 

@@ -26,6 +26,7 @@ from .file_operations import (
     move_remaining_to_finished,
     ensure_unique_destination,
     move_related_episode_artifacts,
+    is_file_complete,
 )
 from .path_utils import (
     is_season_directory,
@@ -172,7 +173,7 @@ def _iter_release_directories(
         else:
             # For episode directories inside Season folders, extract even if they only contain files.
             # Also treat children under a TV-tagged parent (e.g., The.Show.S02...) as episodes.
-            from .archive_constants import (
+            from ..extraction.archive_constants import (
                 TV_TAG_RE as _TV_RE,
                 EPISODE_ONLY_TAG_RE as _E_RE,
             )
@@ -251,7 +252,7 @@ def _iter_release_directories(
 
         # If this child looks like an episode directory, recursively process it
         # Episode/TV tag can be Sxx or just Exx/Exxx
-        from .archive_constants import EPISODE_ONLY_TAG_RE
+        from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
 
         has_tv_tag = (
             TV_TAG_RE.search(child.name) is not None
@@ -518,18 +519,30 @@ def process_downloads(
 
                 if not archives:
                     # Handle directories without archives: copy files to extracted
+                    # But first check if files are complete (for already extracted files)
                     if not demo_mode:
                         try:
+                            # Get settings DB and stability hours
+                            from ..web.settings_db import get_settings_db
+                            db = get_settings_db()
+                            stability_hours = db.get("file_stability_hours", 24)
+                            
+                            # Check if files are complete before processing
+                            files_to_copy = []
+                            for entry in current_dir.iterdir():
+                                if entry.is_file() and entry.suffix.lower() != ".sfv":
+                                    # Check if file is complete (for already extracted files)
+                                    if not is_file_complete(entry, db, stability_hours):
+                                        _logger.info(
+                                            "File %s appears to be still downloading, skipping...",
+                                            entry.name
+                                        )
+                                        continue
+                                    files_to_copy.append(entry)
+                            
                             target_dir = paths.extracted_root / relative_parent
                             target_dir.mkdir(parents=True, exist_ok=True)
                             extracted_targets.append(target_dir)
-
-                            # Count files to copy
-                            files_to_copy = [
-                                entry
-                                for entry in current_dir.iterdir()
-                                if entry.is_file() and entry.suffix.lower() != ".sfv"
-                            ]
 
                             if files_to_copy:
                                 copy_tracker = ProgressTracker(
@@ -1004,7 +1017,7 @@ def process_downloads(
                         )
                         # Additionally, move related artifacts for TV episodes (Subs/Sample/etc.)
                         try:
-                            from .archive_constants import EPISODE_ONLY_TAG_RE
+                            from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
 
                             if EPISODE_ONLY_TAG_RE.search(source_dir.name):
                                 move_related_episode_artifacts(

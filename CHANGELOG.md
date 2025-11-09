@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.3] - 2025-11-10
+
+### 🚀 Major Changes
+
+- **File Completeness Check:** Added support for checking if already extracted files are complete
+  - Files must be unchanged for configurable hours (default: 24 hours) before processing
+  - Prevents processing of files that are still downloading
+  - Works for all file types, not just archives
+  - Handles long downloads with pauses (e.g., 19 hours with multiple hour-long pauses)
+  - Uses database to track file size across runs for reliable comparison
+
+### 🎯 Improvements
+
+- **File Stability Hours Setting:** New configurable setting in WebGUI
+  - Default: 24 hours
+  - Range: 1-168 hours (7 days)
+  - Configurable via WebGUI Settings → File Processing
+  - Ensures files are fully downloaded before processing
+
+### 🔧 Technical Details
+
+- Added `file_status` table to settings database
+- New `is_file_complete()` function checks file size across runs
+- Files are only processed if unchanged for configured hours
+- DB-based comparison between runs (not just single-scan check)
+- File status is persisted in SQLite database
+
+### 🐛 Bug Fixes
+
+- Fixed import errors: `from .archive_constants` → `from ..extraction.archive_constants`
+  - Fixed in `src/cineripr/core/archives.py` (3 locations)
+  - Fixed in `src/cineripr/core/file_operations.py` (3 locations)
+
 ## [2.3.2] - 2025-11-10
 
 ### 🚀 Major Changes

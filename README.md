@@ -48,6 +48,7 @@ Downloaded media often comes as:
 | **🗜️ Multi-Part Archives** | Full support for RAR5, split ZIPs, and multi-volume archives |
 | **📺 Smart TV Show Organization** | Automatic detection and organization into `ShowName/Season XX/` |
 | **🎬 Movie Organization** | Proper naming and structure for movie collections |
+| **✅ File Completeness Check** | Verifies files are fully downloaded before processing (configurable stability period) |
 | **🔄 Real-Time Progress** | Live progress bars with color-coded status |
 | **🐳 Docker-Ready** | Production-tested Docker image with official 7-Zip binary |
 | **⚙️ Configurable** | WebGUI settings + CLI args + optional TOML config |
