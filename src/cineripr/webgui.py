@@ -44,6 +44,38 @@ def get_html_template() -> str:
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
+        :root {
+            /* Dark Theme (default) */
+            --bg-gradient-start: #1a1a2e;
+            --bg-gradient-mid: #16213e;
+            --bg-gradient-end: #0f3460;
+            --text-primary: #e9ecef;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.5);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --modal-bg: rgba(26, 26, 46, 0.98);
+            --input-bg: rgba(0, 0, 0, 0.3);
+            --stat-bg: rgba(0, 0, 0, 0.2);
+        }
+        
+        body.light-theme {
+            /* Light Theme */
+            --bg-gradient-start: #f0f4f8;
+            --bg-gradient-mid: #d9e2ec;
+            --bg-gradient-end: #bcccdc;
+            --text-primary: #1a202c;
+            --text-secondary: rgba(26, 32, 44, 0.8);
+            --text-muted: rgba(26, 32, 44, 0.6);
+            --card-bg: rgba(255, 255, 255, 0.7);
+            --card-border: rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --modal-bg: rgba(255, 255, 255, 0.98);
+            --input-bg: rgba(255, 255, 255, 0.5);
+            --stat-bg: rgba(255, 255, 255, 0.5);
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -52,10 +84,11 @@ def get_html_template() -> str:
         
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            color: #e9ecef;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
+            color: var(--text-primary);
             min-height: 100vh;
             overflow-x: hidden;
+            transition: all 0.3s ease;
         }
         
         /* Animated Background */
@@ -97,9 +130,9 @@ def get_html_template() -> str:
         
         /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--glass-bg);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--card-border);
             border-radius: 20px;
             padding: 30px;
             margin-bottom: 20px;
@@ -136,8 +169,33 @@ def get_html_template() -> str:
         }
         
         .header-text .subtitle {
-            color: rgba(255, 255, 255, 0.6);
+            color: var(--text-muted);
             font-size: 0.9em;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .theme-toggle {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 12px;
+            background: var(--stat-bg);
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .theme-toggle:hover {
+            transform: scale(1.1) rotate(15deg);
         }
         
         .header-status {
@@ -145,7 +203,7 @@ def get_html_template() -> str:
             align-items: center;
             gap: 10px;
             padding: 12px 20px;
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--input-bg);
             border-radius: 12px;
         }
         
@@ -172,9 +230,9 @@ def get_html_template() -> str:
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--glass-bg);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--card-border);
             border-radius: 16px;
             padding: 10px;
         }
@@ -184,7 +242,7 @@ def get_html_template() -> str:
             padding: 12px 20px;
             background: transparent;
             border: none;
-            color: rgba(255, 255, 255, 0.6);
+            color: var(--text-muted);
             font-size: 0.95em;
             font-weight: 500;
             cursor: pointer;
@@ -197,8 +255,8 @@ def get_html_template() -> str:
         }
         
         .nav-tab:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: rgba(255, 255, 255, 0.9);
+            background: var(--input-bg);
+            color: var(--text-secondary);
         }
         
         .nav-tab.active {
@@ -224,16 +282,16 @@ def get_html_template() -> str:
         
         /* Cards */
         .card {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--card-bg);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--card-border);
             border-radius: 16px;
             padding: 25px;
             margin-bottom: 20px;
         }
         
         .card h2 {
-            color: #fff;
+            color: var(--text-primary);
             margin-bottom: 20px;
             font-size: 1.3em;
             display: flex;
@@ -249,7 +307,7 @@ def get_html_template() -> str:
         }
         
         .stat-card {
-            background: rgba(0, 0, 0, 0.2);
+            background: var(--stat-bg);
             border-radius: 12px;
             padding: 20px;
             border-left: 3px solid var(--color);
@@ -262,7 +320,7 @@ def get_html_template() -> str:
         }
         
         .stat-label {
-            color: rgba(255, 255, 255, 0.6);
+            color: var(--text-muted);
             font-size: 0.85em;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -325,13 +383,20 @@ def get_html_template() -> str:
         }
         
         .queue-item {
-            background: rgba(0, 0, 0, 0.2);
+            background: var(--stat-bg);
             border-radius: 10px;
             padding: 15px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .queue-item:hover {
+            background: var(--input-bg);
+            transform: translateX(5px);
         }
         
         .queue-dot {
@@ -354,20 +419,20 @@ def get_html_template() -> str:
         }
         
         .queue-name {
-            color: #fff;
+            color: var(--text-primary);
             font-weight: 500;
             margin-bottom: 4px;
         }
         
         .queue-meta {
             font-size: 0.85em;
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-muted);
         }
         
         .queue-empty {
             text-align: center;
             padding: 40px;
-            color: rgba(255, 255, 255, 0.4);
+            color: var(--text-muted);
         }
         
         /* System Health */
@@ -377,7 +442,7 @@ def get_html_template() -> str:
         }
         
         .disk-item {
-            background: rgba(0, 0, 0, 0.2);
+            background: var(--stat-bg);
             border-radius: 12px;
             padding: 20px;
         }
@@ -389,12 +454,12 @@ def get_html_template() -> str:
         }
         
         .disk-label {
-            color: #fff;
+            color: var(--text-primary);
             font-weight: 500;
         }
         
         .disk-percent {
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--text-secondary);
             font-weight: 600;
         }
         
@@ -432,11 +497,11 @@ def get_html_template() -> str:
         }
         
         .log-filter, .log-search {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
             border-radius: 8px;
             padding: 8px 12px;
-            color: #fff;
+            color: var(--text-primary);
             font-size: 0.9em;
         }
         
@@ -552,6 +617,175 @@ def get_html_template() -> str:
             font-size: 0.85em;
         }
         
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: var(--modal-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            padding: 30px 30px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .modal-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(90deg);
+        }
+        
+        .modal-body {
+            padding: 30px;
+        }
+        
+        .modal-section {
+            margin-bottom: 30px;
+        }
+        
+        .modal-section-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .modal-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            background: var(--stat-bg);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .modal-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .modal-detail-label {
+            color: var(--text-muted);
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .modal-detail-value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 1.1em;
+        }
+        
+        .modal-logs {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        
+        .modal-log-entry {
+            padding: 6px 8px;
+            margin-bottom: 6px;
+            border-left: 3px solid transparent;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-log-entry.info { border-left-color: #3b82f6; }
+        .modal-log-entry.warning { border-left-color: #f59e0b; }
+        .modal-log-entry.error { border-left-color: #ef4444; }
+        .modal-log-entry.debug { border-left-color: #6b7280; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-badge.pending {
+            background: rgba(107, 114, 128, 0.3);
+            color: #9ca3af;
+        }
+        
+        .status-badge.processing {
+            background: rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+        
+        .status-badge.completed {
+            background: rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+        }
+        
+        .status-badge.failed {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+        
         /* Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -569,6 +803,174 @@ def get_html_template() -> str:
         
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 30px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.5) 0%, rgba(118, 75, 162, 0.5) 100%);
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-left: 70px;
+            margin-bottom: 30px;
+            animation: slideInLeft 0.5s ease-out;
+        }
+        
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: 20px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 3px solid rgba(26, 26, 46, 1);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+        }
+        
+        .timeline-marker.success {
+            background: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.3);
+        }
+        
+        .timeline-marker.failed {
+            background: #ef4444;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3);
+        }
+        
+        .timeline-content {
+            background: var(--stat-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 3px solid var(--timeline-color);
+            transition: all 0.3s;
+        }
+        
+        .timeline-content:hover {
+            background: var(--input-bg);
+            transform: translateX(5px);
+        }
+        
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .timeline-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .timeline-time {
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+        
+        .timeline-meta {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+        
+        .timeline-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .history-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .history-empty-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        /* Control Panel */
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .control-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .control-btn:active {
+            transform: translateY(0);
+        }
+        
+        .control-btn.pause {
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            color: white;
+        }
+        
+        .control-btn.resume {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .control-status {
+            margin-top: 15px;
+            padding: 12px;
+            background: var(--stat-bg);
+            border-radius: 8px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        
+        .control-status.paused {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
         }
         
         /* Responsive */
@@ -589,6 +991,18 @@ def get_html_template() -> str:
             .log-controls {
                 flex-direction: column;
             }
+            
+            .timeline::before {
+                left: 15px;
+            }
+            
+            .timeline-item {
+                padding-left: 50px;
+            }
+            
+            .timeline-marker {
+                left: 5px;
+            }
         }
     </style>
 </head>
@@ -606,9 +1020,14 @@ def get_html_template() -> str:
                     <div class="subtitle">Archive Extraction Dashboard</div>
                 </div>
             </div>
-            <div class="header-status">
-                <div class="status-dot" id="status-dot"></div>
-                <div id="status-text">Idle</div>
+            <div class="header-right">
+                <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                <div class="header-status">
+                    <div class="status-dot" id="status-dot"></div>
+                    <div id="status-text">Idle</div>
+                </div>
             </div>
         </div>
         
@@ -622,6 +1041,9 @@ def get_html_template() -> str:
             </button>
             <button class="nav-tab" onclick="switchTab('health')">
                 💻 System Health
+            </button>
+            <button class="nav-tab" onclick="switchTab('history')">
+                📅 History
             </button>
             <button class="nav-tab" onclick="switchTab('logs')">
                 📝 Logs
@@ -657,21 +1079,43 @@ def get_html_template() -> str:
             <div class="card">
                 <h2>⚙️ Current Operation</h2>
                 <div id="current-operation-content">
-                    <div class="progress-info">
-                        <span><strong>Release:</strong> <span id="release-name">-</span></span>
-                        <span id="progress-text">0%</span>
+                    <div style="margin-bottom: 15px;">
+                        <div style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 5px;">Release</div>
+                        <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="release-name">-</div>
                     </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress-fill" style="width: 0%">0%</div>
+                    <div style="margin-bottom: 10px;">
+                        <div style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 5px;">
+                            Progress: <span id="progress-text" style="color: var(--text-primary); font-weight: 600;">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%">0%</div>
+                        </div>
                     </div>
                     <div class="progress-section">
-                        <div style="margin-top: 15px; color: rgba(255, 255, 255, 0.7);">
-                            <strong>Archiv:</strong> <span id="archive-name">-</span>
+                        <div style="margin-bottom: 10px;">
+                            <div style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 5px;">Current Archive</div>
+                            <div style="color: var(--text-primary); font-weight: 500;" id="archive-name">-</div>
                         </div>
-                        <div style="margin-top: 8px; color: rgba(255, 255, 255, 0.6); font-size: 0.9em;" id="status-message">
-                            -
+                        <div style="color: var(--text-secondary); font-size: 0.9em;" id="status-message">
+                            Waiting for files...
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Control Panel -->
+            <div class="card">
+                <h2>🎮 Control Panel</h2>
+                <div class="control-panel">
+                    <button class="control-btn pause" id="pause-btn" onclick="pauseProcessing()">
+                        <span>⏸</span> Pause Processing
+                    </button>
+                    <button class="control-btn resume" id="resume-btn" onclick="resumeProcessing()">
+                        <span>▶</span> Resume Processing
+                    </button>
+                </div>
+                <div class="control-status" id="control-status">
+                    Processing is active
                 </div>
             </div>
         </div>
@@ -737,9 +1181,34 @@ def get_html_template() -> str:
             
             <div class="card">
                 <h2>🔧 System Information</h2>
-                <div style="padding: 15px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;">
-                    <div style="margin-bottom: 10px;">
-                        <strong>7-Zip Version:</strong> <span id="seven-zip-version">Unknown</span>
+                <div style="padding: 15px; background: var(--stat-bg); border-radius: 10px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div>
+                            <div style="color: var(--text-muted); font-size: 0.85em; margin-bottom: 5px;">7-Zip Version</div>
+                            <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="seven-zip-version">Unknown</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted); font-size: 0.85em; margin-bottom: 5px;">CPU Usage</div>
+                            <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="cpu-usage">0%</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted); font-size: 0.85em; margin-bottom: 5px;">Memory Usage</div>
+                            <div style="color: var(--text-primary); font-weight: 500; font-size: 1.1em;" id="memory-usage">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- History Tab -->
+        <div class="tab-content" id="tab-history">
+            <div class="card">
+                <h2>📅 Processing History</h2>
+                <div class="timeline" id="history-timeline">
+                    <div class="history-empty">
+                        <div class="history-empty-icon">🕐</div>
+                        <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
+                        <div>Processed releases will appear here</div>
                     </div>
                 </div>
             </div>
@@ -769,6 +1238,60 @@ def get_html_template() -> str:
         </div>
     </div>
     
+    <!-- Release Detail Modal -->
+    <div class="modal-overlay" id="release-modal" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Release Details</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <div class="modal-section-title">📋 Information</div>
+                    <div class="modal-detail-grid">
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-label">Status</div>
+                            <div class="modal-detail-value" id="modal-status">-</div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-label">Archive Count</div>
+                            <div class="modal-detail-value" id="modal-archive-count">-</div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-label">Start Time</div>
+                            <div class="modal-detail-value" id="modal-start-time">-</div>
+                        </div>
+                        <div class="modal-detail-item">
+                            <div class="modal-detail-label">Duration</div>
+                            <div class="modal-detail-value" id="modal-duration">-</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section" id="modal-progress-section" style="display: none;">
+                    <div class="modal-section-title">📊 Progress</div>
+                    <div style="background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 20px;">
+                        <div style="margin-bottom: 10px; font-size: 0.9em; color: rgba(255, 255, 255, 0.7);">
+                            <strong>Current:</strong> <span id="modal-current-archive">-</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="modal-progress-fill" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">📝 Logs</div>
+                    <div class="modal-logs" id="modal-logs">
+                        <div style="text-align: center; color: rgba(255, 255, 255, 0.4); padding: 20px;">
+                            No logs available for this release
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script>
         // Create particles
         function createParticles() {
@@ -795,6 +1318,53 @@ def get_html_template() -> str:
         
         // Toast notifications
         let notificationQueue = new Set();
+        let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
+        
+        // Simple notification sound using Web Audio API
+        function playNotificationSound(type) {
+            if (!soundEnabled) return;
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                // Different frequencies for different notification types
+                const frequencies = {
+                    success: [523.25, 659.25], // C5, E5
+                    error: [329.63, 261.63],    // E4, C4
+                    warning: [440, 440],        // A4, A4
+                    info: [523.25, 523.25]      // C5, C5
+                };
+                
+                const freqs = frequencies[type] || frequencies.info;
+                oscillator.frequency.value = freqs[0];
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+                
+                // Second tone
+                setTimeout(() => {
+                    const osc2 = audioContext.createOscillator();
+                    const gain2 = audioContext.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioContext.destination);
+                    osc2.frequency.value = freqs[1];
+                    gain2.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    osc2.start(audioContext.currentTime);
+                    osc2.stop(audioContext.currentTime + 0.1);
+                }, 100);
+            } catch (e) {
+                console.log('Sound notification not supported');
+            }
+        }
         
         function showToast(type, title, message, duration = 5000) {
             const container = document.getElementById('toast-container');
@@ -813,6 +1383,9 @@ def get_html_template() -> str:
             `;
             
             container.appendChild(toast);
+            
+            // Play sound
+            playNotificationSound(type);
             
             setTimeout(() => {
                 toast.style.opacity = '0';
@@ -848,6 +1421,159 @@ def get_html_template() -> str:
         }
         
         let previousStatus = {};
+        let currentQueueData = [];
+        
+        // Modal functions
+        function openReleaseModal(index) {
+            const item = currentQueueData[index];
+            if (!item) return;
+            
+            document.getElementById('modal-title').textContent = item.name;
+            document.getElementById('modal-status').innerHTML = `<span class="status-badge ${item.status}">${item.status}</span>`;
+            document.getElementById('modal-archive-count').textContent = item.archive_count || 0;
+            
+            // Start time and duration
+            if (item.start_time) {
+                const startTime = new Date(item.start_time);
+                document.getElementById('modal-start-time').textContent = startTime.toLocaleString('de-DE');
+                
+                const now = new Date();
+                const duration = Math.floor((now - startTime) / 1000);
+                const hours = Math.floor(duration / 3600);
+                const minutes = Math.floor((duration % 3600) / 60);
+                const seconds = duration % 60;
+                document.getElementById('modal-duration').textContent = 
+                    `${hours}h ${minutes}m ${seconds}s`;
+            } else {
+                document.getElementById('modal-start-time').textContent = 'Not started';
+                document.getElementById('modal-duration').textContent = '-';
+            }
+            
+            // Progress
+            if (item.status === 'processing' && item.current_archive) {
+                document.getElementById('modal-progress-section').style.display = 'block';
+                document.getElementById('modal-current-archive').textContent = item.current_archive;
+                const progress = item.progress || 0;
+                document.getElementById('modal-progress-fill').style.width = progress + '%';
+                document.getElementById('modal-progress-fill').textContent = progress + '%';
+            } else {
+                document.getElementById('modal-progress-section').style.display = 'none';
+            }
+            
+            // Logs (filter by release name if available in logs)
+            const logsContainer = document.getElementById('modal-logs');
+            const allLogs = previousStatus.recent_logs || [];
+            const releaseLogs = allLogs.filter(log => 
+                log.message.includes(item.name) || 
+                (item.current_archive && log.message.includes(item.current_archive))
+            );
+            
+            if (releaseLogs.length > 0) {
+                logsContainer.innerHTML = releaseLogs.slice().reverse().map(log => {
+                    const time = new Date(log.timestamp).toLocaleTimeString('de-DE');
+                    const level = (log.level || 'info').toLowerCase();
+                    return `<div class="modal-log-entry ${level}">[${time}] [${log.level}] ${log.message}</div>`;
+                }).join('');
+            } else {
+                logsContainer.innerHTML = '<div style="text-align: center; color: rgba(255, 255, 255, 0.4); padding: 20px;">No specific logs for this release</div>';
+            }
+            
+            document.getElementById('release-modal').classList.add('active');
+        }
+        
+        function closeModal(event) {
+            if (!event || event.target.classList.contains('modal-overlay')) {
+                document.getElementById('release-modal').classList.remove('active');
+            }
+        }
+        
+        // Keyboard shortcut to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal({ target: { classList: { contains: () => true } } });
+            }
+        });
+        
+        // Control functions
+        function pauseProcessing() {
+            fetch('/api/control/pause', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    showToast('warning', 'Processing Paused', 'Processing has been paused');
+                    document.getElementById('pause-btn').disabled = true;
+                    document.getElementById('resume-btn').disabled = false;
+                })
+                .catch(err => {
+                    showToast('error', 'Error', 'Failed to pause processing');
+                    console.error('Pause error:', err);
+                });
+        }
+        
+        function resumeProcessing() {
+            fetch('/api/control/resume', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    showToast('success', 'Processing Resumed', 'Processing has been resumed');
+                    document.getElementById('pause-btn').disabled = false;
+                    document.getElementById('resume-btn').disabled = true;
+                })
+                .catch(err => {
+                    showToast('error', 'Error', 'Failed to resume processing');
+                    console.error('Resume error:', err);
+                });
+        }
+        
+        // Theme toggle
+        let currentTheme = 'dark';
+        
+        function toggleTheme() {
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+            
+            // Save to server
+            fetch('/api/theme', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: newTheme })
+            }).catch(err => console.error('Failed to save theme:', err));
+        }
+        
+        function applyTheme(theme) {
+            currentTheme = theme;
+            const body = document.body;
+            const icon = document.getElementById('theme-icon');
+            
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                icon.textContent = '☀️';
+            } else {
+                body.classList.remove('light-theme');
+                icon.textContent = '🌙';
+            }
+            
+            localStorage.setItem('theme', theme);
+        }
+        
+        // Load theme preference
+        function loadThemePreference() {
+            // First check localStorage
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            }
+            
+            // Then fetch from server
+            fetch('/api/theme')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.theme && data.theme !== currentTheme) {
+                        applyTheme(data.theme);
+                    }
+                })
+                .catch(err => console.error('Failed to load theme:', err));
+        }
+        
+        loadThemePreference();
         
         function updateStatus() {
             fetch('/api/status')
@@ -871,15 +1597,36 @@ def get_html_template() -> str:
                     
                     // Status
                     const isRunning = data.is_running || false;
+                    const isPaused = data.is_paused || false;
                     const statusDot = document.getElementById('status-dot');
                     const statusText = document.getElementById('status-text');
                     
-                    if (isRunning) {
+                    if (isPaused) {
+                        statusDot.classList.remove('running');
+                        statusText.textContent = 'Paused';
+                    } else if (isRunning) {
                         statusDot.classList.add('running');
                         statusText.textContent = 'Processing';
                     } else {
                         statusDot.classList.remove('running');
                         statusText.textContent = 'Idle';
+                    }
+                    
+                    // Control panel
+                    const pauseBtn = document.getElementById('pause-btn');
+                    const resumeBtn = document.getElementById('resume-btn');
+                    const controlStatus = document.getElementById('control-status');
+                    
+                    if (isPaused) {
+                        pauseBtn.disabled = true;
+                        resumeBtn.disabled = false;
+                        controlStatus.textContent = '⏸ Processing is paused';
+                        controlStatus.classList.add('paused');
+                    } else {
+                        pauseBtn.disabled = false;
+                        resumeBtn.disabled = true;
+                        controlStatus.textContent = '▶ Processing is active';
+                        controlStatus.classList.remove('paused');
                     }
                     
                     // Current operation
@@ -906,12 +1653,13 @@ def get_html_template() -> str:
                     
                     // Queue
                     const queue = data.queue || [];
+                    currentQueueData = queue; // Store for modal access
                     const queueList = document.getElementById('queue-list');
                     if (queue.length === 0) {
                         queueList.innerHTML = '<div class="queue-empty">No items in queue</div>';
                     } else {
-                        queueList.innerHTML = queue.map(item => `
-                            <div class="queue-item">
+                        queueList.innerHTML = queue.map((item, index) => `
+                            <div class="queue-item" onclick="openReleaseModal(${index})">
                                 <div class="queue-dot ${item.status}"></div>
                                 <div class="queue-info">
                                     <div class="queue-name">${item.name}</div>
@@ -928,6 +1676,8 @@ def get_html_template() -> str:
                         updateDisk('extracted', h.disk_extracted_used_gb, h.disk_extracted_free_gb, h.disk_extracted_percent);
                         updateDisk('finished', h.disk_finished_used_gb, h.disk_finished_free_gb, h.disk_finished_percent);
                         document.getElementById('seven-zip-version').textContent = h.seven_zip_version || 'Unknown';
+                        document.getElementById('cpu-usage').textContent = (h.cpu_percent || 0).toFixed(1) + '%';
+                        document.getElementById('memory-usage').textContent = (h.memory_percent || 0).toFixed(1) + '%';
                     }
                     
                     // Logs
@@ -947,6 +1697,55 @@ def get_html_template() -> str:
                         if (isBottom) {
                             logsContainer.scrollTop = logsContainer.scrollHeight;
                         }
+                    }
+                    
+                    // History
+                    const history = data.history || [];
+                    const historyTimeline = document.getElementById('history-timeline');
+                    if (history.length === 0) {
+                        historyTimeline.innerHTML = `
+                            <div class="history-empty">
+                                <div class="history-empty-icon">🕐</div>
+                                <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
+                                <div>Processed releases will appear here</div>
+                            </div>
+                        `;
+                    } else {
+                        historyTimeline.innerHTML = history.map(item => {
+                            const endTime = new Date(item.end_time);
+                            const timeStr = endTime.toLocaleString('de-DE');
+                            const duration = item.duration_seconds || 0;
+                            const hours = Math.floor(duration / 3600);
+                            const minutes = Math.floor((duration % 3600) / 60);
+                            const seconds = duration % 60;
+                            const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
+                            
+                            const markerClass = item.success ? 'success' : 'failed';
+                            const borderColor = item.success ? '#10b981' : '#ef4444';
+                            
+                            return `
+                                <div class="timeline-item">
+                                    <div class="timeline-marker ${markerClass}"></div>
+                                    <div class="timeline-content" style="--timeline-color: ${borderColor}">
+                                        <div class="timeline-header">
+                                            <div class="timeline-title">${item.release_name}</div>
+                                            <div class="timeline-time">${timeStr}</div>
+                                        </div>
+                                        <div class="timeline-meta">
+                                            <div class="timeline-meta-item">
+                                                <span>⏱</span> ${durationStr}
+                                            </div>
+                                            <div class="timeline-meta-item">
+                                                <span>📦</span> ${item.archive_count || 0} archives
+                                            </div>
+                                            <div class="timeline-meta-item">
+                                                <span>${item.success ? '✓' : '✗'}</span> ${item.success ? 'Success' : 'Failed'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
                     }
                     
                     // Update time

@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.36] - 2025-11-09
+
+### Added
+- **Release Detail View**: Click on any queue item to view detailed information in a modal dialog
+  - View release status, archive count, start time, and duration
+  - See current archive being processed with progress
+  - Filter logs specific to that release
+  - Keyboard shortcut (ESC) to close modal
+- **Timeline/History View**: New "History" tab showing processed releases
+  - Visual timeline with color-coded success/failure markers
+  - Display duration, archive count, and completion status
+  - Animated entry with smooth transitions
+- **Manual Control Panel**: Pause and resume processing on demand
+  - Visual pause/resume buttons with gradient styling
+  - Status indicator showing current processing state
+  - Automatic button state updates based on processing status
+- **Dark/Light Mode Toggle**: Switch between dark and light themes
+  - Theme preference saved to localStorage and server
+  - Smooth CSS transitions between themes
+  - Full CSS variable system for theming
+  - Theme persists across page reloads
+- **CPU & Memory Monitoring**: Real-time system resource tracking
+  - Display current CPU usage percentage
+  - Display current memory usage percentage
+  - Updated every 2 seconds alongside other system health metrics
+- **Toast Sound Notifications**: Optional audio alerts for notifications
+  - Different tones for success, error, warning, and info
+  - Two-tone notification sounds using Web Audio API
+  - Configurable via localStorage (soundEnabled)
+  - Automatically plays on toast notifications
+
+### Changed
+- Complete frontend architecture overhaul for improved modularity
+- Enhanced modal system with better animations and keyboard controls
+- Improved status tracking with pause/resume state management
+- Extended StatusTracker with history, theme, and control endpoints
+- Better responsive design for all screen sizes
+- Improved header layout with theme toggle button
+- Updated all cards and components to use CSS variables for theming
+
+### Backend
+- Extended `StatusTracker` with `ReleaseHistory` dataclass
+- Added `is_paused`, `history`, and `theme_preference` to GlobalStatus
+- New methods: `add_to_history()`, `set_theme()`, `pause_processing()`, `resume_processing()`
+- Enhanced `update_system_health()` to include CPU and memory monitoring via psutil
+- New API endpoints:
+  - `/api/theme` (GET/POST) for theme management
+  - `/api/control/pause` (POST) to pause processing
+  - `/api/control/resume` (POST) to resume processing
+  - `/api/history` (GET) to retrieve processing history
+- Updated `/api/notifications/<notif_id>/read` endpoint
+
 ## [1.0.35] - 2025-11-09
 
 ### Added

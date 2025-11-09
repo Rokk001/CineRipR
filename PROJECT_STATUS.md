@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 1.0.35)
+## Aktueller Stand (Version 1.0.36)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -90,7 +90,21 @@ Finished/
 4. **Cleanup**: Optionale Aufräum-/Retention-Logik im `finished`-Verzeichnis
 
 ## Session Notes (2025-11-09)
-- Version 1.0.35 veröffentlicht mit Major WebGUI Overhaul
+
+### Version 1.0.36 - Complete WebGUI Feature Set
+- **Release Detail View**: Detaillierte Modal-Ansicht für Queue-Items (Feature 5)
+- **Timeline/History View**: Neuer History-Tab mit visueller Timeline (Feature 6)
+- **Manual Control Panel**: Pause/Resume Buttons für Processing-Kontrolle (Feature 7)
+- **Dark/Light Mode Toggle**: Theme-Switcher im Header mit Persistenz (Feature 8)
+- **CPU & Memory Monitoring**: Echtzeit-System-Ressourcen-Tracking
+- **Toast Sound Notifications**: Audio-Feedback für Benachrichtigungen (Web Audio API)
+- Backend erweitert mit History-Tracking, Theme-Management und Control-Endpoints
+- Vollständiges CSS-Variable-System für nahtloses Theming
+- Enhanced StatusTracker mit `ReleaseHistory`, `is_paused`, `theme_preference`
+- Neue API-Endpoints: `/api/theme`, `/api/control/pause`, `/api/control/resume`, `/api/history`
+- Alle 8 geplanten WebGUI-Features vollständig implementiert! 🎉
+
+### Version 1.0.35 - Major WebGUI Overhaul (Features 1-4)
 - Toast Notifications für Echtzeit-Feedback
 - Processing Queue Display zeigt anstehende Arbeit
 - Log-Filtering & Search für einfaches Debugging
@@ -100,6 +114,8 @@ Finished/
 - 7-Zip Version wird angezeigt
 - Status-Display-Inkonsistenzen behoben
 - Komplette Interface-Restrukturierung
+
+### Core Logik (Unverändert)
 - Klarstellung: `extracted` ist der finale Zielpfad für extrahierte Inhalte; `finished` spiegelt die Download-Quelle 1:1 pro Release-Root.
 - Companion-Ordner (`Sample`, `Subs`, …) werden beim Verschieben nach `finished` unverändert übernommen.
 - UNC-/Docker-Pfade: Safe-Move mit Fallback (copy+delete) bleibt aktiv; chmod 777, kein chown.
