@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.9] - 2025-11-10
+
+### 🐛 Critical Bug Fixes
+
+- **AttributeError in StatusTracker Fixed:**
+  - `get_seconds_until_next_run()` wurde falsch aufgerufen
+  - Methode existiert in `GlobalStatus`, nicht in `StatusTracker`
+  - Fix: `self.get_seconds_until_next_run()` → `self._status.get_seconds_until_next_run()`
+
+- **TemplateNotFound: index.html Fixed:**
+  - Flask konnte Template nicht finden (relativer Pfad)
+  - Fix: Template-Pfad jetzt absolut mit `Path(__file__).parent`
+  - Templates und Static Files werden jetzt korrekt gefunden
+
+- **Debug-Logging entfernt:**
+  - Debug-Logging in `set_next_run()` entfernt
+  - Sauberer Code ohne unnötige Logs
+
+### 🔧 Technical Details
+
+- `status.py`: `set_next_run()` - Debug-Logging entfernt, korrekter Methodenaufruf
+- `app.py`: Template-Pfad jetzt absolut mit `Path(__file__).parent`
+- Flask findet jetzt Templates und Static Files korrekt
+
 ## [2.5.8] - 2025-11-10
 
 ### 🐛 Bug Fixes

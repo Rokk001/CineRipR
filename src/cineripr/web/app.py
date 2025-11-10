@@ -1,6 +1,7 @@
 """Flask application factory."""
 
 import logging
+from pathlib import Path
 from flask import Flask
 from .routes import register_blueprints
 from .services.status_tracker import get_status_tracker
@@ -10,9 +11,11 @@ _logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     """Create and configure Flask application."""
+    # Use absolute paths for templates and static files
+    web_dir = Path(__file__).parent
     app = Flask(__name__, 
-                template_folder='templates',
-                static_folder='static')
+                template_folder=str(web_dir / 'templates'),
+                static_folder=str(web_dir / 'static'))
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     
     # Initialize tracker with DB settings
