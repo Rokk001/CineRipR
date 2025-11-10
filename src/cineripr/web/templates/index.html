@@ -966,60 +966,7 @@
                         statusText.textContent = 'Idle';
                     }
                     
-                    // Countdown Progressbar (NEW in v2.5.0)
-                    const countdownContainer = document.getElementById('countdown-container');
-                    const countdownFill = document.getElementById('countdown-fill');
-                    const countdownPercentage = document.getElementById('countdown-percentage');
-                    const countdownTime = document.getElementById('countdown-time');
-                    
-                    const isIdle = !isRunning && !isPaused;
-                    const hasNextRun = data.seconds_until_next_run !== null && data.seconds_until_next_run >= 0;
-                    // CRITICAL FIX v2.5.5: Show progressbar if repeat mode is enabled, even if seconds_until_next_run is null
-                    const hasRepeatMode = data.repeat_mode && data.repeat_interval_minutes > 0;
-                    
-                    if (isIdle && (hasNextRun || hasRepeatMode)) {
-                        // Show countdown progressbar
-                        countdownContainer.style.display = 'flex';
-                        
-                        // Calculate percentage (inverse: 100% = just finished, 0% = starting now)
-                        const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
-                        // If seconds_until_next_run is null but repeat mode is active, show 100% (just started)
-                        const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
-                        const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
-                        
-                        // Update progressbar
-                        countdownFill.style.width = percentage + '%';
-                        countdownPercentage.textContent = Math.round(percentage) + '%';
-                        
-                        // Format time
-                        const hours = Math.floor(remainingSeconds / 3600);
-                        const minutes = Math.floor((remainingSeconds % 3600) / 60);
-                        const seconds = remainingSeconds % 60;
-                        
-                        let timeString;
-                        if (hours > 0) {
-                            timeString = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                        } else {
-                            timeString = `${minutes}:${String(seconds).padStart(2, '0')}`;
-                        }
-                        countdownTime.textContent = timeString;
-                        
-                        // Color based on time remaining
-                        if (percentage < 20) {
-                            countdownFill.style.background = 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'; // Red
-                        } else if (percentage < 50) {
-                            countdownFill.style.background = 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'; // Orange
-                        } else {
-                            countdownFill.style.background = 'linear-gradient(90deg, var(--accent-color) 0%, rgba(139, 92, 246, 0.7) 100%)'; // Purple
-                        }
-                    } else if (isIdle) {
-                        // Idle but no next run (manual mode)
-                        countdownContainer.style.display = 'none';
-                        statusText.textContent = 'Idle (Manual Mode)';
-                    } else {
-                        // Processing or Paused
-                        countdownContainer.style.display = 'none';
-                    }
+                    // Countdown Progressbar - handled by app.js
                     
                     // Control panel (REMOVED in v2.2.5 - replaced by header button)
                     // Legacy code removed
