@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.6] - 2025-11-10
+
+### 🐛 CRITICAL FIX - Progressbar Default Settings
+
+- **Settings Update Bug:** Fixed critical bug where `db.get()` was using wrong default values
+  - `db.get("repeat_forever", False)` returned `False` even when DB was empty
+  - This caused progressbar to not show when Auto-Run was enabled but DB was empty
+  - Now using `db.get_all()` which correctly returns `DEFAULT_SETTINGS.copy()` with DB overrides
+  - Progressbar now ALWAYS shows when Auto-Run is enabled, even if DB is empty
+
+### 🔧 Technical Changes
+
+- `webgui.py`: Changed from `db.get()` to `db.get_all()` in settings update endpoint (lines 2615-2617)
+- `db.get_all()` returns `DEFAULT_SETTINGS.copy()` with DB overrides, ensuring correct defaults
+- This ensures `repeat_forever: True` from `DEFAULT_SETTINGS` is used when DB is empty
+
 ## [2.5.5] - 2025-11-10
 
 ### 🐛 CRITICAL FIX - THE REAL ONE THIS TIME
