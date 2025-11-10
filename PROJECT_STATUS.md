@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.5)
+## Aktueller Stand (Version 2.5.7)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -59,19 +59,37 @@
 ### 📁 Projektstruktur
 ```
 src/cineripr/
-├── __init__.py              # Version 1.0.29
-├── archives.py              # Hauptorchestrierung
-├── file_operations.py       # Datei-Operationen
-├── path_utils.py            # Pfad-Utilities
-├── archive_extraction.py    # Extraktionslogik
-├── archive_detection.py     # Archive-Erkennung
-├── archive_constants.py     # Konstanten und Regex
-├── config.py                # Konfiguration
+├── __init__.py              # Version 2.5.7
 ├── cli.py                   # Command-Line-Interface
+├── config.py                # Konfiguration
 ├── progress.py              # Progress-Tracking
-├── status.py                # Status-Tracking für WebGUI
-├── webgui.py                # WebGUI für Status-Monitoring
-└── cleanup.py               # Finished-Directory-Cleanup
+├── core/                    # Core Business Logic
+│   ├── archives.py         # Hauptorchestrierung
+│   ├── file_operations.py  # Datei-Operationen
+│   ├── path_utils.py        # Pfad-Utilities
+│   └── cleanup.py          # Finished-Directory-Cleanup
+├── extraction/              # Archive Handling
+│   ├── archive_detection.py # Archive-Erkennung
+│   ├── archive_extraction.py # Extraktionslogik
+│   └── archive_constants.py  # Konstanten und Regex
+└── web/                     # WebGUI (v2.5.7: Refactored)
+    ├── __init__.py          # Exports
+    ├── app.py               # Flask App Factory
+    ├── webgui.py            # Legacy wrapper
+    ├── status.py            # Status-Tracking
+    ├── settings_db.py       # Settings DB
+    ├── routes/              # Flask Blueprints
+    │   ├── views.py         # HTML Views
+    │   ├── api.py           # API Routes
+    │   └── settings.py      # Settings Routes
+    ├── templates/           # HTML Templates
+    │   └── index.html       # Dashboard Template
+    ├── static/              # Static Files
+    │   ├── css/style.css    # CSS Styles
+    │   ├── js/app.js        # JavaScript
+    │   └── favicon.svg      # Favicon
+    └── services/            # Services Layer
+        └── status_tracker.py # Status Tracker Wrapper
 ```
 
 ### 🎯 TV-Show-Organisation (Funktioniert)

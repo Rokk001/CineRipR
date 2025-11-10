@@ -390,7 +390,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Set repeat mode and countdown in tracker (NEW in v2.1.0, FIXED in v2.4.1, v2.5.1, v2.5.5)
     # Always set these, even if repeat_forever is False initially
     # WebGUI settings might override this later
-    tracker.set_repeat_mode(settings.repeat_forever, interval_minutes=settings.repeat_after_minutes)
+    tracker.set_repeat_mode(
+        settings.repeat_forever, interval_minutes=settings.repeat_after_minutes
+    )
 
     # Set initial next run time so countdown is visible from start
     # This ensures countdown is visible even after container restarts
@@ -950,7 +952,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
                 # Use DB value for delay
                 delay = max(1, int(db_repeat_after_minutes))
-                
+
                 # Update tracker with DB values
                 tracker.set_repeat_mode(settings.repeat_forever, interval_minutes=delay)
             except Exception as e:
@@ -1001,7 +1003,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                             )
                             settings.repeat_after_minutes = int(db_repeat_after_minutes)
                             delay = max(1, int(db_repeat_after_minutes))
-                            tracker.set_repeat_mode(bool(db_repeat_forever), interval_minutes=delay)
+                            tracker.set_repeat_mode(
+                                bool(db_repeat_forever), interval_minutes=delay
+                            )
                             tracker.set_next_run(delay)
                             # Recalculate end_time with new delay
                             end_time = time.time() + (delay * 60)

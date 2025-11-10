@@ -29,10 +29,11 @@ Deployment and operational guides.
 Detailed release notes for all versions.
 
 - **[All Release Notes](releases/)** - Chronological list of all releases
-- **[Latest: v2.5.1](releases/v2.5.1.md)** - Critical Hotfix (Crash Fix, Queue/Disk/Countdown)
+- **[Latest: v2.5.7](releases/v2.5.7.md)** - Major Refactoring: Frontend/Backend Trennung
+- [v2.5.6](releases/v2.5.6.md) - Progressbar Default Settings Fix
+- [v2.5.5](releases/v2.5.5.md) - Main Loop Settings Update Fix
+- [v2.5.1](releases/v2.5.1.md) - Critical Hotfix (Crash Fix, Queue/Disk/Countdown)
 - [v2.5.0](releases/v2.5.0.md) - Visual Countdown & History Fixes
-- [v2.4.3](releases/v2.4.3.md) - The REAL Countdown Fix
-- [v2.4.2](releases/v2.4.2.md) - Critical Countdown Fix (had bugs)
 
 ## 🔗 Quick Links
 

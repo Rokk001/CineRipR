@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from .status import get_status_tracker
-from .webgui import create_app, run_webgui
+from .app import create_app
+from .webgui import run_webgui
 
 __all__ = [
     "get_status_tracker",

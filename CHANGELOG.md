@@ -2,6 +2,66 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.7] - 2025-11-10
+
+### 🏗️ MAJOR REFACTORING - Frontend/Backend Trennung
+
+- **Projektstruktur modernisiert:** Komplette Trennung von Frontend und Backend
+  - HTML/CSS/JavaScript aus Python-Strings extrahiert
+  - Flask Blueprints für bessere Organisation
+  - Flask App Factory Pattern implementiert
+  - Moderne, wartbare Struktur nach Best Practices
+
+### ✨ Neue Struktur
+
+**Vorher:**
+- `webgui.py` = 2752 Zeilen (alles in einer Datei)
+
+**Nachher:**
+- `app.py` = Flask App Factory (30 Zeilen)
+- `routes/views.py` = HTML Views (32 Zeilen)
+- `routes/api.py` = API Routes (137 Zeilen)
+- `routes/settings.py` = Settings Routes (106 Zeilen)
+- `templates/index.html` = HTML Template (1242 Zeilen)
+- `static/css/style.css` = CSS Styles (1215 Zeilen)
+- `static/js/app.js` = JavaScript (760 Zeilen)
+
+### 🔧 Technische Verbesserungen
+
+- **Frontend/Backend Trennung:**
+  - HTML in `templates/index.html`
+  - CSS in `static/css/style.css`
+  - JavaScript in `static/js/app.js`
+  - Favicon in `static/favicon.svg`
+
+- **Flask Blueprints:**
+  - `views_bp` für HTML-Seiten
+  - `api_bp` für API-Endpunkte
+  - `settings_bp` für Settings-Verwaltung
+
+- **Flask App Factory:**
+  - `create_app()` für zentrale App-Erstellung
+  - Tracker-Initialisierung mit DB-Werten
+  - Blueprint-Registrierung
+
+- **Services Layer:**
+  - `services/status_tracker.py` für Status-Tracking
+  - Klare Trennung von Concerns
+
+### 📈 Vorteile
+
+1. **Wartbarkeit:** HTML/CSS/JS in separaten Dateien mit Syntax-Highlighting
+2. **Testbarkeit:** Blueprints einzeln testbar
+3. **Skalierbarkeit:** Einfach neue Routes hinzufügen
+4. **Best Practices:** Flask-Standards eingehalten
+5. **Developer Experience:** Code-Completion, Syntax-Highlighting, Debugging
+
+### 🔄 Backward Compatibility
+
+- **Keine Breaking Changes:** Alle Imports funktionieren weiterhin
+- `webgui.py` bleibt als Legacy-Wrapper erhalten
+- `create_app()` und `run_webgui()` funktionieren wie vorher
+
 ## [2.5.6] - 2025-11-10
 
 ### 🐛 CRITICAL FIX - Progressbar Default Settings

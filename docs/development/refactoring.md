@@ -2,6 +2,15 @@
 
 ## Overview
 
+This document describes the major refactoring efforts in CineRipR:
+
+1. **Core Module Refactoring (v2.0.0):** `archives.py` split into 6 focused modules
+2. **WebGUI Refactoring (v2.5.7):** Frontend/Backend separation with Flask Blueprints
+
+---
+
+## 1. Core Module Refactoring (v2.0.0)
+
 The `archives.py` file has been refactored from a monolithic **1204-line file** into **6 focused, maintainable modules**. This improves code organization, testability, and maintainability.
 
 ## New Module Structure
@@ -192,7 +201,75 @@ With this new structure, future enhancements become easier:
 3. **Improve error handling**: Modify only `file_operations.py`
 4. **Add new features**: Clear module boundaries make it obvious where to add code
 
+---
+
+## 2. WebGUI Refactoring (v2.5.7)
+
+The `webgui.py` file has been refactored from a monolithic **2752-line file** into a modern, maintainable structure with complete Frontend/Backend separation.
+
+### New Structure
+
+**Before:**
+- `webgui.py` = 2752 Zeilen (alles in einer Datei)
+  - HTML, CSS, JavaScript in Python-Strings
+  - Alle Routes in einer Funktion
+  - Schwer zu warten und zu testen
+
+**After:**
+```
+src/cineripr/web/
+├── app.py                    # Flask App Factory (30 Zeilen)
+├── webgui.py                 # Legacy wrapper (vereinfacht)
+├── routes/                   # Flask Blueprints
+│   ├── views.py             # HTML Views (32 Zeilen)
+│   ├── api.py               # API Routes (137 Zeilen)
+│   └── settings.py          # Settings Routes (106 Zeilen)
+├── templates/               # HTML Templates
+│   └── index.html           # Dashboard Template (1242 Zeilen)
+├── static/                  # Static Files
+│   ├── css/style.css        # CSS Styles (1215 Zeilen)
+│   ├── js/app.js            # JavaScript (760 Zeilen)
+│   └── favicon.svg          # Favicon
+└── services/                # Services Layer
+    └── status_tracker.py     # Status Tracker Wrapper
+```
+
+### Key Improvements
+
+1. **Frontend/Backend Separation:**
+   - HTML in `templates/index.html`
+   - CSS in `static/css/style.css`
+   - JavaScript in `static/js/app.js`
+   - Favicon in `static/favicon.svg`
+
+2. **Flask Blueprints:**
+   - `views_bp` für HTML-Seiten
+   - `api_bp` für API-Endpunkte
+   - `settings_bp` für Settings-Verwaltung
+
+3. **Flask App Factory:**
+   - `create_app()` für zentrale App-Erstellung
+   - Tracker-Initialisierung mit DB-Werten
+   - Blueprint-Registrierung
+
+### Benefits
+
+1. **Maintainability:** HTML/CSS/JS in separate files with syntax highlighting
+2. **Testability:** Blueprints can be tested individually
+3. **Scalability:** Easy to add new routes
+4. **Best Practices:** Follows Flask standards
+5. **Developer Experience:** Code completion, syntax highlighting, debugging
+
+### Backward Compatibility
+
+- **No Breaking Changes:** All imports work as before
+- `webgui.py` remains as legacy wrapper
+- `create_app()` and `run_webgui()` work as before
+- All API endpoints remain unchanged
+
+---
+
 ## Conclusion
 
-This refactoring significantly improves code quality while maintaining all existing functionality. The modular structure provides a solid foundation for future development and maintenance.
+These refactorings significantly improve code quality while maintaining all existing functionality. The modular structure provides a solid foundation for future development and maintenance.
 
