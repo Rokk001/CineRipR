@@ -2605,13 +2605,16 @@ def create_app() -> Flask:
             db.set(key, data["value"])
             _logger.info(f"🔧 [DEBUG] Setting '{key}' saved to DB successfully")
             
-            # Update countdown/repeat mode after EVERY setting save (FIX v2.5.3, DEBUG v2.5.4)
+            # Update countdown/repeat mode after EVERY setting save (FIX v2.5.3, DEBUG v2.5.4, FIX v2.5.6)
             # This ensures countdown is always in sync with DB, regardless of race conditions
             try:
                 _logger.info(f"🔧 [DEBUG] Reading settings from DB...")
-                # Always reload from DB to get the latest values
-                repeat_forever = db.get("repeat_forever", False)
-                repeat_after_minutes = db.get("repeat_after_minutes", 30)
+                # CRITICAL FIX v2.5.6: Use get_all() to get correct DEFAULT_SETTINGS
+                # db.get() doesn't use DEFAULT_SETTINGS, only the default parameter
+                # get_all() returns DEFAULT_SETTINGS.copy() with DB overrides, which is correct
+                db_settings = db.get_all()
+                repeat_forever = db_settings.get("repeat_forever")
+                repeat_after_minutes = db_settings.get("repeat_after_minutes")
                 
                 _logger.info(f"🔧 [DEBUG] DB values: repeat_forever={repeat_forever}, repeat_after_minutes={repeat_after_minutes}")
                 
