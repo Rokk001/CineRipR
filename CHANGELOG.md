@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.10] - 2025-11-10
+
+### 🐛 Critical Bug Fixes
+
+- **TemplateNotFound: index.html - Root Cause Fixed:**
+  - Templates und Static Files wurden nicht im installierten Paket mitgeliefert
+  - `pyproject.toml` hatte keine `package-data` Konfiguration
+  - Fix: `[tool.setuptools.package-data]` hinzugefügt für `cineripr.web`
+  - Templates (`templates/**/*`) und Static Files (`static/**/*`) werden jetzt im Wheel-Paket enthalten
+
+### 🔧 Technical Details
+
+- `pyproject.toml`: `[tool.setuptools.package-data]` Konfiguration hinzugefügt
+- Templates und Static Files werden jetzt korrekt im installierten Paket enthalten
+- Docker-Build enthält jetzt alle benötigten Dateien
+
 ## [2.5.9] - 2025-11-10
 
 ### 🐛 Critical Bug Fixes
