@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.11] - 2025-11-10
+
+### 🎨 UI Improvements
+
+- **Progressbar UX Verbesserungen:**
+  - `header-status-basic` wird ausgeblendet, wenn die Progressbar angezeigt wird
+  - Keine redundante "Idle" Anzeige mehr - nur noch in der Progressbar
+  - Saubereres, konsistentes UI-Design
+
+- **Footer Cleanup:**
+  - "Auto-refresh every 2 seconds" Text entfernt
+  - Footer zeigt jetzt nur noch relevante Informationen
+  - Kommentare in JavaScript angepasst (Smart Refresh)
+
+### 🔧 Technical Details
+
+- JavaScript: `header-status-basic` wird dynamisch ein-/ausgeblendet
+- HTML: Footer-Text entfernt
+- JavaScript: Kommentare aktualisiert für Smart Refresh
+
 ## [2.5.10] - 2025-11-10
 
 ### 🐛 Critical Bug Fixes

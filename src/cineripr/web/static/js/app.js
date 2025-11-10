@@ -532,9 +532,14 @@ function updateStatus() {
                 const countdownContainer = document.getElementById('countdown-container');
                 const countdownFill = document.getElementById('countdown-fill');
                 const countdownTime = document.getElementById('countdown-time');
+                const headerStatusBasic = document.querySelector('.header-status-basic');
                 
                 if (isIdle && (hasNextRun || hasRepeatMode)) {
                     countdownContainer.style.display = 'flex';
+                    // Hide header-status-basic when progressbar is shown
+                    if (headerStatusBasic) {
+                        headerStatusBasic.style.display = 'none';
+                    }
                     
                     const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
                     const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
@@ -558,12 +563,20 @@ function updateStatus() {
                     countdownFill.style.background = `linear-gradient(90deg, rgb(${red}, ${green}, ${blue}) 0%, rgb(${Math.max(0, red - 20)}, ${Math.max(0, green - 20)}, ${Math.max(0, blue - 20)}) 100%)`;
                 } else if (isIdle) {
                     countdownContainer.style.display = 'none';
+                    // Show header-status-basic when progressbar is hidden
+                    if (headerStatusBasic) {
+                        headerStatusBasic.style.display = 'flex';
+                    }
                     const statusText = document.getElementById('status-text');
                     if (statusText) {
                         statusText.textContent = 'Idle (Manual Mode)';
                     }
                 } else {
                     countdownContainer.style.display = 'none';
+                    // Show header-status-basic when progressbar is hidden
+                    if (headerStatusBasic) {
+                        headerStatusBasic.style.display = 'flex';
+                    }
                 }
             }
             
@@ -888,7 +901,7 @@ function updateDisk(name, used, free, percent) {
 }
 
 // Initial load and auto-refresh
-// FIX v2.5.5: Ensure only ONE interval runs, use 2s as shown in footer
+// Smart refresh: Updates only when data changes (conditional rendering)
 (function() {
     let statusInterval = null;
     function startStatusUpdates() {
@@ -896,7 +909,7 @@ function updateDisk(name, used, free, percent) {
             clearInterval(statusInterval); // Clear any existing interval
         }
         updateStatus(); // Initial call
-        statusInterval = setInterval(updateStatus, 2000); // 2 seconds as shown in footer
+        statusInterval = setInterval(updateStatus, 2000); // Poll every 2 seconds, but only update DOM when data changes
     }
     startStatusUpdates();
 })();
