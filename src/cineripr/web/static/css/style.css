@@ -213,24 +213,26 @@ body {
 }
 
 .countdown-run-now-btn {
-    padding: 4px 10px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
+    padding: 0;
+    background: none;
+    border: none;
     color: white;
     cursor: pointer;
-    font-size: 0.7em;
-    font-weight: 600;
+    font-size: 1.2em;
+    font-weight: 400;
     transition: all 0.2s;
     white-space: nowrap;
     margin-left: 8px;
     z-index: 11;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .countdown-run-now-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: scale(1.05);
+    opacity: 1;
+    transform: scale(1.15);
 }
 
 .header-control-btn:hover {

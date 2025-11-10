@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.12] - 2025-11-10
+
+### 🎨 UI Improvements
+
+- **Progressbar "Run Now" Button Redesign:**
+  - Button zeigt jetzt nur noch das Icon "⏭️" (ohne Text)
+  - Kein Button-Hintergrund, kein Border, kein Padding mehr
+  - Minimalistisches Design - nur Icon mit subtilem Hover-Effekt
+  - Hover: Opacity 0.8 → 1.0, Scale 1.15
+
+### 🔧 Technical Details
+
+- HTML: Button-Text von "⏭️ Run Now" zu nur "⏭️" geändert
+- CSS: Button-Styling komplett überarbeitet (kein Hintergrund, Border, Padding)
+- CSS: Hover-Effekt angepasst (Opacity + Scale statt Hintergrund)
+
 ## [2.5.11] - 2025-11-10
 
 ### 🎨 UI Improvements
