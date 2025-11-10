@@ -287,6 +287,20 @@ class StatusTracker:
                         error=item["error"],
                     )
                 )
+            
+            # CRITICAL FIX v2.5.7: Load repeat_mode and repeat_interval_minutes from DB
+            # This ensures progressbar shows correctly even if cli.py hasn't called set_repeat_mode yet
+            db_settings = db.get_all()
+            repeat_forever = db_settings.get("repeat_forever", True)  # Default: True
+            repeat_after_minutes = db_settings.get("repeat_after_minutes", 30)  # Default: 30
+            
+            self._status.repeat_mode = bool(repeat_forever)
+            self._status.repeat_interval_minutes = int(repeat_after_minutes)
+            
+            # If repeat mode is enabled, set next_run_time
+            if repeat_forever and repeat_after_minutes > 0:
+                from datetime import timedelta
+                self._status.next_run_time = datetime.now() + timedelta(minutes=repeat_after_minutes)
         except Exception as e:
             # If DB loading fails, continue with empty state
             import logging
@@ -465,8 +479,11 @@ class StatusTracker:
         """Get a copy of the current status."""
         with self._lock:
             # Return a copy to avoid race conditions
+            # CRITICAL FIX v2.5.7: Copy ALL fields including repeat_mode, repeat_interval_minutes, next_run_time
+            from dataclasses import replace
             status = GlobalStatus(
                 is_running=self._status.is_running,
+                is_paused=self._status.is_paused,  # FIX: was missing
                 current_operation=self._status.current_operation,
                 processed_count=self._status.processed_count,
                 failed_count=self._status.failed_count,
@@ -493,6 +510,15 @@ class StatusTracker:
                 recent_logs=self._status.recent_logs.copy(),
                 start_time=self._status.start_time,
                 last_completion_time=self._status.last_completion_time,
+                queue=self._status.queue.copy(),  # FIX: was missing
+                system_health=replace(self._status.system_health),  # FIX: was missing (use replace for dataclass copy)
+                notifications=self._status.notifications.copy(),  # FIX: was missing
+                history=self._status.history.copy(),  # FIX: was missing
+                theme_preference=self._status.theme_preference,  # FIX: was missing
+                # CRITICAL FIX v2.5.7: Copy repeat_mode, repeat_interval_minutes, and next_run_time
+                repeat_mode=self._status.repeat_mode,  # FIX: was missing
+                repeat_interval_minutes=self._status.repeat_interval_minutes,  # FIX: was missing
+                next_run_time=self._status.next_run_time,  # FIX: was missing
             )
             return status
 

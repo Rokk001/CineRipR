@@ -2497,6 +2497,23 @@ def create_app() -> Flask:
     app = Flask(__name__)
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     tracker = get_status_tracker()
+    
+    # CRITICAL FIX v2.5.7: Ensure tracker is initialized with DB settings
+    # This is a fallback in case __init__ didn't load them (e.g., if DB wasn't ready)
+    try:
+        from .settings_db import get_settings_db
+        db = get_settings_db()
+        db_settings = db.get_all()
+        repeat_forever = db_settings.get("repeat_forever", True)  # Default: True
+        repeat_after_minutes = db_settings.get("repeat_after_minutes", 30)  # Default: 30
+        
+        tracker.set_repeat_mode(bool(repeat_forever), interval_minutes=int(repeat_after_minutes))
+        
+        if repeat_forever and repeat_after_minutes > 0:
+            tracker.set_next_run(int(repeat_after_minutes))
+    except Exception as e:
+        _logger = logging.getLogger(__name__)
+        _logger.debug(f"Failed to initialize tracker with DB settings in create_app: {e}")
 
     @app.route("/")
     def index() -> str:
