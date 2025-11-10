@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.8] - 2025-11-10
+
+### 🐛 Bug Fixes
+
+- **Progressbar Improvements:**
+  - Prozentanzeige entfernt, nur noch "Idle (mm:ss)" angezeigt
+  - Farbverlauf: 100% = rot, 0% = grün (intuitiver)
+  - "Run Now" Button direkt in Progressbar integriert
+
+- **Run Now Problem Fixed:**
+  - Progressbar verschwindet nicht mehr nach Klick
+  - Queue, Logs und History bleiben sichtbar
+  - Trigger wird sofort erkannt (vor Sleep geprüft)
+
+- **Disk Space Display Fixed:**
+  - Disk Space wird jetzt korrekt angezeigt
+  - UNC-Pfade (z.B. `\\SERVER\Share`) funktionieren jetzt
+  - `Path.exists()` Checks entfernt, direkter `disk_usage()` Aufruf
+
+### ⚡ Performance Optimizations
+
+- **Smart Refresh - Nur bei Änderungen:**
+  - History, Queue, Logs werden nur bei Änderungen gerendert
+  - Keine "nervösen" 2-Sekunden-Refreshes mehr
+  - Deutlich weniger DOM-Updates, bessere Performance
+  - Change Detection für alle UI-Komponenten
+
+### 🔧 Technical Details
+
+- JavaScript: Helper-Funktionen für Array/Object-Vergleiche
+- Backend: Direkter `disk_usage()` Aufruf für UNC-Pfade
+- Backend: `trigger_run_now()` löscht `next_run_time` nicht mehr
+- Backend: Trigger wird VOR dem Sleep geprüft
+
 ## [2.5.7] - 2025-11-10
 
 ### 🏗️ MAJOR REFACTORING - Frontend/Backend Trennung

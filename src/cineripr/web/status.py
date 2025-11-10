@@ -613,70 +613,79 @@ class StatusTracker:
         
         with self._lock:
             if downloads_path:
-                if downloads_path.exists():
-                    try:
-                        usage = shutil.disk_usage(downloads_path)
-                        self._status.system_health.disk_downloads_total_gb = (
-                            usage.total / (1024**3)
-                        )
-                        self._status.system_health.disk_downloads_used_gb = (
-                            usage.used / (1024**3)
-                        )
-                        self._status.system_health.disk_downloads_free_gb = (
-                            usage.free / (1024**3)
-                        )
-                        self._status.system_health.disk_downloads_percent = (
-                            (usage.used / usage.total) * 100 if usage.total > 0 else 0
-                        )
-                        _logger.debug(f"System Health: Downloads path {downloads_path} - {usage.used / (1024**3):.2f} GB used")
-                    except Exception as e:
-                        _logger.error(f"Failed to get disk usage for downloads_path {downloads_path}: {e}")
-                else:
-                    _logger.warning(f"System Health: Downloads path {downloads_path} does not exist")
+                try:
+                    # Directly call disk_usage - works with UNC paths even if exists() returns False
+                    usage = shutil.disk_usage(downloads_path)
+                    self._status.system_health.disk_downloads_total_gb = (
+                        usage.total / (1024**3)
+                    )
+                    self._status.system_health.disk_downloads_used_gb = (
+                        usage.used / (1024**3)
+                    )
+                    self._status.system_health.disk_downloads_free_gb = (
+                        usage.free / (1024**3)
+                    )
+                    self._status.system_health.disk_downloads_percent = (
+                        (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                    )
+                    _logger.debug(f"System Health: Downloads path {downloads_path} - {usage.used / (1024**3):.2f} GB used")
+                except Exception as e:
+                    _logger.error(f"Failed to get disk usage for downloads_path {downloads_path}: {e}")
+                    # Set to 0 on error
+                    self._status.system_health.disk_downloads_total_gb = 0.0
+                    self._status.system_health.disk_downloads_used_gb = 0.0
+                    self._status.system_health.disk_downloads_free_gb = 0.0
+                    self._status.system_health.disk_downloads_percent = 0.0
 
             if extracted_path:
-                if extracted_path.exists():
-                    try:
-                        usage = shutil.disk_usage(extracted_path)
-                        self._status.system_health.disk_extracted_total_gb = (
-                            usage.total / (1024**3)
-                        )
-                        self._status.system_health.disk_extracted_used_gb = (
-                            usage.used / (1024**3)
-                        )
-                        self._status.system_health.disk_extracted_free_gb = (
-                            usage.free / (1024**3)
-                        )
-                        self._status.system_health.disk_extracted_percent = (
-                            (usage.used / usage.total) * 100 if usage.total > 0 else 0
-                        )
-                        _logger.debug(f"System Health: Extracted path {extracted_path} - {usage.used / (1024**3):.2f} GB used")
-                    except Exception as e:
-                        _logger.error(f"Failed to get disk usage for extracted_path {extracted_path}: {e}")
-                else:
-                    _logger.warning(f"System Health: Extracted path {extracted_path} does not exist")
+                try:
+                    # Directly call disk_usage - works with UNC paths even if exists() returns False
+                    usage = shutil.disk_usage(extracted_path)
+                    self._status.system_health.disk_extracted_total_gb = (
+                        usage.total / (1024**3)
+                    )
+                    self._status.system_health.disk_extracted_used_gb = (
+                        usage.used / (1024**3)
+                    )
+                    self._status.system_health.disk_extracted_free_gb = (
+                        usage.free / (1024**3)
+                    )
+                    self._status.system_health.disk_extracted_percent = (
+                        (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                    )
+                    _logger.debug(f"System Health: Extracted path {extracted_path} - {usage.used / (1024**3):.2f} GB used")
+                except Exception as e:
+                    _logger.error(f"Failed to get disk usage for extracted_path {extracted_path}: {e}")
+                    # Set to 0 on error
+                    self._status.system_health.disk_extracted_total_gb = 0.0
+                    self._status.system_health.disk_extracted_used_gb = 0.0
+                    self._status.system_health.disk_extracted_free_gb = 0.0
+                    self._status.system_health.disk_extracted_percent = 0.0
 
             if finished_path:
-                if finished_path.exists():
-                    try:
-                        usage = shutil.disk_usage(finished_path)
-                        self._status.system_health.disk_finished_total_gb = (
-                            usage.total / (1024**3)
-                        )
-                        self._status.system_health.disk_finished_used_gb = (
-                            usage.used / (1024**3)
-                        )
-                        self._status.system_health.disk_finished_free_gb = (
-                            usage.free / (1024**3)
-                        )
-                        self._status.system_health.disk_finished_percent = (
-                            (usage.used / usage.total) * 100 if usage.total > 0 else 0
-                        )
-                        _logger.debug(f"System Health: Finished path {finished_path} - {usage.used / (1024**3):.2f} GB used")
-                    except Exception as e:
-                        _logger.error(f"Failed to get disk usage for finished_path {finished_path}: {e}")
-                else:
-                    _logger.warning(f"System Health: Finished path {finished_path} does not exist")
+                try:
+                    # Directly call disk_usage - works with UNC paths even if exists() returns False
+                    usage = shutil.disk_usage(finished_path)
+                    self._status.system_health.disk_finished_total_gb = (
+                        usage.total / (1024**3)
+                    )
+                    self._status.system_health.disk_finished_used_gb = (
+                        usage.used / (1024**3)
+                    )
+                    self._status.system_health.disk_finished_free_gb = (
+                        usage.free / (1024**3)
+                    )
+                    self._status.system_health.disk_finished_percent = (
+                        (usage.used / usage.total) * 100 if usage.total > 0 else 0
+                    )
+                    _logger.debug(f"System Health: Finished path {finished_path} - {usage.used / (1024**3):.2f} GB used")
+                except Exception as e:
+                    _logger.error(f"Failed to get disk usage for finished_path {finished_path}: {e}")
+                    # Set to 0 on error
+                    self._status.system_health.disk_finished_total_gb = 0.0
+                    self._status.system_health.disk_finished_used_gb = 0.0
+                    self._status.system_health.disk_finished_free_gb = 0.0
+                    self._status.system_health.disk_finished_percent = 0.0
 
             # Always update 7-Zip version if provided (even if "Unknown")
             if seven_zip_version is not None:
@@ -845,7 +854,7 @@ class StatusTracker:
         """Trigger immediate run (skip sleep)."""
         with self._lock:
             self._trigger_now = True
-            self.clear_next_run()
+            # Don't clear next_run_time - let frontend show "Starting..." state
 
     def should_trigger_now(self) -> bool:
         """Check if manual trigger was requested."""

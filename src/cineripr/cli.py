@@ -970,17 +970,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             _LOGGER.info("💤 Next run scheduled in %s minute(s)...", delay)
             tracker.add_log("INFO", f"Next run in {delay} minute(s)")
 
-            # Sleep with live countdown updates
-            end_time = time.time() + (delay * 60)
-            last_system_health_update = 0
-            last_settings_check = 0
+            # Check for manual trigger BEFORE sleep (FIX v2.5.8)
+            if tracker.should_trigger_now():
+                _LOGGER.info("⚡ Manual trigger received - starting run now!")
+                tracker.add_log("INFO", "Manual trigger - starting immediately")
+            else:
+                # Sleep with live countdown updates
+                end_time = time.time() + (delay * 60)
+                last_system_health_update = 0
+                last_settings_check = 0
 
-            while time.time() < end_time:
-                # Check for manual trigger (NEW in v2.1.0)
-                if tracker.should_trigger_now():
-                    _LOGGER.info("⚡ Manual trigger received - starting run now!")
-                    tracker.add_log("INFO", "Manual trigger - starting immediately")
-                    break
+                while time.time() < end_time:
+                    # Check for manual trigger (NEW in v2.1.0)
+                    if tracker.should_trigger_now():
+                        _LOGGER.info("⚡ Manual trigger received - starting run now!")
+                        tracker.add_log("INFO", "Manual trigger - starting immediately")
+                        break
 
                 # Check if settings changed during sleep (FIX v2.5.5)
                 # This ensures WebGUI changes are immediately reflected

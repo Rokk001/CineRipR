@@ -235,8 +235,7 @@ function triggerRunNow() {
             .then(r => r.json())
             .then(data => {
                 showToast('success', 'Run Triggered', 'Starting processing now...', true);
-                // Hide countdown progressbar immediately
-                document.getElementById('countdown-container').style.display = 'none';
+                // Don't hide progressbar - let it show "Starting..." state
             })
             .catch(err => {
                 showToast('error', 'Error', 'Failed to trigger run');
@@ -451,9 +450,28 @@ loadThemePreference();
 
 function updateStatus() {
     fetch('/api/status')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) {
+                throw new Error(`HTTP error! status: ${r.status}`);
+            }
+            return r.json();
+        })
         .then(data => {
-            // Stats
+            // Helper function to check if arrays are equal
+            function arraysEqual(a, b) {
+                if (!a || !b) return a === b;
+                if (a.length !== b.length) return false;
+                // Compare by JSON string for simplicity
+                return JSON.stringify(a) === JSON.stringify(b);
+            }
+            
+            // Helper function to check if objects are equal (for system health)
+            function objectsEqual(a, b) {
+                if (!a || !b) return a === b;
+                return JSON.stringify(a) === JSON.stringify(b);
+            }
+            
+            // Stats - only update if changed (updateValue already does this)
             updateValue('processed', data.processed_count || 0);
             updateValue('failed', data.failed_count || 0);
             updateValue('unsupported', data.unsupported_count || 0);
@@ -472,254 +490,354 @@ function updateStatus() {
                 }
             }
             
-            // Status
+            // Status - only update if changed
             const isRunning = data.is_running || false;
             const isPaused = data.is_paused || false;
-            const statusDot = document.getElementById('status-dot');
-            const statusText = document.getElementById('status-text');
+            const prevIsRunning = previousStatus.is_running || false;
+            const prevIsPaused = previousStatus.is_paused || false;
             
-            if (isPaused) {
-                statusDot.classList.remove('running');
-                statusText.textContent = 'Paused';
-            } else if (isRunning) {
-                statusDot.classList.add('running');
-                statusText.textContent = 'Processing';
-            } else {
-                statusDot.classList.remove('running');
-                statusText.textContent = 'Idle';
+            if (isRunning !== prevIsRunning || isPaused !== prevIsPaused) {
+                const statusDot = document.getElementById('status-dot');
+                const statusText = document.getElementById('status-text');
+                
+                if (isPaused) {
+                    statusDot.classList.remove('running');
+                    statusText.textContent = 'Paused';
+                } else if (isRunning) {
+                    statusDot.classList.add('running');
+                    statusText.textContent = 'Processing';
+                } else {
+                    statusDot.classList.remove('running');
+                    statusText.textContent = 'Idle';
+                }
             }
             
-            // Countdown Progressbar (NEW in v2.5.0)
-            const countdownContainer = document.getElementById('countdown-container');
-            const countdownFill = document.getElementById('countdown-fill');
-            const countdownPercentage = document.getElementById('countdown-percentage');
-            const countdownTime = document.getElementById('countdown-time');
-            
+            // Countdown Progressbar - only update if changed
             const isIdle = !isRunning && !isPaused;
             const hasNextRun = data.seconds_until_next_run !== null && data.seconds_until_next_run >= 0;
-            // CRITICAL FIX v2.5.5: Show progressbar if repeat mode is enabled, even if seconds_until_next_run is null
             const hasRepeatMode = data.repeat_mode && data.repeat_interval_minutes > 0;
             
-            if (isIdle && (hasNextRun || hasRepeatMode)) {
-                // Show countdown progressbar
-                countdownContainer.style.display = 'flex';
+            const prevSecondsUntilNextRun = previousStatus.seconds_until_next_run;
+            const prevRepeatMode = previousStatus.repeat_mode;
+            const prevRepeatInterval = previousStatus.repeat_interval_minutes;
+            
+            const countdownChanged = 
+                data.seconds_until_next_run !== prevSecondsUntilNextRun ||
+                data.repeat_mode !== prevRepeatMode ||
+                data.repeat_interval_minutes !== prevRepeatInterval ||
+                isRunning !== prevIsRunning ||
+                isPaused !== prevIsPaused;
+            
+            if (countdownChanged) {
+                const countdownContainer = document.getElementById('countdown-container');
+                const countdownFill = document.getElementById('countdown-fill');
+                const countdownTime = document.getElementById('countdown-time');
                 
-                // Calculate percentage (inverse: 100% = just finished, 0% = starting now)
-                const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
-                // If seconds_until_next_run is null but repeat mode is active, show 100% (just started)
-                const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
-                const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
-                
-                // Update progressbar
-                countdownFill.style.width = percentage + '%';
-                countdownPercentage.textContent = Math.round(percentage) + '%';
-                
-                // Format time
-                const hours = Math.floor(remainingSeconds / 3600);
-                const minutes = Math.floor((remainingSeconds % 3600) / 60);
-                const seconds = remainingSeconds % 60;
-                
-                let timeString;
-                if (hours > 0) {
-                    timeString = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                if (isIdle && (hasNextRun || hasRepeatMode)) {
+                    countdownContainer.style.display = 'flex';
+                    
+                    const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
+                    const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
+                    const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
+                    
+                    countdownFill.style.width = percentage + '%';
+                    
+                    // Format time as "Idle (mm:ss)"
+                    const minutes = Math.floor(remainingSeconds / 60);
+                    const seconds = remainingSeconds % 60;
+                    const timeString = `Idle (${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')})`;
+                    countdownTime.textContent = timeString;
+                    
+                    // Color gradient: 100% = red, 0% = green (inverse of percentage)
+                    const redPercent = percentage;
+                    const greenPercent = 100 - percentage;
+                    // Interpolate between red (#dc2626) and green (#10b981)
+                    const red = Math.floor(220 - (greenPercent / 100) * 186); // 220 -> 34
+                    const green = Math.floor(38 + (greenPercent / 100) * 159); // 38 -> 197
+                    const blue = Math.floor(38 - (greenPercent / 100) * 38); // 38 -> 0
+                    countdownFill.style.background = `linear-gradient(90deg, rgb(${red}, ${green}, ${blue}) 0%, rgb(${Math.max(0, red - 20)}, ${Math.max(0, green - 20)}, ${Math.max(0, blue - 20)}) 100%)`;
+                } else if (isIdle) {
+                    countdownContainer.style.display = 'none';
+                    const statusText = document.getElementById('status-text');
+                    if (statusText) {
+                        statusText.textContent = 'Idle (Manual Mode)';
+                    }
                 } else {
-                    timeString = `${minutes}:${String(seconds).padStart(2, '0')}`;
+                    countdownContainer.style.display = 'none';
                 }
-                countdownTime.textContent = timeString;
-                
-                // Color based on time remaining
-                if (percentage < 20) {
-                    countdownFill.style.background = 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'; // Red
-                } else if (percentage < 50) {
-                    countdownFill.style.background = 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'; // Orange
-                } else {
-                    countdownFill.style.background = 'linear-gradient(90deg, var(--accent-color) 0%, rgba(139, 92, 246, 0.7) 100%)'; // Purple
-                }
-            } else if (isIdle) {
-                // Idle but no next run (manual mode)
-                countdownContainer.style.display = 'none';
-                statusText.textContent = 'Idle (Manual Mode)';
-            } else {
-                // Processing or Paused
-                countdownContainer.style.display = 'none';
             }
             
-            // Control panel (REMOVED in v2.2.5 - replaced by header button)
-            // Legacy code removed
-            
-            // Current operation
+            // Current operation - only update if changed
             const release = data.current_release;
-            if (release && isRunning) {
-                document.getElementById('release-name').textContent = release.release_name || '-';
-                document.getElementById('archive-name').textContent = release.current_archive || '-';
-                document.getElementById('status-message').textContent = release.message || '-';
-                
-                const progress = release.archive_total > 0 
-                    ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
-                
-                document.getElementById('progress-fill').style.width = progress + '%';
-                document.getElementById('progress-text').textContent = progress + '%';
-            } else {
-                document.getElementById('release-name').textContent = '-';
-                document.getElementById('archive-name').textContent = '-';
-                document.getElementById('status-message').textContent = isRunning ? 'Initializing...' : 'Waiting for files...';
-                document.getElementById('progress-fill').style.width = '0%';
-                document.getElementById('progress-text').textContent = '0%';
+            const prevRelease = previousStatus.current_release;
+            const releaseChanged = 
+                !release !== !prevRelease ||
+                (release && prevRelease && (
+                    release.release_name !== prevRelease.release_name ||
+                    release.current_archive !== prevRelease.current_archive ||
+                    release.archive_progress !== prevRelease.archive_progress ||
+                    release.archive_total !== prevRelease.archive_total ||
+                    release.message !== prevRelease.message ||
+                    release.status !== prevRelease.status
+                ));
+            
+            if (releaseChanged || isRunning !== prevIsRunning) {
+                if (release && isRunning) {
+                    document.getElementById('release-name').textContent = release.release_name || '-';
+                    document.getElementById('archive-name').textContent = release.current_archive || '-';
+                    document.getElementById('status-message').textContent = release.message || '-';
+                    
+                    const progress = release.archive_total > 0 
+                        ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
+                    
+                    document.getElementById('progress-fill').style.width = progress + '%';
+                    document.getElementById('progress-text').textContent = progress + '%';
+                } else {
+                    document.getElementById('release-name').textContent = '-';
+                    document.getElementById('archive-name').textContent = '-';
+                    document.getElementById('status-message').textContent = isRunning ? 'Initializing...' : 'Waiting for files...';
+                    document.getElementById('progress-fill').style.width = '0%';
+                    document.getElementById('progress-text').textContent = '0%';
+                }
             }
             
-            // Queue
+            // Queue - only update if changed
             const queue = data.queue || [];
-            currentQueueData = queue; // Store for modal access
-            const queueList = document.getElementById('queue-list');
-            if (queue.length === 0) {
-                queueList.innerHTML = '<div class="queue-empty">No items in queue</div>';
-            } else {
-                queueList.innerHTML = queue.map((item, index) => `
-                    <div class="queue-item" onclick="openReleaseModal(${index})">
-                        <div class="queue-dot ${item.status}"></div>
-                        <div class="queue-info">
-                            <div class="queue-name">${item.name}</div>
-                            <div class="queue-meta">${item.archive_count} archive(s) • ${item.status}</div>
+            const prevQueue = previousStatus.queue || [];
+            const queueChanged = !arraysEqual(queue, prevQueue);
+            
+            if (queueChanged) {
+                currentQueueData = queue; // Store for modal access
+                const queueList = document.getElementById('queue-list');
+                if (!queueList) return;
+                
+                if (queue.length === 0) {
+                    queueList.innerHTML = '<div class="queue-empty">No items in queue</div>';
+                } else {
+                    queueList.innerHTML = queue.map((item, index) => `
+                        <div class="queue-item" onclick="openReleaseModal(${index})">
+                            <div class="queue-dot ${item.status}"></div>
+                            <div class="queue-info">
+                                <div class="queue-name">${item.name}</div>
+                                <div class="queue-meta">${item.archive_count} archive(s) • ${item.status}</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `).join('');
+                }
+            } else {
+                // Still update currentQueueData for modal access
+                currentQueueData = queue;
             }
             
-            // System health
-            if (data.system_health) {
-                const h = data.system_health;
+            // System health - only update if changed
+            const systemHealth = data.system_health;
+            const prevSystemHealth = previousStatus.system_health;
+            const healthChanged = !objectsEqual(systemHealth, prevSystemHealth);
+            
+            if (healthChanged && systemHealth) {
+                const h = systemHealth;
                 updateDisk('downloads', h.disk_downloads_used_gb, h.disk_downloads_free_gb, h.disk_downloads_percent);
                 updateDisk('extracted', h.disk_extracted_used_gb, h.disk_extracted_free_gb, h.disk_extracted_percent);
                 updateDisk('finished', h.disk_finished_used_gb, h.disk_finished_free_gb, h.disk_finished_percent);
-                document.getElementById('seven-zip-version').textContent = h.seven_zip_version || 'Unknown';
-                document.getElementById('cpu-usage').textContent = (h.cpu_percent || 0).toFixed(1) + '%';
-                document.getElementById('memory-usage').textContent = (h.memory_percent || 0).toFixed(1) + '%';
-            }
-            
-            // Logs
-            const logsContainer = document.getElementById('logs-container');
-            const currentScroll = logsContainer.scrollTop;
-            const isBottom = logsContainer.scrollHeight - logsContainer.clientHeight <= currentScroll + 10;
-            
-            if (data.recent_logs && data.recent_logs.length > 0) {
-                logsContainer.innerHTML = data.recent_logs.slice().reverse().map(log => {
-                    const time = new Date(log.timestamp).toLocaleTimeString('de-DE');
-                    const level = (log.level || 'info').toLowerCase();
-                    return `<div class="log-entry ${level}" data-level="${level}">[${time}] [${log.level}] ${log.message}</div>`;
-                }).join('');
                 
-                filterLogs();
+                const sevenZipEl = document.getElementById('seven-zip-version');
+                if (sevenZipEl && sevenZipEl.textContent !== (h.seven_zip_version || 'Unknown')) {
+                    sevenZipEl.textContent = h.seven_zip_version || 'Unknown';
+                }
                 
-                if (isBottom) {
-                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                const cpuEl = document.getElementById('cpu-usage');
+                if (cpuEl) {
+                    const cpuText = (h.cpu_percent || 0).toFixed(1) + '%';
+                    if (cpuEl.textContent !== cpuText) {
+                        cpuEl.textContent = cpuText;
+                    }
+                }
+                
+                const memEl = document.getElementById('memory-usage');
+                if (memEl) {
+                    const memText = (h.memory_percent || 0).toFixed(1) + '%';
+                    if (memEl.textContent !== memText) {
+                        memEl.textContent = memText;
+                    }
                 }
             }
             
-            // History
+            // Logs - only update if changed
+            const logs = data.recent_logs || [];
+            const prevLogs = previousStatus.recent_logs || [];
+            const logsChanged = !arraysEqual(logs, prevLogs);
+            
+            if (logsChanged) {
+                const logsContainer = document.getElementById('logs-container');
+                if (!logsContainer) return;
+                
+                const currentScroll = logsContainer.scrollTop;
+                const isBottom = logsContainer.scrollHeight - logsContainer.clientHeight <= currentScroll + 10;
+                
+                if (logs.length > 0) {
+                    logsContainer.innerHTML = logs.slice().reverse().map(log => {
+                        const time = new Date(log.timestamp).toLocaleTimeString('de-DE');
+                        const level = (log.level || 'info').toLowerCase();
+                        return `<div class="log-entry ${level}" data-level="${level}">[${time}] [${log.level}] ${log.message}</div>`;
+                    }).join('');
+                    
+                    filterLogs();
+                    
+                    if (isBottom) {
+                        logsContainer.scrollTop = logsContainer.scrollHeight;
+                    }
+                } else {
+                    logsContainer.innerHTML = '';
+                }
+            }
+            
+            // History - only update if changed
             const history = data.history || [];
-            const historyTimeline = document.getElementById('history-timeline');
-            if (history.length === 0) {
-                historyTimeline.innerHTML = `
-                    <div class="history-empty">
-                        <div class="history-empty-icon">🕐</div>
-                        <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
-                        <div>Processed releases will appear here</div>
-                    </div>
-                `;
-            } else {
-                historyTimeline.innerHTML = history.map(item => {
-                    const endTime = new Date(item.timestamp);
-                    const timeStr = endTime.toLocaleString('en-US');
-                    const duration = item.duration_seconds || 0;
-                    const hours = Math.floor(duration / 3600);
-                    const minutes = Math.floor((duration % 3600) / 60);
-                    const seconds = Math.floor(duration % 60);
-                    const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
-                    
-                    const isSuccess = item.status === 'completed';
-                    const markerClass = isSuccess ? 'success' : 'failed';
-                    const borderColor = isSuccess ? '#10b981' : '#ef4444';
-                    
-                    return `
-                        <div class="timeline-item">
-                            <div class="timeline-marker ${markerClass}"></div>
-                            <div class="timeline-content" style="--timeline-color: ${borderColor}">
-                                <div class="timeline-header">
-                                    <div class="timeline-title">${item.release_name}</div>
-                                    <div class="timeline-time">${timeStr}</div>
-                                </div>
-                                <div class="timeline-meta">
-                                    <div class="timeline-meta-item">
-                                        <span>⏱</span> ${durationStr}
-                                    </div>
-                                    <div class="timeline-meta-item">
-                                        <span>📦</span> Processed: ${item.processed_archives || 0} | Failed: ${item.failed_archives || 0}
-                                    </div>
-                                    <div class="timeline-meta-item">
-                                        <span>${isSuccess ? '✓' : '✗'}</span> ${isSuccess ? 'Completed' : 'Failed'}
-                                    </div>
-                                </div>
-                                ${item.error_messages && item.error_messages.length > 0 ? `
-                                <div class="timeline-errors">
-                                    <div style="color: #ef4444; font-weight: 600; margin-bottom: 5px;">⚠️ Errors:</div>
-                                    ${item.error_messages.slice(0, 3).map(err => `<div style="font-size: 0.85em; opacity: 0.8;">• ${err}</div>`).join('')}
-                                </div>
-                                ` : ''}
-                            </div>
+            const prevHistory = previousStatus.history || [];
+            const historyChanged = !arraysEqual(history, prevHistory);
+            
+            if (historyChanged) {
+                const historyTimeline = document.getElementById('history-timeline');
+                if (!historyTimeline) return;
+                
+                if (history.length === 0) {
+                    historyTimeline.innerHTML = `
+                        <div class="history-empty">
+                            <div class="history-empty-icon">🕐</div>
+                            <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
+                            <div>Processed releases will appear here</div>
                         </div>
                     `;
-                }).join('');
-            }
-            
-            // Update time
-            if (data.last_update) {
-                document.getElementById('last-update').textContent = new Date(data.last_update).toLocaleString('de-DE');
-            }
-            
-            // Next Run Countdown (NEW in v2.1.0)
-            const nextRunCard = document.getElementById('next-run-card');
-            if (data.repeat_mode && data.seconds_until_next_run !== null && !isRunning) {
-                const seconds = data.seconds_until_next_run;
-                
-                if (seconds > 0) {
-                    nextRunCard.style.display = 'block';
-                    
-                    const hours = Math.floor(seconds / 3600);
-                    const minutes = Math.floor((seconds % 3600) / 60);
-                    const secs = seconds % 60;
-                    
-                    const timeStr = hours > 0 
-                        ? `${hours}h ${minutes}m ${secs}s`
-                        : minutes > 0
-                            ? `${minutes}m ${secs}s`
-                            : `${secs}s`;
-                    
-                    document.getElementById('next-run-countdown').textContent = timeStr;
-                    
-                    if (data.next_run_time) {
-                        const nextRunDate = new Date(data.next_run_time);
-                        document.getElementById('next-run-text').textContent = 
-                            `at ${nextRunDate.toLocaleTimeString('de-DE')}`;
-                    }
-                    
-                    const countdownEl = document.getElementById('next-run-countdown');
-                    if (seconds < 60) {
-                        countdownEl.classList.add('pulse');
-                    } else {
-                        countdownEl.classList.remove('pulse');
-                    }
-                } else if (seconds === 0) {
-                    nextRunCard.style.display = 'block';
-                    document.getElementById('next-run-countdown').textContent = 'Starting now...';
-                    document.getElementById('next-run-text').textContent = '';
+                } else {
+                    historyTimeline.innerHTML = history.map(item => {
+                        const endTime = new Date(item.timestamp);
+                        const timeStr = endTime.toLocaleString('en-US');
+                        const duration = item.duration_seconds || 0;
+                        const hours = Math.floor(duration / 3600);
+                        const minutes = Math.floor((duration % 3600) / 60);
+                        const seconds = Math.floor(duration % 60);
+                        const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
+                        
+                        const isSuccess = item.status === 'completed';
+                        const markerClass = isSuccess ? 'success' : 'failed';
+                        const borderColor = isSuccess ? '#10b981' : '#ef4444';
+                        
+                        return `
+                            <div class="timeline-item">
+                                <div class="timeline-marker ${markerClass}"></div>
+                                <div class="timeline-content" style="--timeline-color: ${borderColor}">
+                                    <div class="timeline-header">
+                                        <div class="timeline-title">${item.release_name}</div>
+                                        <div class="timeline-time">${timeStr}</div>
+                                    </div>
+                                    <div class="timeline-meta">
+                                        <div class="timeline-meta-item">
+                                            <span>⏱</span> ${durationStr}
+                                        </div>
+                                        <div class="timeline-meta-item">
+                                            <span>📦</span> Processed: ${item.processed_archives || 0} | Failed: ${item.failed_archives || 0}
+                                        </div>
+                                        <div class="timeline-meta-item">
+                                            <span>${isSuccess ? '✓' : '✗'}</span> ${isSuccess ? 'Completed' : 'Failed'}
+                                        </div>
+                                    </div>
+                                    ${item.error_messages && item.error_messages.length > 0 ? `
+                                    <div class="timeline-errors">
+                                        <div style="color: #ef4444; font-weight: 600; margin-bottom: 5px;">⚠️ Errors:</div>
+                                        ${item.error_messages.slice(0, 3).map(err => `<div style="font-size: 0.85em; opacity: 0.8;">• ${err}</div>`).join('')}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                 }
-            } else {
-                nextRunCard.style.display = 'none';
             }
             
+            // Last update time - only update if changed (every second is fine)
+            if (data.last_update) {
+                const lastUpdateEl = document.getElementById('last-update');
+                if (lastUpdateEl) {
+                    const newText = new Date(data.last_update).toLocaleString('de-DE');
+                    if (lastUpdateEl.textContent !== newText) {
+                        lastUpdateEl.textContent = newText;
+                    }
+                }
+            }
+            
+            // Next Run Countdown - only update if changed
+            const nextRunChanged = 
+                data.repeat_mode !== prevRepeatMode ||
+                data.seconds_until_next_run !== prevSecondsUntilNextRun ||
+                data.next_run_time !== previousStatus.next_run_time ||
+                isRunning !== prevIsRunning;
+            
+            if (nextRunChanged) {
+                const nextRunCard = document.getElementById('next-run-card');
+                if (nextRunCard) {
+                    if (data.repeat_mode && data.seconds_until_next_run !== null && !isRunning) {
+                        const seconds = data.seconds_until_next_run;
+                        
+                        if (seconds > 0) {
+                            nextRunCard.style.display = 'block';
+                            
+                            const hours = Math.floor(seconds / 3600);
+                            const minutes = Math.floor((seconds % 3600) / 60);
+                            const secs = seconds % 60;
+                            
+                            const timeStr = hours > 0 
+                                ? `${hours}h ${minutes}m ${secs}s`
+                                : minutes > 0
+                                    ? `${minutes}m ${secs}s`
+                                    : `${secs}s`;
+                            
+                            const countdownEl = document.getElementById('next-run-countdown');
+                            if (countdownEl && countdownEl.textContent !== timeStr) {
+                                countdownEl.textContent = timeStr;
+                            }
+                            
+                            if (data.next_run_time) {
+                                const nextRunDate = new Date(data.next_run_time);
+                                const nextRunTextEl = document.getElementById('next-run-text');
+                                if (nextRunTextEl) {
+                                    const newText = `at ${nextRunDate.toLocaleTimeString('de-DE')}`;
+                                    if (nextRunTextEl.textContent !== newText) {
+                                        nextRunTextEl.textContent = newText;
+                                    }
+                                }
+                            }
+                            
+                            if (countdownEl) {
+                                if (seconds < 60) {
+                                    countdownEl.classList.add('pulse');
+                                } else {
+                                    countdownEl.classList.remove('pulse');
+                                }
+                            }
+                        } else if (seconds === 0) {
+                            nextRunCard.style.display = 'block';
+                            const countdownEl = document.getElementById('next-run-countdown');
+                            if (countdownEl) {
+                                countdownEl.textContent = 'Starting now...';
+                            }
+                            const nextRunTextEl = document.getElementById('next-run-text');
+                            if (nextRunTextEl) {
+                                nextRunTextEl.textContent = '';
+                            }
+                        }
+                    } else {
+                        nextRunCard.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Store current status for next comparison
             previousStatus = data;
         })
-        .catch(err => console.error('Error:', err));
+        .catch(err => {
+            console.error('Error updating status:', err);
+            // Don't break the UI - just log the error
+        });
 }
 
 function updateValue(id, value) {
@@ -734,13 +852,39 @@ function updateValue(id, value) {
 }
 
 function updateDisk(name, used, free, percent) {
-    document.getElementById(`disk-${name}-used`).textContent = `${used.toFixed(1)} GB used`;
-    document.getElementById(`disk-${name}-free`).textContent = `${free.toFixed(1)} GB free`;
-    document.getElementById(`disk-${name}-percent`).textContent = `${percent.toFixed(1)}%`;
+    const usedEl = document.getElementById(`disk-${name}-used`);
+    const freeEl = document.getElementById(`disk-${name}-free`);
+    const percentEl = document.getElementById(`disk-${name}-percent`);
+    const fillEl = document.getElementById(`disk-${name}-fill`);
     
-    const fill = document.getElementById(`disk-${name}-fill`);
-    fill.style.width = `${percent}%`;
-    fill.classList.toggle('warning', percent > 90);
+    if (usedEl) {
+        const usedText = `${used.toFixed(1)} GB used`;
+        if (usedEl.textContent !== usedText) {
+            usedEl.textContent = usedText;
+        }
+    }
+    
+    if (freeEl) {
+        const freeText = `${free.toFixed(1)} GB free`;
+        if (freeEl.textContent !== freeText) {
+            freeEl.textContent = freeText;
+        }
+    }
+    
+    if (percentEl) {
+        const percentText = `${percent.toFixed(1)}%`;
+        if (percentEl.textContent !== percentText) {
+            percentEl.textContent = percentText;
+        }
+    }
+    
+    if (fillEl) {
+        const percentStr = `${percent}%`;
+        if (fillEl.style.width !== percentStr) {
+            fillEl.style.width = percentStr;
+        }
+        fillEl.classList.toggle('warning', percent > 90);
+    }
 }
 
 // Initial load and auto-refresh

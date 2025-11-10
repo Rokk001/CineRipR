@@ -182,6 +182,9 @@ body {
     border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
 }
 
 .countdown-progressbar-fill {
@@ -189,19 +192,18 @@ body {
     left: 0;
     top: 0;
     height: 100%;
-    background: linear-gradient(90deg, var(--accent-color) 0%, rgba(139, 92, 246, 0.7) 100%);
+    background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
     transition: width 1s linear, background 0.5s ease;
     border-radius: 14px;
+    z-index: 1;
 }
 
 .countdown-progressbar-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
+    width: 100%;
     font-size: 0.8em;
     font-weight: 600;
     color: white;
@@ -210,26 +212,24 @@ body {
     white-space: nowrap;
 }
 
-.countdown-separator {
-    opacity: 0.5;
-}
-
 .countdown-run-now-btn {
-    padding: 6px 12px;
-    background: rgba(139, 92, 246, 0.2);
-    border: 1px solid var(--accent-color);
-    border-radius: 8px;
-    color: var(--accent-color);
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: white;
     cursor: pointer;
-    font-size: 0.75em;
+    font-size: 0.7em;
     font-weight: 600;
     transition: all 0.2s;
     white-space: nowrap;
+    margin-left: 8px;
+    z-index: 11;
 }
 
 .countdown-run-now-btn:hover {
-    background: var(--accent-color);
-    color: white;
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
     transform: scale(1.05);
 }
 
