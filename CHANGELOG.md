@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.13] - 2025-11-13
+
+### 🐛 Critical Bug Fixes
+
+- **Queue Duplikate verhindert:**
+  - `add_to_queue()` prüft jetzt, ob ein Eintrag mit demselben Namen bereits existiert
+  - Wenn vorhanden, wird der bestehende Eintrag aktualisiert statt ein Duplikat hinzuzufügen
+  - Verhindert endlose Queue-Füllung mit identischen Einträgen
+
+- **History Duplikate verhindert:**
+  - `add_to_history()` prüft jetzt, ob bereits ein Eintrag für denselben Release existiert
+  - Wenn vorhanden, wird der bestehende Eintrag aktualisiert und `attempt_count` erhöht
+  - Statt unzähliger identischer Einträge wird nur ein Eintrag mit Versuchsanzahl angezeigt
+  - History zeigt jetzt: "Release Name (3x versucht)" wenn mehrfach versucht wurde
+
+- **Check Interval Problem behoben:**
+  - Progressbar verwendet jetzt korrekt das konfigurierte Check Interval (z.B. 35 min)
+  - `set_next_run()` wird jetzt immer aufgerufen, wenn `repeat_forever` aktiv ist
+  - Einstellungsänderungen werden sofort in der Progressbar reflektiert
+
+### 🎯 Improvements
+
+- **History Anzeige:**
+  - Versuchsanzahl wird in der History angezeigt: "Release Name (3x versucht)"
+  - Nur wenn `attempt_count > 1`, sonst keine Anzeige
+  - Bessere Übersicht über fehlgeschlagene Versuche
+
+### 🔧 Technical Details
+
+- **`src/cineripr/web/status.py`:**
+  - `ReleaseHistory` erweitert um `attempt_count: int = 1`
+  - `add_to_queue()` prüft auf Duplikate und aktualisiert bestehende Einträge
+  - `add_to_history()` prüft auf Duplikate und inkrementiert `attempt_count`
+  - `to_dict()` gibt jetzt `attempt_count` zurück
+  - `load_history()` berücksichtigt `attempt_count` beim Laden aus DB
+
+- **`src/cineripr/web/settings_db.py`:**
+  - Datenbank-Schema erweitert um `attempt_count INTEGER DEFAULT 1`
+  - Migration hinzugefügt für bestehende Datenbanken
+  - `save_history()` und `load_history()` aktualisiert
+
+- **`src/cineripr/web/static/js/app.js`:**
+  - History-Anzeige zeigt Versuchsanzahl: `(3x versucht)`
+  - Nur wenn `attempt_count > 1`
+
+- **`src/cineripr/web/routes/settings.py`:**
+  - `set_next_run()` wird jetzt immer aufgerufen, wenn `repeat_forever` aktiv ist
+  - Stellt sicher, dass Progressbar das korrekte Interval verwendet
+
 ## [2.5.12] - 2025-11-10
 
 ### 🎨 UI Improvements

@@ -58,6 +58,7 @@ class ReleaseHistory:
     duration_seconds: float = 0.0
     extracted_files: list[str] = field(default_factory=list)
     error_messages: list[str] = field(default_factory=list)
+    attempt_count: int = 1  # NEW: Track number of attempts
 
 
 @dataclass
@@ -213,12 +214,15 @@ class GlobalStatus:
                     "duration_seconds": h.duration_seconds,
                     "extracted_files": h.extracted_files[:50],  # Limit to 50 files
                     "error_messages": h.error_messages,
+                    "attempt_count": h.attempt_count,  # NEW in v2.5.13
                 }
                 for h in self.history[-50:]  # Last 50 releases
             ],
             "theme_preference": self.theme_preference,
             # Next run tracking (NEW in v2.1.0)
-            "next_run_time": self.next_run_time.isoformat() if self.next_run_time else None,
+            "next_run_time": (
+                self.next_run_time.isoformat() if self.next_run_time else None
+            ),
             "seconds_until_next_run": self.get_seconds_until_next_run(),
             "repeat_mode": self.repeat_mode,
             "repeat_interval_minutes": self.repeat_interval_minutes,
@@ -231,12 +235,13 @@ class StatusTracker:
     def __init__(self) -> None:
         self._status = GlobalStatus()
         self._lock = threading.Lock()
-        
+
         # Load statistics and history from DB on startup
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            
+
             # Load statistics
             stats = db.load_statistics()
             self._status.processed_count = stats.get("processed_count", 0)
@@ -247,7 +252,7 @@ class StatusTracker:
             self._status.extracted_count = stats.get("extracted_count", 0)
             self._status.copied_count = stats.get("copied_count", 0)
             self._status.moved_count = stats.get("moved_count", 0)
-            
+
             # Load history
             history_data = db.load_history()
             for item in history_data:
@@ -255,12 +260,14 @@ class StatusTracker:
                 timestamp = item["timestamp"]
                 if isinstance(timestamp, str):
                     try:
-                        timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                        timestamp = datetime.fromisoformat(
+                            timestamp.replace("Z", "+00:00")
+                        )
                     except (ValueError, AttributeError):
                         timestamp = datetime.now()
                 elif not isinstance(timestamp, datetime):
                     timestamp = datetime.now()
-                
+
                 self._status.history.append(
                     ReleaseHistory(
                         release_name=item["release_name"],
@@ -271,9 +278,10 @@ class StatusTracker:
                         extracted_files=item["extracted_files"],
                         error_messages=item["error_messages"],
                         timestamp=timestamp,
+                        attempt_count=item.get("attempt_count", 1),  # NEW in v2.5.13
                     )
                 )
-            
+
             # Load queue (NEW in v2.5.1)
             queue_data = db.load_queue()
             for item in queue_data:
@@ -287,24 +295,32 @@ class StatusTracker:
                         error=item["error"],
                     )
                 )
-            
+
             # CRITICAL FIX v2.5.7: Load repeat_mode and repeat_interval_minutes from DB
             # This ensures progressbar shows correctly even if cli.py hasn't called set_repeat_mode yet
             db_settings = db.get_all()
             repeat_forever = db_settings.get("repeat_forever", True)  # Default: True
-            repeat_after_minutes = db_settings.get("repeat_after_minutes", 30)  # Default: 30
-            
+            repeat_after_minutes = db_settings.get(
+                "repeat_after_minutes", 30
+            )  # Default: 30
+
             self._status.repeat_mode = bool(repeat_forever)
             self._status.repeat_interval_minutes = int(repeat_after_minutes)
-            
+
             # If repeat mode is enabled, set next_run_time
             if repeat_forever and repeat_after_minutes > 0:
                 from datetime import timedelta
-                self._status.next_run_time = datetime.now() + timedelta(minutes=repeat_after_minutes)
+
+                self._status.next_run_time = datetime.now() + timedelta(
+                    minutes=repeat_after_minutes
+                )
         except Exception as e:
             # If DB loading fails, continue with empty state
             import logging
-            logging.getLogger(__name__).debug(f"Failed to load statistics/history from DB: {e}")
+
+            logging.getLogger(__name__).debug(
+                f"Failed to load statistics/history from DB: {e}"
+            )
 
     def start_processing(self) -> None:
         """Mark processing as started."""
@@ -384,23 +400,27 @@ class StatusTracker:
             if cleanup_failed is not None:
                 self._status.cleanup_failed_count = cleanup_failed
             self._status.last_update = datetime.now()
-        
+
         # Save statistics to DB
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            db.save_statistics({
-                "processed_count": self._status.processed_count,
-                "failed_count": self._status.failed_count,
-                "unsupported_count": self._status.unsupported_count,
-                "deleted_count": self._status.deleted_count,
-                "cleanup_failed_count": self._status.cleanup_failed_count,
-                "extracted_count": self._status.extracted_count,
-                "copied_count": self._status.copied_count,
-                "moved_count": self._status.moved_count,
-            })
+            db.save_statistics(
+                {
+                    "processed_count": self._status.processed_count,
+                    "failed_count": self._status.failed_count,
+                    "unsupported_count": self._status.unsupported_count,
+                    "deleted_count": self._status.deleted_count,
+                    "cleanup_failed_count": self._status.cleanup_failed_count,
+                    "extracted_count": self._status.extracted_count,
+                    "copied_count": self._status.copied_count,
+                    "moved_count": self._status.moved_count,
+                }
+            )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
 
     def increment_extracted(self, count: int = 1) -> None:
@@ -408,71 +428,83 @@ class StatusTracker:
         with self._lock:
             self._status.extracted_count += count
             self._status.last_update = datetime.now()
-        
+
         # Save to DB
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            db.save_statistics({
-                "processed_count": self._status.processed_count,
-                "failed_count": self._status.failed_count,
-                "unsupported_count": self._status.unsupported_count,
-                "deleted_count": self._status.deleted_count,
-                "cleanup_failed_count": self._status.cleanup_failed_count,
-                "extracted_count": self._status.extracted_count,
-                "copied_count": self._status.copied_count,
-                "moved_count": self._status.moved_count,
-            })
+            db.save_statistics(
+                {
+                    "processed_count": self._status.processed_count,
+                    "failed_count": self._status.failed_count,
+                    "unsupported_count": self._status.unsupported_count,
+                    "deleted_count": self._status.deleted_count,
+                    "cleanup_failed_count": self._status.cleanup_failed_count,
+                    "extracted_count": self._status.extracted_count,
+                    "copied_count": self._status.copied_count,
+                    "moved_count": self._status.moved_count,
+                }
+            )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
-    
+
     def increment_copied(self, count: int = 1) -> None:
         """Increment copied files count."""
         with self._lock:
             self._status.copied_count += count
             self._status.last_update = datetime.now()
-        
+
         # Save to DB
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            db.save_statistics({
-                "processed_count": self._status.processed_count,
-                "failed_count": self._status.failed_count,
-                "unsupported_count": self._status.unsupported_count,
-                "deleted_count": self._status.deleted_count,
-                "cleanup_failed_count": self._status.cleanup_failed_count,
-                "extracted_count": self._status.extracted_count,
-                "copied_count": self._status.copied_count,
-                "moved_count": self._status.moved_count,
-            })
+            db.save_statistics(
+                {
+                    "processed_count": self._status.processed_count,
+                    "failed_count": self._status.failed_count,
+                    "unsupported_count": self._status.unsupported_count,
+                    "deleted_count": self._status.deleted_count,
+                    "cleanup_failed_count": self._status.cleanup_failed_count,
+                    "extracted_count": self._status.extracted_count,
+                    "copied_count": self._status.copied_count,
+                    "moved_count": self._status.moved_count,
+                }
+            )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
-    
+
     def increment_moved(self, count: int = 1) -> None:
         """Increment moved files count."""
         with self._lock:
             self._status.moved_count += count
             self._status.last_update = datetime.now()
-        
+
         # Save to DB
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            db.save_statistics({
-                "processed_count": self._status.processed_count,
-                "failed_count": self._status.failed_count,
-                "unsupported_count": self._status.unsupported_count,
-                "deleted_count": self._status.deleted_count,
-                "cleanup_failed_count": self._status.cleanup_failed_count,
-                "extracted_count": self._status.extracted_count,
-                "copied_count": self._status.copied_count,
-                "moved_count": self._status.moved_count,
-            })
+            db.save_statistics(
+                {
+                    "processed_count": self._status.processed_count,
+                    "failed_count": self._status.failed_count,
+                    "unsupported_count": self._status.unsupported_count,
+                    "deleted_count": self._status.deleted_count,
+                    "cleanup_failed_count": self._status.cleanup_failed_count,
+                    "extracted_count": self._status.extracted_count,
+                    "copied_count": self._status.copied_count,
+                    "moved_count": self._status.moved_count,
+                }
+            )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
 
     def get_status(self) -> GlobalStatus:
@@ -481,6 +513,7 @@ class StatusTracker:
             # Return a copy to avoid race conditions
             # CRITICAL FIX v2.5.7: Copy ALL fields including repeat_mode, repeat_interval_minutes, next_run_time
             from dataclasses import replace
+
             status = GlobalStatus(
                 is_running=self._status.is_running,
                 is_paused=self._status.is_paused,  # FIX: was missing
@@ -511,7 +544,9 @@ class StatusTracker:
                 start_time=self._status.start_time,
                 last_completion_time=self._status.last_completion_time,
                 queue=self._status.queue.copy(),  # FIX: was missing
-                system_health=replace(self._status.system_health),  # FIX: was missing (use replace for dataclass copy)
+                system_health=replace(
+                    self._status.system_health
+                ),  # FIX: was missing (use replace for dataclass copy)
                 notifications=self._status.notifications.copy(),  # FIX: was missing
                 history=self._status.history.copy(),  # FIX: was missing
                 theme_preference=self._status.theme_preference,  # FIX: was missing
@@ -530,13 +565,25 @@ class StatusTracker:
 
     # Queue Management
     def add_to_queue(self, name: str, path: str, archive_count: int = 0) -> None:
-        """Add an item to the processing queue."""
+        """Add an item to the processing queue, or update if it already exists."""
         with self._lock:
+            # Check if item already exists
+            for item in self._status.queue:
+                if item.name == name:
+                    # Update existing item
+                    item.path = path
+                    item.archive_count = archive_count
+                    item.status = "pending"  # Reset status to pending if re-added
+                    self._status.last_update = datetime.now()
+                    self._save_queue_to_db()
+                    return
+
+            # Add new item if not found
             self._status.queue.append(
                 QueueItem(name=name, path=path, archive_count=archive_count)
             )
             self._status.last_update = datetime.now()
-            
+
             # Save queue to DB (NEW in v2.5.1)
             self._save_queue_to_db()
 
@@ -551,7 +598,7 @@ class StatusTracker:
                     item.error = error
                     break
             self._status.last_update = datetime.now()
-            
+
             # Save queue to DB (NEW in v2.5.1)
             self._save_queue_to_db()
 
@@ -562,7 +609,7 @@ class StatusTracker:
                 item for item in self._status.queue if item.name != name
             ]
             self._status.last_update = datetime.now()
-            
+
             # Save queue to DB (NEW in v2.5.1)
             self._save_queue_to_db()
 
@@ -574,27 +621,28 @@ class StatusTracker:
                 for item in self._status.queue
                 if item.status not in ("completed", "failed")
             ]
-            
+
             # Save queue to DB (NEW in v2.5.1)
             self._save_queue_to_db()
-    
+
     def _save_queue_to_db(self) -> None:
         """Save current queue to database (helper method for v2.5.1)."""
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            
+
             # Convert queue items to dicts
             queue_dicts = [
                 {
-                    'id': item.name,
-                    'status': item.status,
-                    'archive_count': item.archive_count,
-                    'error': item.error,
+                    "id": item.name,
+                    "status": item.status,
+                    "archive_count": item.archive_count,
+                    "error": item.error,
                 }
                 for item in self._status.queue
             ]
-            
+
             db.save_queue(queue_dicts)
         except Exception:
             pass  # Don't break on DB save errors
@@ -609,28 +657,33 @@ class StatusTracker:
     ) -> None:
         """Update system health metrics."""
         import logging
+
         _logger = logging.getLogger(__name__)
-        
+
         with self._lock:
             if downloads_path:
                 try:
                     # Directly call disk_usage - works with UNC paths even if exists() returns False
                     usage = shutil.disk_usage(downloads_path)
-                    self._status.system_health.disk_downloads_total_gb = (
-                        usage.total / (1024**3)
+                    self._status.system_health.disk_downloads_total_gb = usage.total / (
+                        1024**3
                     )
-                    self._status.system_health.disk_downloads_used_gb = (
-                        usage.used / (1024**3)
+                    self._status.system_health.disk_downloads_used_gb = usage.used / (
+                        1024**3
                     )
-                    self._status.system_health.disk_downloads_free_gb = (
-                        usage.free / (1024**3)
+                    self._status.system_health.disk_downloads_free_gb = usage.free / (
+                        1024**3
                     )
                     self._status.system_health.disk_downloads_percent = (
                         (usage.used / usage.total) * 100 if usage.total > 0 else 0
                     )
-                    _logger.debug(f"System Health: Downloads path {downloads_path} - {usage.used / (1024**3):.2f} GB used")
+                    _logger.debug(
+                        f"System Health: Downloads path {downloads_path} - {usage.used / (1024**3):.2f} GB used"
+                    )
                 except Exception as e:
-                    _logger.error(f"Failed to get disk usage for downloads_path {downloads_path}: {e}")
+                    _logger.error(
+                        f"Failed to get disk usage for downloads_path {downloads_path}: {e}"
+                    )
                     # Set to 0 on error
                     self._status.system_health.disk_downloads_total_gb = 0.0
                     self._status.system_health.disk_downloads_used_gb = 0.0
@@ -641,21 +694,25 @@ class StatusTracker:
                 try:
                     # Directly call disk_usage - works with UNC paths even if exists() returns False
                     usage = shutil.disk_usage(extracted_path)
-                    self._status.system_health.disk_extracted_total_gb = (
-                        usage.total / (1024**3)
+                    self._status.system_health.disk_extracted_total_gb = usage.total / (
+                        1024**3
                     )
-                    self._status.system_health.disk_extracted_used_gb = (
-                        usage.used / (1024**3)
+                    self._status.system_health.disk_extracted_used_gb = usage.used / (
+                        1024**3
                     )
-                    self._status.system_health.disk_extracted_free_gb = (
-                        usage.free / (1024**3)
+                    self._status.system_health.disk_extracted_free_gb = usage.free / (
+                        1024**3
                     )
                     self._status.system_health.disk_extracted_percent = (
                         (usage.used / usage.total) * 100 if usage.total > 0 else 0
                     )
-                    _logger.debug(f"System Health: Extracted path {extracted_path} - {usage.used / (1024**3):.2f} GB used")
+                    _logger.debug(
+                        f"System Health: Extracted path {extracted_path} - {usage.used / (1024**3):.2f} GB used"
+                    )
                 except Exception as e:
-                    _logger.error(f"Failed to get disk usage for extracted_path {extracted_path}: {e}")
+                    _logger.error(
+                        f"Failed to get disk usage for extracted_path {extracted_path}: {e}"
+                    )
                     # Set to 0 on error
                     self._status.system_health.disk_extracted_total_gb = 0.0
                     self._status.system_health.disk_extracted_used_gb = 0.0
@@ -666,21 +723,25 @@ class StatusTracker:
                 try:
                     # Directly call disk_usage - works with UNC paths even if exists() returns False
                     usage = shutil.disk_usage(finished_path)
-                    self._status.system_health.disk_finished_total_gb = (
-                        usage.total / (1024**3)
+                    self._status.system_health.disk_finished_total_gb = usage.total / (
+                        1024**3
                     )
-                    self._status.system_health.disk_finished_used_gb = (
-                        usage.used / (1024**3)
+                    self._status.system_health.disk_finished_used_gb = usage.used / (
+                        1024**3
                     )
-                    self._status.system_health.disk_finished_free_gb = (
-                        usage.free / (1024**3)
+                    self._status.system_health.disk_finished_free_gb = usage.free / (
+                        1024**3
                     )
                     self._status.system_health.disk_finished_percent = (
                         (usage.used / usage.total) * 100 if usage.total > 0 else 0
                     )
-                    _logger.debug(f"System Health: Finished path {finished_path} - {usage.used / (1024**3):.2f} GB used")
+                    _logger.debug(
+                        f"System Health: Finished path {finished_path} - {usage.used / (1024**3):.2f} GB used"
+                    )
                 except Exception as e:
-                    _logger.error(f"Failed to get disk usage for finished_path {finished_path}: {e}")
+                    _logger.error(
+                        f"Failed to get disk usage for finished_path {finished_path}: {e}"
+                    )
                     # Set to 0 on error
                     self._status.system_health.disk_finished_total_gb = 0.0
                     self._status.system_health.disk_finished_used_gb = 0.0
@@ -694,7 +755,10 @@ class StatusTracker:
             # CPU and Memory monitoring
             try:
                 import psutil
-                self._status.system_health.cpu_percent = psutil.cpu_percent(interval=0.1)
+
+                self._status.system_health.cpu_percent = psutil.cpu_percent(
+                    interval=0.1
+                )
                 mem = psutil.virtual_memory()
                 self._status.system_health.memory_used_gb = mem.used / (1024**3)
                 self._status.system_health.memory_total_gb = mem.total / (1024**3)
@@ -709,16 +773,12 @@ class StatusTracker:
             self._status.last_update = datetime.now()
 
     # Notifications
-    def add_notification(
-        self, notif_type: str, title: str, message: str
-    ) -> None:
+    def add_notification(self, notif_type: str, title: str, message: str) -> None:
         """Add a notification."""
         with self._lock:
             notif_id = f"{datetime.now().timestamp()}"
             self._status.notifications.append(
-                Notification(
-                    id=notif_id, type=notif_type, title=title, message=message
-                )
+                Notification(id=notif_id, type=notif_type, title=title, message=message)
             )
             # Keep only last 50 notifications
             if len(self._status.notifications) > 50:
@@ -750,47 +810,77 @@ class StatusTracker:
         extracted_files: list[str] | None = None,
         error_messages: list[str] | None = None,
     ) -> None:
-        """Add a release to the history."""
+        """Add a release to the history, or update existing entry with attempt count."""
         with self._lock:
-            history_item = ReleaseHistory(
-                release_name=release_name,
-                status=status,
-                processed_archives=processed_archives,
-                failed_archives=failed_archives,
-                timestamp=datetime.now(),
-                duration_seconds=duration_seconds,
-                extracted_files=extracted_files or [],
-                error_messages=error_messages or [],
-            )
-            self._status.history.append(history_item)
-            
+            # Check if history entry already exists for this release
+            existing_entry = None
+            for h in self._status.history:
+                if h.release_name == release_name:
+                    existing_entry = h
+                    break
+
+            if existing_entry:
+                # Update existing entry: increment attempt count, update status and errors
+                existing_entry.attempt_count += 1
+                existing_entry.status = status  # Update to latest status
+                existing_entry.processed_archives = processed_archives
+                existing_entry.failed_archives = failed_archives
+                existing_entry.timestamp = datetime.now()  # Update to latest timestamp
+                existing_entry.duration_seconds = duration_seconds
+                # Merge error messages (keep unique errors)
+                if error_messages:
+                    for err in error_messages:
+                        if err not in existing_entry.error_messages:
+                            existing_entry.error_messages.append(err)
+                # Keep only last 10 unique errors
+                existing_entry.error_messages = existing_entry.error_messages[-10:]
+            else:
+                # Create new history entry
+                history_item = ReleaseHistory(
+                    release_name=release_name,
+                    status=status,
+                    processed_archives=processed_archives,
+                    failed_archives=failed_archives,
+                    timestamp=datetime.now(),
+                    duration_seconds=duration_seconds,
+                    extracted_files=extracted_files or [],
+                    error_messages=error_messages or [],
+                    attempt_count=1,
+                )
+                self._status.history.append(history_item)
+
             # Keep only last 100 releases
             if len(self._status.history) > 100:
                 self._status.history = self._status.history[-100:]
             self._status.last_update = datetime.now()
-        
+
         # Save history to DB
         try:
             from .settings_db import get_settings_db
+
             db = get_settings_db()
-            
+
             # Convert history to dict format for DB
             history_data = []
             with self._lock:
                 for h in self._status.history:
-                    history_data.append({
-                        "release_name": h.release_name,
-                        "status": h.status,
-                        "processed_archives": h.processed_archives,
-                        "failed_archives": h.failed_archives,
-                        "duration_seconds": h.duration_seconds,
-                        "extracted_files": h.extracted_files,
-                        "error_messages": h.error_messages,
-                        "timestamp": h.timestamp.isoformat(),
-                    })
+                    history_data.append(
+                        {
+                            "release_name": h.release_name,
+                            "status": h.status,
+                            "processed_archives": h.processed_archives,
+                            "failed_archives": h.failed_archives,
+                            "duration_seconds": h.duration_seconds,
+                            "extracted_files": h.extracted_files,
+                            "error_messages": h.error_messages,
+                            "timestamp": h.timestamp.isoformat(),
+                            "attempt_count": h.attempt_count,  # NEW in v2.5.13
+                        }
+                    )
             db.save_history(history_data)
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to save history to DB: {e}")
 
     # Theme Management
@@ -837,7 +927,9 @@ class StatusTracker:
             self._status.next_run_time = None
             self._status.last_update = datetime.now()
 
-    def set_repeat_mode(self, enabled: bool, interval_minutes: int | None = None) -> None:
+    def set_repeat_mode(
+        self, enabled: bool, interval_minutes: int | None = None
+    ) -> None:
         """Set repeat mode."""
         with self._lock:
             self._status.repeat_mode = enabled
@@ -878,4 +970,3 @@ __all__ = [
     "ReleaseHistory",
     "get_status_tracker",
 ]
-

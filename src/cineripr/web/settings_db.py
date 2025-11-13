@@ -89,7 +89,8 @@ class SettingsDB:
                         duration_seconds REAL DEFAULT 0.0,
                         extracted_files TEXT,
                         error_messages TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        attempt_count INTEGER DEFAULT 1
                     )
                 """)
                 # File status table
@@ -135,6 +136,14 @@ class SettingsDB:
                             )
                     except (json.JSONDecodeError, ValueError):
                         pass  # Ignore malformed values
+                
+                # Migration: Add attempt_count column if it doesn't exist (v2.5.13)
+                try:
+                    conn.execute("ALTER TABLE history ADD COLUMN attempt_count INTEGER DEFAULT 1")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    # Column already exists, ignore
+                    pass
             finally:
                 conn.close()
 
@@ -299,8 +308,8 @@ class SettingsDB:
                     conn.execute("""
                         INSERT INTO history (
                             release_name, status, processed_archives, failed_archives,
-                            duration_seconds, extracted_files, error_messages, timestamp
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            duration_seconds, extracted_files, error_messages, timestamp, attempt_count
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         item.get("release_name", ""),
                         item.get("status", "completed"),
@@ -310,6 +319,7 @@ class SettingsDB:
                         json.dumps(item.get("extracted_files", [])),
                         json.dumps(item.get("error_messages", [])),
                         item.get("timestamp", ""),
+                        item.get("attempt_count", 1),  # NEW
                     ))
                 conn.commit()
             finally:
@@ -322,7 +332,7 @@ class SettingsDB:
             try:
                 cursor = conn.execute("""
                     SELECT release_name, status, processed_archives, failed_archives,
-                           duration_seconds, extracted_files, error_messages, timestamp
+                           duration_seconds, extracted_files, error_messages, timestamp, attempt_count
                     FROM history
                     ORDER BY id DESC
                     LIMIT 100
@@ -338,6 +348,7 @@ class SettingsDB:
                         "extracted_files": json.loads(row[5]) if row[5] else [],
                         "error_messages": json.loads(row[6]) if row[6] else [],
                         "timestamp": row[7],
+                        "attempt_count": row[8] if len(row) > 8 else 1,  # NEW: Default to 1 if column doesn't exist
                     })
                 return history
             finally:

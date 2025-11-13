@@ -38,8 +38,6 @@ def item(key: str):
         try:
             _logger.info(f"🔧 [DEBUG] Reading settings from DB...")
             # CRITICAL FIX v2.5.6: Use get_all() to get correct DEFAULT_SETTINGS
-            # db.get() doesn't use DEFAULT_SETTINGS, only the default parameter
-            # get_all() returns DEFAULT_SETTINGS.copy() with DB overrides, which is correct
             db_settings = db.get_all()
             repeat_forever = db_settings.get("repeat_forever")
             repeat_after_minutes = db_settings.get("repeat_after_minutes")
@@ -50,12 +48,15 @@ def item(key: str):
             _logger.info(f"🔧 [DEBUG] Calling tracker.set_repeat_mode({repeat_forever}, interval={repeat_after_minutes})...")
             tracker.set_repeat_mode(bool(repeat_forever), interval_minutes=int(repeat_after_minutes))
             
+            # FIX v2.5.13: Always update next_run if repeat_forever is enabled and interval > 0
+            # This ensures the progressbar uses the correct interval
             if repeat_forever and repeat_after_minutes > 0:
                 _logger.info(f"🔧 [DEBUG] Calling tracker.set_next_run({repeat_after_minutes})...")
                 tracker.set_next_run(int(repeat_after_minutes))
                 _logger.info(f"🔧 [DEBUG] ✓ tracker.set_next_run() completed successfully!")
             else:
-                _logger.info(f"🔧 [DEBUG] Skipping set_next_run (repeat_forever={repeat_forever}, minutes={repeat_after_minutes})")
+                _logger.info(f"🔧 [DEBUG] Clearing next_run (repeat_forever={repeat_forever}, minutes={repeat_after_minutes})")
+                tracker.clear_next_run()
                 
         except Exception as e:
             # Don't break on tracker update errors

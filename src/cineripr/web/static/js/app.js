@@ -735,12 +735,16 @@ function updateStatus() {
                         const markerClass = isSuccess ? 'success' : 'failed';
                         const borderColor = isSuccess ? '#10b981' : '#ef4444';
                         
+                        // Show attempt count if > 1 (NEW in v2.5.13)
+                        const attemptCount = item.attempt_count || 1;
+                        const attemptText = attemptCount > 1 ? ` (${attemptCount}x versucht)` : '';
+                        
                         return `
                             <div class="timeline-item">
                                 <div class="timeline-marker ${markerClass}"></div>
                                 <div class="timeline-content" style="--timeline-color: ${borderColor}">
                                     <div class="timeline-header">
-                                        <div class="timeline-title">${item.release_name}</div>
+                                        <div class="timeline-title">${item.release_name}${attemptText}</div>
                                         <div class="timeline-time">${timeStr}</div>
                                     </div>
                                     <div class="timeline-meta">
