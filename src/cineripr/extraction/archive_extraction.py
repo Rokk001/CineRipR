@@ -12,6 +12,7 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Callable
 
 from .archive_constants import UNWANTED_EXTRACTED_SUFFIXES
 from ..progress import ProgressTracker
@@ -246,6 +247,7 @@ def _extract_with_seven_zip(
     progress: ProgressTracker | None = None,
     logger: logging.Logger | None = None,
     part_count: int = 1,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> None:
     """Extract RAR archive using 7-Zip with progress tracking.
 
@@ -256,6 +258,8 @@ def _extract_with_seven_zip(
         cpu_cores: Number of CPU cores to use for extraction (default: 2)
         progress: Optional progress tracker
         logger: Optional logger for progress updates
+        part_count: Number of parts in the archive
+        progress_callback: Optional callback for progress updates (current, total)
     """
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -452,6 +456,7 @@ def extract_archive(
             progress=progress,
             logger=logger,
             part_count=part_count,
+            progress_callback=progress_callback,
         )
     elif format_name == "dctmp":
         # DCTMP files are temporary archive files that should be handled by 7-Zip
@@ -468,6 +473,7 @@ def extract_archive(
             progress=progress,
             logger=logger,
             part_count=part_count,
+            progress_callback=progress_callback,
         )
     else:
         # Use shutil for other formats

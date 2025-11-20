@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.7)
+## Aktueller Stand (Version 2.5.14)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -22,6 +22,10 @@
 17. **Settings Race Condition (v2.5.3)**: THE REAL FIX - DB-Werte werden nach JEDEM Setting-Save neu geladen, Countdown/Progressbar erscheinen sofort
 18. **Queue Empty Bug (v2.5.3)**: Tracker wird immer initialisiert wenn WebGUI aktiv ist, Queue wird korrekt befüllt
 19. **Main Loop Overwrites Settings (v2.5.5)**: THE REAL FIX - Loop liest jetzt IMMER aus DB, nicht aus settings object. WebGUI-Änderungen werden sofort übernommen!
+20. **Queue/History Duplikate (v2.5.13)**: Queue und History zeigen jetzt jeden Titel nur einmal, mit Versuchsanzahl bei mehrfachen Versuchen
+21. **Check Interval Problem (v2.5.13)**: Progressbar verwendet jetzt korrekt das konfigurierte Check Interval (z.B. 35 min)
+22. **progress_callback NameError (v2.5.14)**: Kritischer Fehler behoben - Endlosschleife und hohe CPU-Last nach Fehlern
+23. **Processing Status Bug (v2.5.14)**: GUI zeigt jetzt korrekt "Idle" statt "Processing" nach Fehlern
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`
@@ -59,7 +63,7 @@
 ### 📁 Projektstruktur
 ```
 src/cineripr/
-├── __init__.py              # Version 2.5.7
+├── __init__.py              # Version 2.5.14
 ├── cli.py                   # Command-Line-Interface
 ├── config.py                # Konfiguration
 ├── progress.py              # Progress-Tracking

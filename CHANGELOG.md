@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.14] - 2025-11-13
+
+### 🐛 Critical Bug Fixes
+
+- **`progress_callback` NameError behoben:**
+  - `_extract_with_seven_zip()` verwendete `progress_callback`, aber der Parameter fehlte in der Funktionssignatur
+  - Fehler: `name 'progress_callback' is not defined` verursachte Endlosschleife und hohe CPU-Last
+  - Fix: `progress_callback` Parameter hinzugefügt und korrekt weitergegeben
+
+- **Endlosschleife und hohe CPU-Last behoben:**
+  - Nach einem Fehler wurde `tracker.stop_processing()` nicht aufgerufen
+  - `is_running` blieb auf `True` → GUI zeigte fälschlicherweise "Processing" an
+  - Sleep-Schleife wurde übersprungen → sofortiger Neustart → permanente CPU-Last
+  - Fix: `tracker.stop_processing()` wird jetzt nach jedem Fehler aufgerufen
+  - Sleep-Schleife wird jetzt korrekt ausgeführt (z.B. 35 Minuten)
+
+### 🔧 Technical Details
+
+- **`src/cineripr/extraction/archive_extraction.py`:**
+  - `_extract_with_seven_zip()` erweitert um `progress_callback` Parameter
+  - `progress_callback` wird von `extract_archive()` an `_extract_with_seven_zip()` weitergegeben
+  - `Callable` Import hinzugefügt
+
+- **`src/cineripr/cli.py`:**
+  - `tracker.stop_processing()` wird nach Fehlern im Exception-Handler aufgerufen
+  - Logging für Fehler verbessert
+  - Verhindert Endlosschleife nach Fehlern
+
 ## [2.5.13] - 2025-11-13
 
 ### 🐛 Critical Bug Fixes

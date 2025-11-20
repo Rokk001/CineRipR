@@ -904,6 +904,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         except Exception as exc:
             _LOGGER.error("Unexpected error in main loop: %s", exc)
+            tracker.add_log("ERROR", f"Unexpected error: {exc}")
+            # CRITICAL FIX v2.5.14: Ensure processing is stopped after error
+            # This prevents "Processing" status from staying active and high CPU usage
+            tracker.stop_processing()
 
         # Check repeat_forever from DB if WebGUI is enabled (FIX v2.5.5)
         repeat_forever_check = settings.repeat_forever
