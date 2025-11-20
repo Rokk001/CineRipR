@@ -296,10 +296,22 @@ def _extract_with_seven_zip(
         stdout_lines = []
         last_percent = -1
         progress_shown = False
+        last_callback_time = 0.0
+        current_part = 1
+        
+        # Import time for periodic updates
+        import time
         
         # Show initial progress message
         if progress is not None and logger is not None:
             progress.log(logger, f"Extracting {archive.name}...")
+        
+        # Initial callback call
+        if progress_callback:
+            try:
+                progress_callback(1, part_count)
+            except Exception:
+                pass
         
         for line in process.stdout:
             stdout_lines.append(line)
@@ -315,6 +327,12 @@ def _extract_with_seven_zip(
                 percent = max(0, min(100, int(m.group(1))))
                 progress_shown = True
 
+                # Calculate current part being processed based on percent
+                # At 99% with 66 parts, we want to show 65/66 (not 64/66)
+                calculated_part = max(1, int(round((percent / 100) * part_count)))
+                # Cap at part_count
+                calculated_part = min(calculated_part, part_count)
+                
                 # Update progress tracker when percent changes
                 if (
                     percent != last_percent
@@ -322,12 +340,7 @@ def _extract_with_seven_zip(
                     and logger is not None
                 ):
                     last_percent = percent
-
-                    # Calculate current part being processed based on percent
-                    # At 99% with 66 parts, we want to show 65/66 (not 64/66)
-                    current_part = max(1, int(round((percent / 100) * part_count)))
-                    # Cap at part_count
-                    current_part = min(current_part, part_count)
+                    current_part = calculated_part
 
                     message = f"Extracting {archive.name}"
                     progress.advance(logger, message, absolute=current_part)
@@ -336,8 +349,32 @@ def _extract_with_seven_zip(
                     if progress_callback:
                         try:
                             progress_callback(current_part, part_count)
+                            last_callback_time = time.time()
                         except Exception:
                             pass  # Ignore callback errors
+                elif calculated_part != current_part:
+                    # Percent didn't change but calculated part did (edge case)
+                    current_part = calculated_part
+                    if progress_callback:
+                        try:
+                            progress_callback(current_part, part_count)
+                            last_callback_time = time.time()
+                        except Exception:
+                            pass
+            
+            # Periodic callback update (every 0.5 seconds) even if percent didn't change
+            # This ensures the frontend gets regular updates during extraction
+            current_time = time.time()
+            if progress_callback and (current_time - last_callback_time) >= 0.5:
+                try:
+                    # Use last known current_part or calculate from last_percent
+                    if last_percent >= 0:
+                        calculated_part = max(1, int(round((last_percent / 100) * part_count)))
+                        calculated_part = min(calculated_part, part_count)
+                        progress_callback(calculated_part, part_count)
+                        last_callback_time = current_time
+                except Exception:
+                    pass  # Ignore callback errors
         
         # If no progress was shown, show completion message
         if not progress_shown and progress is not None and logger is not None:

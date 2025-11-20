@@ -588,11 +588,14 @@ function updateStatus() {
                 (release && prevRelease && (
                     release.release_name !== prevRelease.release_name ||
                     release.current_archive !== prevRelease.current_archive ||
-                    release.archive_progress !== prevRelease.archive_progress ||
                     release.archive_total !== prevRelease.archive_total ||
                     release.message !== prevRelease.message ||
                     release.status !== prevRelease.status
                 ));
+            
+            // Check if only progress changed (for live updates during extraction)
+            const progressChanged = release && prevRelease && 
+                (release.archive_progress !== prevRelease.archive_progress);
             
             if (releaseChanged || isRunning !== prevIsRunning) {
                 if (release && isRunning) {
@@ -612,6 +615,13 @@ function updateStatus() {
                     document.getElementById('progress-fill').style.width = '0%';
                     document.getElementById('progress-text').textContent = '0%';
                 }
+            } else if (progressChanged && release && isRunning) {
+                // Update only progress bar if only progress changed (for live updates)
+                const progress = release.archive_total > 0 
+                    ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
+                
+                document.getElementById('progress-fill').style.width = progress + '%';
+                document.getElementById('progress-text').textContent = progress + '%';
             }
             
             // Queue - only update if changed

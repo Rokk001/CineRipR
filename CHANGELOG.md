@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.15] - 2025-11-13
+
+### 🐛 Critical Bug Fixes
+
+- **History Duplikate beim Laden behoben:**
+  - Beim Laden der History aus der Datenbank wurden alle Duplikate übernommen
+  - `add_to_history()` deduplizierte nur bei neuen Einträgen, nicht bei bereits geladenen
+  - Fix: History wird jetzt beim Laden aus der DB dedupliziert
+  - Jeder Release erscheint nur einmal mit aggregiertem `attempt_count`
+
+- **Progress Live-Updates während Extraktion:**
+  - Progress blieb bei einem Wert stehen (z.B. 4%) und wurde erst aktualisiert, wenn die Datei fertig war
+  - Progress-Callback wurde nur bei Prozentänderung aufgerufen, nicht kontinuierlich
+  - Fix: Progress-Callback wird jetzt auch periodisch (alle 0.5 Sekunden) aufgerufen
+  - Frontend aktualisiert Progress-Bar auch bei kleinen Änderungen separat
+
+### 🎯 Improvements
+
+- **History Aggregation:**
+  - Beim Laden werden Duplikate automatisch aggregiert
+  - `attempt_count` wird summiert, Fehlermeldungen zusammengeführt
+  - Neuester Status und Timestamp werden verwendet
+
+- **Progress Updates:**
+  - Progress wird jetzt kontinuierlich während der Extraktion aktualisiert
+  - Frontend zeigt flüssige Updates, nicht nur Sprünge
+  - Initialer Progress-Callback beim Start der Extraktion
+
+### 🔧 Technical Details
+
+- **`src/cineripr/web/status.py`:**
+  - History wird beim Laden aus DB dedupliziert
+  - Dictionary-basierte Aggregation nach `release_name`
+  - `attempt_count` wird summiert, Fehlermeldungen zusammengeführt
+
+- **`src/cineripr/extraction/archive_extraction.py`:**
+  - Progress-Callback wird periodisch (alle 0.5 Sekunden) aufgerufen
+  - Initialer Callback beim Start der Extraktion
+  - Zeit-basierte Updates zusätzlich zu Prozent-basierten Updates
+
+- **`src/cineripr/web/static/js/app.js`:**
+  - Separates Update für Progress-Bar bei kleinen Änderungen
+  - Progress wird auch aktualisiert, wenn sich nur `archive_progress` ändert
+  - Nicht nur bei `releaseChanged`, sondern auch separat
+
 ## [2.5.14] - 2025-11-13
 
 ### 🐛 Critical Bug Fixes

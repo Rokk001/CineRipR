@@ -255,6 +255,8 @@ class StatusTracker:
 
             # Load history
             history_data = db.load_history()
+            # Deduplicate history by release_name (aggregate duplicates)
+            history_dict: dict[str, ReleaseHistory] = {}
             for item in history_data:
                 # Parse timestamp
                 timestamp = item["timestamp"]
@@ -268,9 +270,31 @@ class StatusTracker:
                 elif not isinstance(timestamp, datetime):
                     timestamp = datetime.now()
 
-                self._status.history.append(
-                    ReleaseHistory(
-                        release_name=item["release_name"],
+                release_name = item["release_name"]
+                
+                # Check if entry already exists for this release
+                if release_name in history_dict:
+                    # Aggregate: increment attempt_count, merge errors, update to latest status
+                    existing = history_dict[release_name]
+                    existing.attempt_count += item.get("attempt_count", 1)
+                    # Use latest timestamp and status
+                    if timestamp > existing.timestamp:
+                        existing.timestamp = timestamp
+                        existing.status = item["status"]
+                        existing.processed_archives = item["processed_archives"]
+                        existing.failed_archives = item["failed_archives"]
+                        existing.duration_seconds = item["duration_seconds"]
+                    # Merge error messages (keep unique)
+                    new_errors = item.get("error_messages", [])
+                    for err in new_errors:
+                        if err not in existing.error_messages:
+                            existing.error_messages.append(err)
+                    # Keep only last 10 unique errors
+                    existing.error_messages = existing.error_messages[-10:]
+                else:
+                    # Create new entry
+                    history_dict[release_name] = ReleaseHistory(
+                        release_name=release_name,
                         status=item["status"],
                         processed_archives=item["processed_archives"],
                         failed_archives=item["failed_archives"],
@@ -278,9 +302,11 @@ class StatusTracker:
                         extracted_files=item["extracted_files"],
                         error_messages=item["error_messages"],
                         timestamp=timestamp,
-                        attempt_count=item.get("attempt_count", 1),  # NEW in v2.5.13
+                        attempt_count=item.get("attempt_count", 1),
                     )
-                )
+            
+            # Convert dictionary values to list
+            self._status.history = list(history_dict.values())
 
             # Load queue (NEW in v2.5.1)
             queue_data = db.load_queue()

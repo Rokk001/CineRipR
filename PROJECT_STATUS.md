@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.14)
+## Aktueller Stand (Version 2.5.15)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -26,6 +26,8 @@
 21. **Check Interval Problem (v2.5.13)**: Progressbar verwendet jetzt korrekt das konfigurierte Check Interval (z.B. 35 min)
 22. **progress_callback NameError (v2.5.14)**: Kritischer Fehler behoben - Endlosschleife und hohe CPU-Last nach Fehlern
 23. **Processing Status Bug (v2.5.14)**: GUI zeigt jetzt korrekt "Idle" statt "Processing" nach Fehlern
+24. **History Duplikate beim Laden (v2.5.15)**: History wird jetzt beim Laden aus DB dedupliziert - jeder Release erscheint nur einmal
+25. **Progress Live-Updates (v2.5.15)**: Progress wird jetzt kontinuierlich während Extraktion aktualisiert, nicht nur bei Prozentänderung
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`
@@ -63,7 +65,7 @@
 ### 📁 Projektstruktur
 ```
 src/cineripr/
-├── __init__.py              # Version 2.5.14
+├── __init__.py              # Version 2.5.15
 ├── cli.py                   # Command-Line-Interface
 ├── config.py                # Konfiguration
 ├── progress.py              # Progress-Tracking
