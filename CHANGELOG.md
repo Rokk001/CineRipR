@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.16] - 2025-11-13
+
+### 🧠 Smarter System Health Updates
+
+- **On-demand health refresh:**
+  - Removed the background thread that pinged disks/CPU every 30 seconds while idle
+  - Added `/api/system-health` endpoint that refreshes metrics only when called
+  - Idle CPU usage drops back to ~0% when CineRipR waits for the next run
+
+- **Tracker remembers monitor sources:**
+  - CLI now registers download/extracted/finished paths + 7-Zip binary once at startup
+  - New tracker helper detects the 7-Zip version only when a refresh is requested
+
+- **WebGUI refresh workflow:**
+  - System Health tab now shows a `🔄 Refresh Metrics` button
+  - Switching to the tab automatically triggers a refresh (without toasts)
+  - Frontend renders refreshed metrics immediately without waiting for the 2s status poll
+
+### 🪟 UX and API Improvements
+
+- Tab buttons now pass context to JS (data attributes) for more reliable switching
+- Added lightweight card header layout + hint explaining the on-demand refresh
+- New `/api/system-health` route (GET/POST) returns cached metrics or refreshes on demand
+
 ## [2.5.15] - 2025-11-13
 
 ### 🐛 Critical Bug Fixes

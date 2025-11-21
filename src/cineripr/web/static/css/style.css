@@ -355,6 +355,24 @@ body {
     gap: 10px;
 }
 
+.card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.card-header-row h2 {
+    margin: 0;
+}
+
+.card-hint {
+    margin: -5px 0 20px;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
 /* Stats Grid */
 .stats-grid {
     display: grid;
@@ -1079,6 +1097,18 @@ body {
     color: white;
     margin-top: 10px;
     width: 200px;
+}
+
+.control-btn.refresh {
+    background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    color: white;
+    padding: 10px 20px;
+    font-size: 0.95em;
+}
+
+.control-btn.refresh.loading {
+    opacity: 0.7;
+    cursor: wait;
 }
 
 /* Settings Tab (NEW in v2.2.0) */

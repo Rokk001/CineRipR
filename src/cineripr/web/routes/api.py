@@ -86,6 +86,17 @@ def health():
     """Health check endpoint."""
     return jsonify({"status": "ok", "service": "cineripr-webgui"})
 
+@api_bp.route("/system-health", methods=["GET", "POST"])
+def system_health():
+    """Fetch the latest system health metrics (optionally refreshing first)."""
+    tracker = get_status_tracker()
+    should_refresh = request.method == "POST" or request.args.get("refresh") == "1"
+    if should_refresh:
+        tracker.update_system_health()
+    status = tracker.get_status()
+    system_health = status.to_dict().get("system_health", {})
+    return jsonify(system_health)
+
 @api_bp.route("/system/hardware", methods=["GET"])
 def system_hardware():
     """Get hardware information."""

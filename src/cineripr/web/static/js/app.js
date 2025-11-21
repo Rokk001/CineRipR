@@ -13,16 +13,29 @@ function createParticles() {
 createParticles();
 
 // Tab switching
-function switchTab(tabName) {
+function switchTab(tabName, evt) {
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
-    event.target.closest('.nav-tab').classList.add('active');
-    document.getElementById('tab-' + tabName).classList.add('active');
+    const activeTabButton = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
+    if (activeTabButton) {
+        activeTabButton.classList.add('active');
+    } else if (evt && evt.target && evt.target.closest('.nav-tab')) {
+        evt.target.closest('.nav-tab').classList.add('active');
+    }
+
+    const targetContent = document.getElementById('tab-' + tabName);
+    if (targetContent) {
+        targetContent.classList.add('active');
+    }
     
     // Load settings when switching to settings tab (NEW in v2.2.0)
     if (tabName === 'settings') {
         loadSettings();
+    }
+
+    if (tabName === 'health') {
+        refreshSystemHealthData(false);
     }
 }
 
@@ -132,6 +145,7 @@ function filterLogs() {
 
 let previousStatus = {};
 let currentQueueData = [];
+let healthRefreshInProgress = false;
 
 // Modal functions
 function openReleaseModal(index) {
@@ -255,6 +269,50 @@ function handleHeaderControl() {
     } else if (btn.classList.contains('resume')) {
         resumeProcessing();
     }
+}
+
+function refreshSystemHealthData(showToastOnSuccess = true) {
+    if (healthRefreshInProgress) {
+        return;
+    }
+
+    healthRefreshInProgress = true;
+    const button = document.getElementById('refresh-health-btn');
+    if (button) {
+        button.disabled = true;
+        button.classList.add('loading');
+        if (!button.dataset.originalText) {
+            button.dataset.originalText = button.textContent;
+        }
+        button.textContent = 'Refreshing...';
+    }
+
+    fetch('/api/system-health', { method: 'POST' })
+        .then(r => {
+            if (!r.ok) {
+                throw new Error(`HTTP error! status: ${r.status}`);
+            }
+            return r.json();
+        })
+        .then(data => {
+            renderSystemHealth(data);
+            if (showToastOnSuccess) {
+                showToast('info', 'System Health', 'Metrics refreshed');
+            }
+            updateStatus();
+        })
+        .catch(err => {
+            console.error('Failed to refresh system health:', err);
+            showToast('error', 'Refresh Failed', 'Could not refresh system health');
+        })
+        .finally(() => {
+            healthRefreshInProgress = false;
+            if (button) {
+                button.disabled = false;
+                button.classList.remove('loading');
+                button.textContent = button.dataset.originalText || '🔄 Refresh Metrics';
+            }
+        });
 }
 
 // Settings Management (NEW in v2.2.0)
@@ -658,31 +716,7 @@ function updateStatus() {
             const healthChanged = !objectsEqual(systemHealth, prevSystemHealth);
             
             if (healthChanged && systemHealth) {
-                const h = systemHealth;
-                updateDisk('downloads', h.disk_downloads_used_gb, h.disk_downloads_free_gb, h.disk_downloads_percent);
-                updateDisk('extracted', h.disk_extracted_used_gb, h.disk_extracted_free_gb, h.disk_extracted_percent);
-                updateDisk('finished', h.disk_finished_used_gb, h.disk_finished_free_gb, h.disk_finished_percent);
-                
-                const sevenZipEl = document.getElementById('seven-zip-version');
-                if (sevenZipEl && sevenZipEl.textContent !== (h.seven_zip_version || 'Unknown')) {
-                    sevenZipEl.textContent = h.seven_zip_version || 'Unknown';
-                }
-                
-                const cpuEl = document.getElementById('cpu-usage');
-                if (cpuEl) {
-                    const cpuText = (h.cpu_percent || 0).toFixed(1) + '%';
-                    if (cpuEl.textContent !== cpuText) {
-                        cpuEl.textContent = cpuText;
-                    }
-                }
-                
-                const memEl = document.getElementById('memory-usage');
-                if (memEl) {
-                    const memText = (h.memory_percent || 0).toFixed(1) + '%';
-                    if (memEl.textContent !== memText) {
-                        memEl.textContent = memText;
-                    }
-                }
+                renderSystemHealth(systemHealth);
             }
             
             // Logs - only update if changed
@@ -875,6 +909,35 @@ function updateValue(id, value) {
             el.textContent = value;
             el.style.transform = 'scale(1)';
         }, 150);
+    }
+}
+
+function renderSystemHealth(systemHealth) {
+    if (!systemHealth) return;
+    const h = systemHealth;
+    updateDisk('downloads', h.disk_downloads_used_gb, h.disk_downloads_free_gb, h.disk_downloads_percent);
+    updateDisk('extracted', h.disk_extracted_used_gb, h.disk_extracted_free_gb, h.disk_extracted_percent);
+    updateDisk('finished', h.disk_finished_used_gb, h.disk_finished_free_gb, h.disk_finished_percent);
+    
+    const sevenZipEl = document.getElementById('seven-zip-version');
+    if (sevenZipEl && sevenZipEl.textContent !== (h.seven_zip_version || 'Unknown')) {
+        sevenZipEl.textContent = h.seven_zip_version || 'Unknown';
+    }
+    
+    const cpuEl = document.getElementById('cpu-usage');
+    if (cpuEl) {
+        const cpuText = (h.cpu_percent || 0).toFixed(1) + '%';
+        if (cpuEl.textContent !== cpuText) {
+            cpuEl.textContent = cpuText;
+        }
+    }
+    
+    const memEl = document.getElementById('memory-usage');
+    if (memEl) {
+        const memText = (h.memory_percent || 0).toFixed(1) + '%';
+        if (memEl.textContent !== memText) {
+            memEl.textContent = memText;
+        }
     }
 }
 

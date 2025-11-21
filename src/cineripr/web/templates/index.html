@@ -48,22 +48,22 @@
         
         <!-- Navigation -->
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchTab('overview')">
+            <button class="nav-tab active" data-tab="overview" onclick="switchTab('overview', event)">
                 📊 Overview
             </button>
-            <button class="nav-tab" onclick="switchTab('queue')">
+            <button class="nav-tab" data-tab="queue" onclick="switchTab('queue', event)">
                 📋 Queue
             </button>
-            <button class="nav-tab" onclick="switchTab('health')">
+            <button class="nav-tab" data-tab="health" onclick="switchTab('health', event)">
                 💻 System Health
             </button>
-            <button class="nav-tab" onclick="switchTab('history')">
+            <button class="nav-tab" data-tab="history" onclick="switchTab('history', event)">
                 📅 History
             </button>
-            <button class="nav-tab" onclick="switchTab('logs')">
+            <button class="nav-tab" data-tab="logs" onclick="switchTab('logs', event)">
                 📝 Logs
             </button>
-            <button class="nav-tab" onclick="switchTab('settings')">
+            <button class="nav-tab" data-tab="settings" onclick="switchTab('settings', event)">
                 ⚙️ Settings
             </button>
         </div>
@@ -159,7 +159,15 @@
         <!-- System Health Tab -->
         <div class="tab-content" id="tab-health">
             <div class="card">
-                <h2>💻 Disk Space</h2>
+                <div class="card-header-row">
+                    <h2>💻 System Health</h2>
+                    <button class="control-btn refresh" id="refresh-health-btn" onclick="refreshSystemHealthData(true)">
+                        🔄 Refresh Metrics
+                    </button>
+                </div>
+                <p class="card-hint">
+                    Metrics update only when requested to keep CineRipR idle-friendly. Click "Refresh" to capture the latest disk, CPU and memory usage.
+                </p>
                 <div class="disk-grid">
                     <div class="disk-item">
                         <div class="disk-header">

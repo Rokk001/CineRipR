@@ -235,6 +235,10 @@ class StatusTracker:
     def __init__(self) -> None:
         self._status = GlobalStatus()
         self._lock = threading.Lock()
+        self._monitor_downloads_path: Path | None = None
+        self._monitor_extracted_path: Path | None = None
+        self._monitor_finished_path: Path | None = None
+        self._seven_zip_command: str | None = None
 
         # Load statistics and history from DB on startup
         try:
@@ -673,6 +677,24 @@ class StatusTracker:
         except Exception:
             pass  # Don't break on DB save errors
 
+    def configure_system_health_sources(
+        self,
+        downloads_path: Path | str | None = None,
+        extracted_path: Path | str | None = None,
+        finished_path: Path | str | None = None,
+        seven_zip_cmd: Path | str | None = None,
+    ) -> None:
+        """Configure paths and tools used for system health monitoring."""
+        with self._lock:
+            if downloads_path is not None:
+                self._monitor_downloads_path = Path(downloads_path)
+            if extracted_path is not None:
+                self._monitor_extracted_path = Path(extracted_path)
+            if finished_path is not None:
+                self._monitor_finished_path = Path(finished_path)
+            if seven_zip_cmd is not None:
+                self._seven_zip_command = str(seven_zip_cmd)
+
     # System Health
     def update_system_health(
         self,
@@ -687,6 +709,10 @@ class StatusTracker:
         _logger = logging.getLogger(__name__)
 
         with self._lock:
+            downloads_path = downloads_path or self._monitor_downloads_path
+            extracted_path = extracted_path or self._monitor_extracted_path
+            finished_path = finished_path or self._monitor_finished_path
+
             if downloads_path:
                 try:
                     # Directly call disk_usage - works with UNC paths even if exists() returns False
@@ -775,8 +801,12 @@ class StatusTracker:
                     self._status.system_health.disk_finished_percent = 0.0
 
             # Always update 7-Zip version if provided (even if "Unknown")
-            if seven_zip_version is not None:
-                self._status.system_health.seven_zip_version = seven_zip_version
+            resolved_seven_zip_version = seven_zip_version
+            if resolved_seven_zip_version is None:
+                resolved_seven_zip_version = self._detect_seven_zip_version()
+
+            if resolved_seven_zip_version is not None:
+                self._status.system_health.seven_zip_version = resolved_seven_zip_version
 
             # CPU and Memory monitoring
             try:
@@ -797,6 +827,51 @@ class StatusTracker:
                 pass
 
             self._status.last_update = datetime.now()
+
+    def _detect_seven_zip_version(self) -> str | None:
+        """Detect the installed 7-Zip version using the configured command."""
+        command = self._seven_zip_command
+        if not command:
+            return self._status.system_health.seven_zip_version or "Unknown"
+
+        try:
+            import re
+            import subprocess
+
+            methods = [
+                lambda: subprocess.run(
+                    [command], capture_output=True, text=True, timeout=5
+                ),
+                lambda: subprocess.run(
+                    [command, "--version"], capture_output=True, text=True, timeout=5
+                ),
+                lambda: subprocess.run(
+                    [command, "-v"], capture_output=True, text=True, timeout=5
+                ),
+            ]
+
+            patterns = [
+                r"7-Zip\s+([\d.]+)",
+                r"7z\s+([\d.]+)",
+                r"p7zip\s+([\d.]+)",
+                r"Version\s+([\d.]+)",
+                r"([\d]+\.[\d]+)",
+            ]
+
+            for method in methods:
+                try:
+                    proc_result = method()
+                    output = (proc_result.stdout or "") + (proc_result.stderr or "")
+                    for pattern in patterns:
+                        match = re.search(pattern, output, re.IGNORECASE)
+                        if match:
+                            return f"7-Zip {match.group(1)}"
+                except Exception:
+                    continue
+        except Exception:
+            return self._status.system_health.seven_zip_version or "Unknown"
+
+        return self._status.system_health.seven_zip_version or "Unknown"
 
     # Notifications
     def add_notification(self, notif_type: str, title: str, message: str) -> None:
