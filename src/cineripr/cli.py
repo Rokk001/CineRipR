@@ -721,6 +721,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 # Sleep with live countdown updates
                 end_time = time.time() + (delay * 60)
                 last_settings_check = 0
+                last_minute_logged = -1
 
                 while time.time() < end_time:
                     # Check for manual trigger (NEW in v2.1.0)
@@ -729,50 +730,53 @@ def main(argv: Sequence[str] | None = None) -> int:
                         tracker.add_log("INFO", "Manual trigger - starting immediately")
                         break
 
-                # Check if settings changed during sleep (FIX v2.5.5)
-                # This ensures WebGUI changes are immediately reflected
-                if args.webgui and time.time() - last_settings_check >= 5:
-                    try:
-                        from .web.settings_db import get_settings_db
+                    # Check if settings changed during sleep (FIX v2.5.5)
+                    # OPTIMIZATION v2.5.17: Only check every 30 seconds instead of 5 to reduce CPU usage
+                    # This reduces DB queries from ~12/min to ~2/min, significantly lowering idle CPU
+                    if args.webgui and time.time() - last_settings_check >= 30:
+                        try:
+                            from .web.settings_db import get_settings_db
 
-                        db = get_settings_db()
-                        db_repeat_forever = db.get(
-                            "repeat_forever", settings.repeat_forever
-                        )
-                        db_repeat_after_minutes = db.get(
-                            "repeat_after_minutes", settings.repeat_after_minutes
-                        )
-
-                        # If settings changed, update tracker and recalculate end_time
-                        if db_repeat_after_minutes != delay:
-                            _LOGGER.info(
-                                f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes"
+                            db = get_settings_db()
+                            db_repeat_forever = db.get(
+                                "repeat_forever", settings.repeat_forever
                             )
-                            settings.repeat_after_minutes = int(db_repeat_after_minutes)
-                            delay = max(1, int(db_repeat_after_minutes))
-                            tracker.set_repeat_mode(
-                                bool(db_repeat_forever), interval_minutes=delay
+                            db_repeat_after_minutes = db.get(
+                                "repeat_after_minutes", settings.repeat_after_minutes
                             )
-                            tracker.set_next_run(delay)
-                            # Recalculate end_time with new delay
-                            end_time = time.time() + (delay * 60)
-                            _LOGGER.info(
-                                f"💤 Next run rescheduled in %s minute(s)...", delay
-                            )
-                    except Exception as e:
-                        _LOGGER.debug(f"Failed to check settings during sleep: {e}")
-                    last_settings_check = time.time()
 
-                remaining = end_time - time.time()
+                            # If settings changed, update tracker and recalculate end_time
+                            if db_repeat_after_minutes != delay:
+                                _LOGGER.info(
+                                    f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes"
+                                )
+                                settings.repeat_after_minutes = int(db_repeat_after_minutes)
+                                delay = max(1, int(db_repeat_after_minutes))
+                                tracker.set_repeat_mode(
+                                    bool(db_repeat_forever), interval_minutes=delay
+                                )
+                                tracker.set_next_run(delay)
+                                # Recalculate end_time with new delay
+                                end_time = time.time() + (delay * 60)
+                                _LOGGER.info(
+                                    f"💤 Next run rescheduled in %s minute(s)...", delay
+                                )
+                        except Exception as e:
+                            _LOGGER.debug(f"Failed to check settings during sleep: {e}")
+                        last_settings_check = time.time()
 
-                # Log every minute
-                if int(remaining) % 60 == 0 and remaining > 0:
-                    mins_left = int(remaining / 60)
-                    if mins_left > 0:
-                        _LOGGER.info(f"⏳ {mins_left} minute(s) until next run...")
+                    remaining = end_time - time.time()
 
-                # Sleep in 1-second chunks to allow interruption
-                time.sleep(1)
+                    # Log every minute (OPTIMIZATION v2.5.17: Only log once per minute, not every second)
+                    current_minute = int(remaining / 60)
+                    if current_minute != last_minute_logged and remaining > 0:
+                        mins_left = int(remaining / 60)
+                        if mins_left > 0:
+                            _LOGGER.info(f"⏳ {mins_left} minute(s) until next run...")
+                        last_minute_logged = current_minute
+
+                    # Sleep in 1-second chunks to allow interruption
+                    time.sleep(1)
 
             # Clear next run time
             tracker.clear_next_run()

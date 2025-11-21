@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.17] - 2025-11-13
+
+### ⚡ Performance Optimization
+
+- **Reduced idle CPU usage:**
+  - Settings check interval increased from 5 to 30 seconds during sleep phase
+  - Reduces database queries from ~12/min to ~2/min
+  - Logging optimization: minute-based logging now only checks once per minute instead of every second
+  - Idle CPU usage should now drop below 1% when waiting for next run
+
+### 🔧 Technical Changes
+
+- `cli.py`: Sleep loop settings check interval increased from 5s to 30s
+- `cli.py`: Minute-based logging now tracks last logged minute to avoid repeated checks
+
 ## [2.5.16] - 2025-11-13
 
 ### 🧠 Smarter System Health Updates
