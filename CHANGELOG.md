@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.19] - 2025-01-02
+
+### 🎬 Automatic Move to Final Destinations
+
+- **New paths for organized media:**
+  - Added `movie_root` and `tvshow_root` configuration options
+  - After successful renaming based on NFO metadata, directories are automatically moved to their final destinations
+  - Movies → `movie_root` (if configured)
+  - TV Shows → `tvshow_root` (if configured)
+
+- **Overwrite behavior:**
+  - If destination directory already exists, it is automatically overwritten
+  - Ensures clean organization without manual intervention
+
+- **Smart detection:**
+  - Automatically detects if NFO contains movie or TV show information
+  - Only moves if NFO file is found and contains valid metadata
+  - If no NFO or missing metadata, extraction continues normally without moving
+
+### 🔧 Technical Changes
+
+- `config.py`: Added `movie_root` and `tvshow_root` to `Paths` dataclass (optional)
+- `core/file_mover.py`: New module for moving directories to final destinations
+- `core/nfo_parser.py`: Now returns tuple `(metadata, is_tv_show)` to distinguish content type
+- `core/archives.py`: Integrated move logic after successful renaming
+
+## [2.5.18] - 2025-01-02
+
+### 🎬 Movie Renaming Based on NFO Metadata
+
+- **Automatic folder and file renaming after extraction:**
+  - After successful extraction, movies are automatically renamed based on NFO file metadata
+  - Folder pattern: `$T{ ($6)}{ ($Y)}` → e.g., "Matrix Resurrections (2021)"
+  - File pattern: `$T` → e.g., "Matrix Resurrections.mkv"
+  - Only applies to movies (not TV shows)
+  - Supports optional blocks `{ ... }` that are only included if they contain non-empty values
+
+- **NFO file parsing:**
+  - New `nfo_parser.py` module for parsing XML NFO files
+  - Extracts title, year, edition, genre, director, rating, and more
+  - Supports both `<movie>` and `<episodedetails>` root elements
+
+- **Pattern interpretation:**
+  - New `naming.py` module for interpreting naming patterns
+  - Supports variables: `$T` (title), `$Y` (year), `$6` (edition), `$G` (genre), etc.
+  - Handles optional blocks and variable substitution
+  - Sanitizes filenames to remove invalid characters
+
+### 🔧 Technical Changes
+
+- `core/nfo_parser.py`: New module for parsing NFO files and extracting metadata
+- `core/naming.py`: New module for pattern interpretation and file/folder renaming
+- `core/archives.py`: Integrated renaming logic after successful extraction (movies only)
+
 ## [2.5.17] - 2025-11-13
 
 ### ⚡ Performance Optimization
@@ -998,11 +1052,11 @@ This release brings **WebGUI-based configuration management** and **live countdo
 
 ### 📊 Default Settings Changes
 
-| Setting | Old Default | New Default | Reason |
-|---------|-------------|-------------|--------|
-| `repeat_forever` | `false` | `true` | Docker users expect auto-run |
-| `repeat_after_minutes` | `0` | `30` | Sensible default interval |
-| `finished_retention_days` | - | `15` | User preference |
+| Setting                   | Old Default | New Default | Reason                       |
+| ------------------------- | ----------- | ----------- | ---------------------------- |
+| `repeat_forever`          | `false`     | `true`      | Docker users expect auto-run |
+| `repeat_after_minutes`    | `0`         | `30`        | Sensible default interval    |
+| `finished_retention_days` | -           | `15`        | User preference              |
 
 ### 🏗️ Internal Changes
 

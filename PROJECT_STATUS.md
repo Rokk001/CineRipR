@@ -1,6 +1,6 @@
 # CineRipR - Projekt Status & Struktur
 
-## Aktueller Stand (Version 2.5.17)
+## Aktueller Stand (Version 2.5.19)
 
 ### ✅ Behobene Probleme
 1. **TV-Show-Organisation**: TV-Shows folgen jetzt korrekt der `TV-Shows/Show Name/Season XX/` Struktur
@@ -30,6 +30,8 @@
 25. **Progress Live-Updates (v2.5.15)**: Progress wird jetzt kontinuierlich während Extraktion aktualisiert, nicht nur bei Prozentänderung
 26. **On-Demand System Health (v2.5.16)**: Systemmetriken werden nur bei Bedarf über den Refresh-Button aktualisiert - Idle-CPU bleibt < 1%
 27. **Idle CPU Optimierung (v2.5.17)**: Settings-Check-Intervall von 5 auf 30 Sekunden erhöht, Logging optimiert - reduziert DB-Abfragen von ~12/min auf ~2/min
+28. **Movie Umbenennung basierend auf NFO (v2.5.18)**: Nach erfolgreicher Extraktion werden Film-Ordner und -Dateien automatisch basierend auf NFO-Metadaten umbenannt (nur Movies, nicht TV-Shows)
+29. **Automatisches Verschieben zu Finalen Zielen (v2.5.19)**: Nach erfolgreicher Umbenennung werden Filme und TV-Shows automatisch in `movie_root` bzw. `tvshow_root` verschoben (mit Überschreiben bei existierenden Verzeichnissen)
 4. **UNC-Pfad-Handling**: Windows UNC-Pfade werden korrekt in Docker-Containern verarbeitet
 5. **Private Pfade**: Alle privaten Pfade aus dem Codebase entfernt
 6. **Archive Movement Logic**: Korrekte Implementierung – Original-Quelldateien (aus Downloads) werden 1:1 nach `finished/<ReleaseName>/` gespiegelt; extrahierte Inhalte bleiben endgültig in `extracted/`
@@ -329,11 +331,11 @@ Finished/
 
 ### 📊 Default Settings Änderungen
 
-| Setting | Alt | Neu | Begründung |
-|---------|-----|-----|------------|
-| `repeat_forever` | `false` | `true` | Docker-User erwarten Auto-Run |
-| `repeat_after_minutes` | `0` | `30` | Sinnvolles Standard-Intervall |
-| `finished_retention_days` | - | `15` | User-Präferenz |
+| Setting                   | Alt     | Neu    | Begründung                    |
+| ------------------------- | ------- | ------ | ----------------------------- |
+| `repeat_forever`          | `false` | `true` | Docker-User erwarten Auto-Run |
+| `repeat_after_minutes`    | `0`     | `30`   | Sinnvolles Standard-Intervall |
+| `finished_retention_days` | -       | `15`   | User-Präferenz                |
 
 ### 📚 Dokumentation
 

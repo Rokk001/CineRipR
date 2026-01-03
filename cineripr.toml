@@ -8,6 +8,9 @@
 download_roots = ["C:/Media/Download"]
 extracted_root = "C:/Media/Extracted"
 finished_root = "C:/Media/Finished"
+# Optional: Final destinations for renamed movies and TV shows
+# movie_root = "C:/Media/Movies"
+# tvshow_root = "C:/Media/TV-Shows"
 
 [options]
 finished_retention_days = 15

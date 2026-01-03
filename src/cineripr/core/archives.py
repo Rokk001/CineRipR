@@ -391,6 +391,7 @@ def process_downloads(
     tracker = None
     try:
         from ..web.status import get_status_tracker
+
         tracker = get_status_tracker()
     except Exception as e:
         # WebGUI not available - this is fine, we'll just skip queue updates
@@ -442,12 +443,12 @@ def process_downloads(
         # - Progress bars (per-thread)
         # - Error handling (aggregation across threads)
         # For now, process sequentially.
-        
+
         for release_dir in release_dirs:
             try:
                 if debug:
                     _logger.info("DEBUG: Processing release: %s", release_dir)
-                
+
                 # Add to queue when release is found (if WebGUI is enabled)
                 if tracker:
                     # Count archives in this release first
@@ -463,17 +464,19 @@ def process_downloads(
                             archive_count += sum(group.part_count for group in groups)
                     except Exception:
                         pass  # Will be counted during actual processing
-                    
+
                     tracker.add_to_queue(
                         name=release_dir.name,
                         path=str(release_dir),
-                        archive_count=archive_count
+                        archive_count=archive_count,
                     )
                     tracker.update_queue_item(release_dir.name, "pending")
-                
+
                 # Update status tracker if callback provided
                 if status_callback:
-                    status_callback("scanning", f"Processing {release_dir.name}", None, 0, 0)
+                    status_callback(
+                        "scanning", f"Processing {release_dir.name}", None, 0, 0
+                    )
                 # Indicate reading start (use a fresh color here; context_color comes later)
                 read_color = next_progress_color()
                 # Start with unknown total; increase dynamically so (k/N) is exact, not guessed
@@ -590,9 +593,10 @@ def process_downloads(
                         try:
                             # Get settings DB and stability hours
                             from ..web.settings_db import get_settings_db
+
                             db = get_settings_db()
                             stability_hours = db.get("file_stability_hours", 24)
-                            
+
                             # Check if files are complete before processing
                             files_to_copy = []
                             for entry in current_dir.iterdir():
@@ -601,11 +605,11 @@ def process_downloads(
                                     if not is_file_complete(entry, db, stability_hours):
                                         _logger.info(
                                             "File %s appears to be still downloading, skipping...",
-                                            entry.name
+                                            entry.name,
                                         )
                                         continue
                                     files_to_copy.append(entry)
-                            
+
                             target_dir = paths.extracted_root / relative_parent
                             target_dir.mkdir(parents=True, exist_ok=True)
                             extracted_targets.append(target_dir)
@@ -637,6 +641,7 @@ def process_downloads(
                                         # Track copied files
                                         if status_callback:
                                             from ..web.status import get_status_tracker
+
                                             tracker = get_status_tracker()
                                             tracker.increment_copied(1)
                                     except OSError:
@@ -671,11 +676,11 @@ def process_downloads(
                     )
                     failed.append(current_dir)
                     continue
-                
+
                 # Update queue status to processing (if WebGUI is enabled and this is the main context)
                 if tracker and is_main_context:
                     tracker.update_queue_item(release_dir.name, "processing")
-                
+
                 target_dir = paths.extracted_root / relative_parent
                 # Use only the release name, not the full path structure
                 release_name = (
@@ -838,7 +843,7 @@ def process_downloads(
                             0,
                             group.part_count,
                         )
-                    
+
                     # Create progress callback for extraction
                     def extraction_progress_callback(current: int, total: int) -> None:
                         if status_callback:
@@ -878,15 +883,20 @@ def process_downloads(
                             progress=extraction_progress,
                             logger=_logger,
                             part_count=group.part_count,
-                            progress_callback=extraction_progress_callback if status_callback else None,
+                            progress_callback=(
+                                extraction_progress_callback
+                                if status_callback
+                                else None
+                            ),
                         )
 
                         # Count extraction as done
                         extractions_done += 1
-                        
+
                         # Track extracted files (count parts as extracted files)
                         if status_callback:
                             from ..web.status import get_status_tracker
+
                             tracker_status = get_status_tracker()
                             tracker_status.increment_extracted(group.part_count)
 
@@ -904,6 +914,68 @@ def process_downloads(
                             flatten_episode_like_dirs(target_dir)
                         except Exception:
                             pass
+
+                        # Rename folder and files based on NFO metadata (for both movies and TV shows)
+                        try:
+                            from .nfo_parser import find_nfo_file, parse_nfo_file
+                            from .naming import rename_movie_folder_and_files
+                            from .file_mover import move_to_final_destination
+
+                            nfo_file = find_nfo_file(target_dir)
+                            if nfo_file:
+                                metadata, is_tv_show = parse_nfo_file(nfo_file)
+                                if metadata and metadata.title:
+                                    # Use patterns from screenshots:
+                                    # Folder: $T{ ($6)}{ ($Y)} → "Matrix Resurrections (2021)"
+                                    # File: ST → interpreted as $T (Title only)
+                                    folder_pattern = "$T{ ($6)}{ ($Y)}"
+                                    file_pattern = "ST"  # Interpreted as $T (Title)
+
+                                    # Rename folder and files
+                                    success, new_target_dir = (
+                                        rename_movie_folder_and_files(
+                                            target_dir,
+                                            folder_pattern,
+                                            file_pattern,
+                                            metadata,
+                                            logger=_logger,
+                                        )
+                                    )
+                                    # Update target_dir to new path if folder was renamed
+                                    if success:
+                                        target_dir = new_target_dir
+
+                                        # Move to final destination (movie_root or tvshow_root)
+                                        if is_tv_show and paths.tvshow_root:
+                                            move_success = move_to_final_destination(
+                                                target_dir,
+                                                paths.tvshow_root,
+                                                overwrite=True,
+                                                logger=_logger,
+                                            )
+                                            if move_success:
+                                                target_dir = (
+                                                    paths.tvshow_root / target_dir.name
+                                                )
+                                        elif not is_tv_show and paths.movie_root:
+                                            move_success = move_to_final_destination(
+                                                target_dir,
+                                                paths.movie_root,
+                                                overwrite=True,
+                                                logger=_logger,
+                                            )
+                                            if move_success:
+                                                target_dir = (
+                                                    paths.movie_root / target_dir.name
+                                                )
+                        except Exception as rename_exc:
+                            # Don't fail extraction if renaming/moving fails
+                            _logger.warning(
+                                "Failed to rename/move folder/files for %s: %s",
+                                target_dir,
+                                rename_exc,
+                            )
+
                         extracted_targets.append(target_dir)
 
                     except (shutil.ReadError, RuntimeError) as exc:
@@ -1048,6 +1120,7 @@ def process_downloads(
                                     # Track moved files
                                     if status_callback:
                                         from ..web.status import get_status_tracker
+
                                         tracker_status = get_status_tracker()
                                         tracker_status.increment_moved(1)
                                 except OSError as move_error:
@@ -1117,7 +1190,9 @@ def process_downloads(
                         )
                         # Additionally, move related artifacts for TV episodes (Subs/Sample/etc.)
                         try:
-                            from ..extraction.archive_constants import EPISODE_ONLY_TAG_RE
+                            from ..extraction.archive_constants import (
+                                EPISODE_ONLY_TAG_RE,
+                            )
 
                             if EPISODE_ONLY_TAG_RE.search(source_dir.name):
                                 move_related_episode_artifacts(
@@ -1154,11 +1229,13 @@ def process_downloads(
                     _remove_empty_tree(release_dir, stop=download_root)
                 except OSError:
                     pass
-            
+
             # Update queue status after processing (if WebGUI is enabled)
             if tracker:
                 if release_failed:
-                    tracker.update_queue_item(release_dir.name, "failed", error="Extraction failed")
+                    tracker.update_queue_item(
+                        release_dir.name, "failed", error="Extraction failed"
+                    )
                 else:
                     tracker.update_queue_item(release_dir.name, "completed")
 

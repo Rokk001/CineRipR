@@ -24,11 +24,15 @@ class Paths:
         download_roots: Tuple of directories to scan for archives to extract
         extracted_root: Directory where extracted content will be placed
         finished_root: Directory where original archives are moved after successful extraction
+        movie_root: Optional directory where successfully renamed movies are moved
+        tvshow_root: Optional directory where successfully renamed TV shows are moved
     """
 
     download_roots: tuple[Path, ...]
     extracted_root: Path
     finished_root: Path
+    movie_root: Path | None = None
+    tvshow_root: Path | None = None
 
     def ensure_ready(self) -> None:
         if not self.download_roots:
@@ -40,6 +44,11 @@ class Paths:
                 raise NotADirectoryError(f"Download path '{root}' is not a directory.")
         for target in (self.extracted_root, self.finished_root):
             target.mkdir(parents=True, exist_ok=True)
+        # Create optional movie/tvshow roots if configured
+        if self.movie_root is not None:
+            self.movie_root.mkdir(parents=True, exist_ok=True)
+        if self.tvshow_root is not None:
+            self.tvshow_root.mkdir(parents=True, exist_ok=True)
 
     # Backwards compatibility: expose first download root as download_root
     @property
@@ -130,6 +139,15 @@ class Settings:
             finished_root = resolve_path(
                 raw_paths["finished_root"], field="finished_root"
             )
+            # Optional: movie_root and tvshow_root
+            movie_root = None
+            if "movie_root" in raw_paths:
+                movie_root = resolve_path(raw_paths["movie_root"], field="movie_root")
+            tvshow_root = None
+            if "tvshow_root" in raw_paths:
+                tvshow_root = resolve_path(
+                    raw_paths["tvshow_root"], field="tvshow_root"
+                )
         except KeyError as exc:
             raise ConfigurationError(
                 "paths section must define download_roots (or download_root), extracted_root and finished_root"
@@ -139,6 +157,8 @@ class Settings:
             download_roots=download_roots,
             extracted_root=extracted_root,
             finished_root=finished_root,
+            movie_root=movie_root,
+            tvshow_root=tvshow_root,
         )
 
         options = data.get("options", data)
@@ -148,7 +168,9 @@ class Settings:
         enable_delete = _read_bool(options, "enable_delete", default=False)
         demo_mode = _read_bool(options, "demo_mode", default=False)
         repeat_forever = _read_bool(options, "repeat_forever", default=False)
-        repeat_after_minutes = _read_int(options, "repeat_after_minutes", default=0, minimum=0)
+        repeat_after_minutes = _read_int(
+            options, "repeat_after_minutes", default=0, minimum=0
+        )
 
         subfolders_data = data.get("subfolders")
         if subfolders_data is None:
@@ -259,6 +281,3 @@ __all__ = [
     "Settings",
     "load_settings",
 ]
-
-
-

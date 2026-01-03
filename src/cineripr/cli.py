@@ -173,10 +173,16 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     else:
         finished_root = args.finished_root.resolve()
 
+    # Get optional movie_root and tvshow_root from settings
+    movie_root = settings.paths.movie_root if settings else None
+    tvshow_root = settings.paths.tvshow_root if settings else None
+
     paths = Paths(
         download_roots=download_roots,
         extracted_root=extracted_root,
         finished_root=finished_root,
+        movie_root=movie_root,
+        tvshow_root=tvshow_root,
     )
 
     # Step 3: Load other settings from TOML (if available) or use defaults
@@ -750,7 +756,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                                 _LOGGER.info(
                                     f"⚙️ Settings changed during sleep: {delay} → {db_repeat_after_minutes} minutes"
                                 )
-                                settings.repeat_after_minutes = int(db_repeat_after_minutes)
+                                settings.repeat_after_minutes = int(
+                                    db_repeat_after_minutes
+                                )
                                 delay = max(1, int(db_repeat_after_minutes))
                                 tracker.set_repeat_mode(
                                     bool(db_repeat_forever), interval_minutes=delay
