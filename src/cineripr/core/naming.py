@@ -275,25 +275,21 @@ def rename_movie_folder_and_files(
                         logger.warning("Failed to rename folder %s: %s", directory, e)
                         return (False, directory)
 
-        # 2. Rename files
-        video_extensions = {".mkv", ".mp4", ".avi", ".mov", ".m4v"}
-        nfo_extensions = {".nfo"}
-
+        # 2. Rename all files in the directory (but not subdirectories)
         try:
-            files = list(new_directory.iterdir())
+            entries = list(new_directory.iterdir())
         except OSError as e:
             logger.warning("Failed to list files in %s: %s", new_directory, e)
             return (False, new_directory)
 
-        for file_path in files:
-            if not file_path.is_file():
+        for entry in entries:
+            # Skip subdirectories - only rename files
+            if not entry.is_file():
                 continue
+
+            file_path = entry
 
             file_ext = file_path.suffix.lower()
-
-            # Only rename video files and NFO files
-            if file_ext not in video_extensions and file_ext not in nfo_extensions:
-                continue
 
             # Get new filename
             new_name_base = interpreter.interpret_file_pattern(
