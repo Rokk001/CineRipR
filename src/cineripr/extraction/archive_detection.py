@@ -177,8 +177,14 @@ def build_archive_groups(archives: Sequence[Path]) -> list[ArchiveGroup]:
     return groups
 
 
-def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
+def validate_archive_group(
+    group: ArchiveGroup, *, check_completeness: bool = True
+) -> tuple[bool, str | None]:
     """Validate that an archive group is complete and ready for extraction.
+
+    Args:
+        group: Archive group to validate
+        check_completeness: If True, check if all parts are present (for multi-part archives)
 
     Returns:
         Tuple of (is_valid, error_message)
@@ -193,13 +199,82 @@ def validate_archive_group(group: ArchiveGroup) -> tuple[bool, str | None]:
         start = 0 if 0 in positives else 1 if 1 in positives else positives[0]
         expected = list(range(start, start + len(positives)))
 
-        # Check for missing parts
+        # Check for missing parts in the sequence
         if positives != expected:
             missing = sorted(set(expected) - set(positives))
             if missing:
                 return False, "missing volume index(es): " + ", ".join(
                     str(value) for value in missing
                 )
+
+        # For multi-part archives, check if all parts are present
+        # This prevents extraction when download is still in progress
+        if check_completeness and len(positives) > 0:
+            # Check if there are any files with higher indices that might be part of this archive
+            # This indicates the download is still in progress
+            last_index = max(positives)
+            last_part = next(
+                (
+                    member
+                    for member, idx in group.order_map.items()
+                    if idx == last_index
+                ),
+                None,
+            )
+            if last_part and last_part.exists():
+                parent_dir = last_part.parent
+                try:
+                    # Check for potential next parts in the same directory
+                    for entry in parent_dir.iterdir():
+                        if not entry.is_file() or entry in group.members:
+                            continue
+                        entry_lower = entry.name.lower()
+                        # Check if this might be a next part of the same archive
+                        part_match = PART_VOLUME_RE.match(entry_lower)
+                        if part_match:
+                            part_idx = int(part_match.group("index") or 0)
+                            candidate_base = (
+                                f"{part_match.group('base')}{part_match.group('ext')}"
+                            )
+                            if (
+                                candidate_base == group.key.lower()
+                                and part_idx > last_index
+                            ):
+                                return (
+                                    False,
+                                    f"found part {part_idx} but sequence ends at {last_index} - download may still be in progress",
+                                )
+                        # Check RAR volume pattern
+                        r_match = R_VOLUME_RE.match(entry_lower)
+                        if r_match:
+                            part_idx = int(r_match.group("index") or 0)
+                            candidate_base = f"{r_match.group('base')}.rar"
+                            if (
+                                candidate_base == group.key.lower()
+                                and part_idx > last_index
+                            ):
+                                return (
+                                    False,
+                                    f"found volume {part_idx} but sequence ends at {last_index} - download may still be in progress",
+                                )
+                        # Check split pattern
+                        split_match = SPLIT_EXT_RE.match(entry_lower)
+                        if split_match:
+                            part_idx = int(split_match.group("index") or 0)
+                            candidate_base = (
+                                f"{split_match.group('base')}{split_match.group('ext')}"
+                            )
+                            if (
+                                candidate_base == group.key.lower()
+                                and part_idx > last_index
+                            ):
+                                return (
+                                    False,
+                                    f"found part {part_idx} but sequence ends at {last_index} - download may still be in progress",
+                                )
+                except OSError:
+                    # If we can't check the directory, assume it's OK
+                    pass
 
         # Old RAR volume format (.r00, .r01) needs base .rar file
         # But modern .partXX.rar format does NOT need a base .rar file

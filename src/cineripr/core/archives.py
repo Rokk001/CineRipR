@@ -723,7 +723,9 @@ def process_downloads(
                     try:
                         progress_before = format_progress(index - 1, total_groups)
 
-                        complete, reason = validate_archive_group(group)
+                        complete, reason = validate_archive_group(
+                            group, check_completeness=True
+                        )
                         if not complete:
                             _logger.warning(
                                 "%s Skipping %s: %s",
@@ -741,14 +743,16 @@ def process_downloads(
                             or group.primary.suffix.lower() == ".rar"
                         )
                         if is_rar and not demo_mode:
+                            # Try to get the actual volume count from the RAR header
+                            # This works even for .part01.rar, .part02.rar format
                             volume_count, volume_error = get_rar_volume_count(
                                 group.primary, seven_zip_path=seven_zip_path
                             )
                             if volume_count is not None and volume_count > 1:
-                                # Multi-volume RAR detected
+                                # Multi-volume RAR detected - verify all volumes are present
                                 if group.part_count < volume_count:
                                     _logger.warning(
-                                        "%s Skipping %s: found %d volume(s) but archive requires %d volume(s)",
+                                        "%s Skipping %s: found %d volume(s) but archive requires %d volume(s) - download may still be in progress",
                                         progress_before,
                                         group.primary,
                                         group.part_count,
@@ -757,9 +761,11 @@ def process_downloads(
                                     failed.append(group.primary)
                                     continue
                             elif volume_error:
-                                # Log warning but continue (might be a single-volume RAR)
+                                # If we can't read the volume count, rely on validate_archive_group
+                                # which already checked for completeness via file scanning
+                                # This handles cases where the first volume is still downloading
                                 _logger.debug(
-                                    "Could not verify volume count for %s: %s",
+                                    "Could not verify RAR volume count for %s: %s (relying on file-based validation)",
                                     group.primary,
                                     volume_error,
                                 )
