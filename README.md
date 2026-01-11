@@ -11,7 +11,7 @@
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)](https://hub.docker.com)
 
 [Features](#-features) • [Quick Start](#-quick-start) • [WebGUI](#-webgui) • [Documentation](#-documentation) • [Docker](#-docker)
-
+ 
 ---
 
 </div>
@@ -43,30 +43,30 @@ Downloaded media often comes as:
 
 ### 🚀 Core Functionality
 
-| Feature | Description |
-|---------|-------------|
-| **🗜️ Multi-Part Archives** | Full support for RAR5, split ZIPs, and multi-volume archives |
-| **📺 Smart TV Show Organization** | Automatic detection and organization into `ShowName/Season XX/` |
-| **🎬 Movie Organization** | Proper naming and structure for movie collections |
-| **✅ File Completeness Check** | Verifies files are fully downloaded before processing (configurable stability period) |
-| **🔄 Real-Time Progress** | Live progress bars with color-coded status |
-| **🐳 Docker-Ready** | Production-tested Docker image with official 7-Zip binary |
-| **⚙️ Configurable** | WebGUI settings + CLI args + optional TOML config |
+| Feature                          | Description                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| **🗜️ Multi-Part Archives**        | Full support for RAR5, split ZIPs, and multi-volume archives                          |
+| **📺 Smart TV Show Organization** | Automatic detection and organization into `ShowName/Season XX/`                       |
+| **🎬 Movie Organization**         | Proper naming and structure for movie collections                                     |
+| **✅ File Completeness Check**    | Verifies files are fully downloaded before processing (configurable stability period) |
+| **🔄 Real-Time Progress**         | Live progress bars with color-coded status                                            |
+| **🐳 Docker-Ready**               | Production-tested Docker image with official 7-Zip binary                             |
+| **⚙️ Configurable**               | WebGUI settings + CLI args + optional TOML config                                     |
 
 ### 🌐 WebGUI Dashboard
 
 **NEW in v2.0!** Modern web-based monitoring interface:
 
-| Feature | Description |
-|---------|-------------|
-| **📊 Real-Time Status** | Live processing status and progress tracking |
-| **📋 Queue Management** | View pending archives and processing queue |
-| **💾 System Health** | Disk space, CPU, and memory monitoring |
-| **📝 Live Logs** | Filterable, searchable log viewer |
-| **📅 History Timeline** | Visual timeline of processed releases |
-| **🎨 Dark/Light Mode** | Theme toggle with persistent preferences |
-| **🎮 Manual Controls** | Pause/resume processing on demand |
-| **🔊 Toast Notifications** | Audio alerts for important events |
+| Feature                   | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| **📊 Real-Time Status**    | Live processing status and progress tracking |
+| **📋 Queue Management**    | View pending archives and processing queue   |
+| **💾 System Health**       | Disk space, CPU, and memory monitoring       |
+| **📝 Live Logs**           | Filterable, searchable log viewer            |
+| **📅 History Timeline**    | Visual timeline of processed releases        |
+| **🎨 Dark/Light Mode**     | Theme toggle with persistent preferences     |
+| **🎮 Manual Controls**     | Pause/resume processing on demand            |
+| **🔊 Toast Notifications** | Audio alerts for important events            |
 
 ### 🛡️ Production-Ready
 
@@ -299,13 +299,13 @@ See [examples/docker-compose.yml](examples/docker-compose.yml) for production-re
 
 ### Quick Links
 
-| Document | Description |
-|----------|-------------|
-| [Architecture Overview](docs/architecture/overview.md) | System design and components |
-| [Finished Path Logic](docs/architecture/finished-path-logic.md) | How file organization works |
-| [Contributing Guide](docs/development/contributing.md) | How to contribute |
-| [Docker Permissions](docs/operations/docker-permissions.md) | Docker setup guide |
-| [Release Notes](docs/releases/) | All version histories |
+| Document                                                        | Description                  |
+| --------------------------------------------------------------- | ---------------------------- |
+| [Architecture Overview](docs/architecture/overview.md)          | System design and components |
+| [Finished Path Logic](docs/architecture/finished-path-logic.md) | How file organization works  |
+| [Contributing Guide](docs/development/contributing.md)          | How to contribute            |
+| [Docker Permissions](docs/operations/docker-permissions.md)     | Docker setup guide           |
+| [Release Notes](docs/releases/)                                 | All version histories        |
 
 ### Examples
 
