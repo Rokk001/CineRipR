@@ -41,6 +41,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--finished-root", type=Path, help="Override finished directory root"
     )
     parser.add_argument(
+        "--movie-root", type=Path, help="Override movie directory root"
+    )
+    parser.add_argument(
+        "--tvshow-root", type=Path, help="Override TV show directory root"
+    )
+    parser.add_argument(
         "--retention-days",
         type=int,
         help="Override number of days after which finished files are deleted",
@@ -173,9 +179,16 @@ def load_and_merge_settings(args: argparse.Namespace) -> Settings:
     else:
         finished_root = args.finished_root.resolve()
 
-    # Get optional movie_root and tvshow_root from settings
-    movie_root = settings.paths.movie_root if settings else None
-    tvshow_root = settings.paths.tvshow_root if settings else None
+    # Get optional movie_root and tvshow_root from CLI args or settings
+    if args.movie_root is None:
+        movie_root = settings.paths.movie_root if settings else None
+    else:
+        movie_root = args.movie_root.resolve()
+
+    if args.tvshow_root is None:
+        tvshow_root = settings.paths.tvshow_root if settings else None
+    else:
+        tvshow_root = args.tvshow_root.resolve()
 
     paths = Paths(
         download_roots=download_roots,
