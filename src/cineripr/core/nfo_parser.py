@@ -159,7 +159,7 @@ def parse_nfo_file(nfo_path: Path) -> tuple[MovieMetadata | None, bool]:
     try:
         directory = nfo_path.parent
         dir_name = directory.name
-        metadata = _parse_directory_name(dir_name)
+        metadata = parse_directory_name(dir_name)
         if metadata and metadata.title and metadata.year:
             _logger.info(
                 "Parsed metadata from directory name '%s': %s (%s)",
@@ -174,7 +174,7 @@ def parse_nfo_file(nfo_path: Path) -> tuple[MovieMetadata | None, bool]:
     return (None, False)
 
 
-def _parse_directory_name(dir_name: str) -> MovieMetadata | None:
+def parse_directory_name(dir_name: str) -> MovieMetadata | None:
     """Parse movie metadata from directory name.
 
     Expected format: Titel.Jahr.Rest
@@ -254,4 +254,4 @@ def find_nfo_file(directory: Path) -> Path | None:
     return None
 
 
-__all__ = ["MovieMetadata", "parse_nfo_file", "find_nfo_file"]
+__all__ = ["MovieMetadata", "parse_nfo_file", "find_nfo_file", "parse_directory_name"]

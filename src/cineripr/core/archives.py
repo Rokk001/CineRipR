@@ -923,36 +923,79 @@ def process_downloads(
 
                         # Rename folder and files based on NFO metadata (for both movies and TV shows)
                         try:
-                            from .nfo_parser import find_nfo_file, parse_nfo_file
+                            from .nfo_parser import (
+                                find_nfo_file,
+                                parse_nfo_file,
+                                parse_directory_name,
+                            )
                             from .naming import rename_movie_folder_and_files
                             from .file_mover import move_to_final_destination
 
                             nfo_file = find_nfo_file(target_dir)
+                            metadata = None
+                            is_tv_show = False
+
                             if nfo_file:
                                 metadata, is_tv_show = parse_nfo_file(nfo_file)
                                 if metadata and metadata.title:
-                                    # Use patterns from screenshots:
-                                    # Folder: $T{ ($6)}{ ($Y)} → "Matrix Resurrections (2021)"
-                                    # File: ST → interpreted as $T (Title only)
-                                    folder_pattern = "$T{ ($6)}{ ($Y)}"
-                                    file_pattern = "ST"  # Interpreted as $T (Title)
-
-                                    # Rename folder and files
-                                    success, new_target_dir = (
-                                        rename_movie_folder_and_files(
-                                            target_dir,
-                                            folder_pattern,
-                                            file_pattern,
-                                            metadata,
-                                            logger=_logger,
-                                        )
+                                    _logger.debug(
+                                        "Found NFO file for %s, using NFO metadata",
+                                        target_dir.name,
                                     )
-                                    # Update target_dir to new path if folder was renamed
-                                    if success:
-                                        target_dir = new_target_dir
+                                else:
+                                    _logger.debug(
+                                        "NFO file found for %s but parsing failed or no title, trying directory name fallback",
+                                        target_dir.name,
+                                    )
+                                    metadata = None
+                            else:
+                                _logger.debug(
+                                    "No NFO file found for %s, trying directory name fallback",
+                                    target_dir.name,
+                                )
 
-                                        # Move to final destination (movie_root or tvshow_root)
-                                        if is_tv_show and paths.tvshow_root:
+                            # Fallback: Try to parse directory name if no NFO metadata
+                            if not metadata or not metadata.title:
+                                metadata = parse_directory_name(target_dir.name)
+                                if metadata and metadata.title:
+                                    _logger.info(
+                                        "Parsed metadata from directory name '%s': %s (%s)",
+                                        target_dir.name,
+                                        metadata.title,
+                                        metadata.year or "unknown year",
+                                    )
+                                    is_tv_show = False  # Directory name parsing assumes movie
+                                else:
+                                    _logger.debug(
+                                        "Could not parse metadata from directory name '%s', skipping rename",
+                                        target_dir.name,
+                                    )
+
+                            # Rename folder and files if we have metadata
+                            if metadata and metadata.title:
+                                # Use patterns from screenshots:
+                                # Folder: $T{ ($6)}{ ($Y)} → "Matrix Resurrections (2021)"
+                                # File: ST → interpreted as $T (Title only)
+                                folder_pattern = "$T{ ($6)}{ ($Y)}"
+                                file_pattern = "ST"  # Interpreted as $T (Title)
+
+                                # Rename folder and files
+                                success, new_target_dir = (
+                                    rename_movie_folder_and_files(
+                                        target_dir,
+                                        folder_pattern,
+                                        file_pattern,
+                                        metadata,
+                                        logger=_logger,
+                                    )
+                                )
+                                # Update target_dir to new path if folder was renamed
+                                if success:
+                                    target_dir = new_target_dir
+
+                                    # Move to final destination (movie_root or tvshow_root)
+                                    if is_tv_show:
+                                        if paths.tvshow_root:
                                             move_success = move_to_final_destination(
                                                 target_dir,
                                                 paths.tvshow_root,
@@ -963,7 +1006,13 @@ def process_downloads(
                                                 target_dir = (
                                                     paths.tvshow_root / target_dir.name
                                                 )
-                                        elif not is_tv_show and paths.movie_root:
+                                        else:
+                                            _logger.debug(
+                                                "TV show root not configured, skipping move for %s",
+                                                target_dir.name,
+                                            )
+                                    else:
+                                        if paths.movie_root:
                                             move_success = move_to_final_destination(
                                                 target_dir,
                                                 paths.movie_root,
@@ -974,6 +1023,11 @@ def process_downloads(
                                                 target_dir = (
                                                     paths.movie_root / target_dir.name
                                                 )
+                                        else:
+                                            _logger.debug(
+                                                "Movie root not configured, skipping move for %s",
+                                                target_dir.name,
+                                            )
                         except Exception as rename_exc:
                             # Don't fail extraction if renaming/moving fails
                             _logger.warning(

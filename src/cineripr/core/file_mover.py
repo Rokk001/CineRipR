@@ -69,12 +69,19 @@ def move_to_final_destination(
             return False
 
     # Move directory
+    # Use shutil.move() instead of rename() to support cross-filesystem moves
     try:
-        directory.rename(destination)
+        shutil.move(str(directory), str(destination))
         logger.info("Moved directory: %s → %s", directory, destination)
         return True
     except OSError as e:
-        logger.error("Failed to move directory %s to %s: %s", directory, destination, e)
+        logger.error(
+            "Failed to move directory %s to %s: %s (error code: %s)",
+            directory,
+            destination,
+            e,
+            getattr(e, "errno", "unknown"),
+        )
         return False
 
 
