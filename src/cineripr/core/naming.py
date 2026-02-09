@@ -121,7 +121,12 @@ class PatternInterpreter:
         # Check if block should be included (has non-empty content)
         # Create a temporary result to check if block has content
         temp_result = self._replace_variables(block_content)
-        has_content = bool(temp_result.strip())
+        
+        # Check if the result contains actual content (alphanumeric)
+        # If it only contains punctuation/spaces (like " ()" or " - "), discard it
+        # This fixes issues like "{ ($6)}" resolving to " ()" when $6 is empty
+        clean_result = re.sub(r'[^\w\d]', '', temp_result)
+        has_content = bool(clean_result)
 
         if has_content:
             # Include the block (remove braces)
