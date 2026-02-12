@@ -16,7 +16,7 @@ createParticles();
 function switchTab(tabName, evt) {
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
+
     const activeTabButton = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
     if (activeTabButton) {
         activeTabButton.classList.add('active');
@@ -28,7 +28,7 @@ function switchTab(tabName, evt) {
     if (targetContent) {
         targetContent.classList.add('active');
     }
-    
+
     // Load settings when switching to settings tab (NEW in v2.2.0)
     if (tabName === 'settings') {
         loadSettings();
@@ -46,15 +46,15 @@ let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 // Simple notification sound using Web Audio API
 function playNotificationSound(type) {
     if (!soundEnabled) return;
-    
+
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
+
         // Different frequencies for different notification types
         const frequencies = {
             success: [523.25, 659.25], // C5, E5
@@ -62,16 +62,16 @@ function playNotificationSound(type) {
             warning: [440, 440],        // A4, A4
             info: [523.25, 523.25]      // C5, C5
         };
-        
+
         const freqs = frequencies[type] || frequencies.info;
         oscillator.frequency.value = freqs[0];
-        
+
         gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-        
+
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.1);
-        
+
         // Second tone
         setTimeout(() => {
             const osc2 = audioContext.createOscillator();
@@ -93,9 +93,9 @@ function showToast(type, title, message, duration = 5000) {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    
+
     const icons = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' };
-    
+
     toast.innerHTML = `
         <div class="toast-icon">${icons[type]}</div>
         <div class="toast-content">
@@ -104,12 +104,12 @@ function showToast(type, title, message, duration = 5000) {
         </div>
         <button class="toast-close" onclick="this.parentElement.remove()">×</button>
     `;
-    
+
     container.appendChild(toast);
-    
+
     // Play sound
     playNotificationSound(type);
-    
+
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
@@ -135,10 +135,10 @@ function filterLogs() {
     logs.forEach(log => {
         const level = log.dataset.level;
         const text = log.textContent.toLowerCase();
-        
+
         const levelMatch = logFilter === 'all' || level === logFilter;
         const searchMatch = logSearchTerm === '' || text.includes(logSearchTerm);
-        
+
         log.classList.toggle('hidden', !(levelMatch && searchMatch));
     });
 }
@@ -151,28 +151,28 @@ let healthRefreshInProgress = false;
 function openReleaseModal(index) {
     const item = currentQueueData[index];
     if (!item) return;
-    
+
     document.getElementById('modal-title').textContent = item.name;
     document.getElementById('modal-status').innerHTML = `<span class="status-badge ${item.status}">${item.status}</span>`;
     document.getElementById('modal-archive-count').textContent = item.archive_count || 0;
-    
+
     // Start time and duration
     if (item.start_time) {
         const startTime = new Date(item.start_time);
         document.getElementById('modal-start-time').textContent = startTime.toLocaleString('de-DE');
-        
+
         const now = new Date();
         const duration = Math.floor((now - startTime) / 1000);
         const hours = Math.floor(duration / 3600);
         const minutes = Math.floor((duration % 3600) / 60);
         const seconds = duration % 60;
-        document.getElementById('modal-duration').textContent = 
+        document.getElementById('modal-duration').textContent =
             `${hours}h ${minutes}m ${seconds}s`;
     } else {
         document.getElementById('modal-start-time').textContent = 'Not started';
         document.getElementById('modal-duration').textContent = '-';
     }
-    
+
     // Progress
     if (item.status === 'processing' && item.current_archive) {
         document.getElementById('modal-progress-section').style.display = 'block';
@@ -182,15 +182,15 @@ function openReleaseModal(index) {
     } else {
         document.getElementById('modal-progress-section').style.display = 'none';
     }
-    
+
     // Logs (filter by release name if available in logs)
     const logsContainer = document.getElementById('modal-logs');
     const allLogs = previousStatus.recent_logs || [];
-    const releaseLogs = allLogs.filter(log => 
-        log.message.includes(item.name) || 
+    const releaseLogs = allLogs.filter(log =>
+        log.message.includes(item.name) ||
         (item.current_archive && log.message.includes(item.current_archive))
     );
-    
+
     if (releaseLogs.length > 0) {
         logsContainer.innerHTML = releaseLogs.slice().reverse().map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('de-DE');
@@ -200,7 +200,7 @@ function openReleaseModal(index) {
     } else {
         logsContainer.innerHTML = '<div style="text-align: center; color: rgba(255, 255, 255, 0.4); padding: 20px;">No specific logs for this release</div>';
     }
-    
+
     document.getElementById('release-modal').classList.add('active');
 }
 
@@ -261,7 +261,7 @@ function triggerRunNow() {
 // NEW in v2.2.5: Handle header control button
 function handleHeaderControl() {
     const btn = document.getElementById('header-control-btn');
-    
+
     if (btn.classList.contains('run-now')) {
         triggerRunNow();
     } else if (btn.classList.contains('pause')) {
@@ -325,13 +325,13 @@ function loadSettings() {
             document.getElementById('setting-repeat-forever').checked = data.repeat_forever !== false;
             // Default: repeat_after_minutes = 30
             document.getElementById('setting-repeat-minutes').value = data.repeat_after_minutes !== undefined ? data.repeat_after_minutes : 30;
-            
+
             // Retention
             // Default: finished_retention_days = 15
             document.getElementById('setting-retention-days').value = data.finished_retention_days !== undefined ? data.finished_retention_days : 15;
             // Default: enable_delete = false
             document.getElementById('setting-enable-delete').checked = data.enable_delete === true;
-            
+
             // Subfolders
             // Default: include_sample = false
             document.getElementById('setting-include-sample').checked = data.include_sample === true;
@@ -339,17 +339,17 @@ function loadSettings() {
             document.getElementById('setting-include-sub').checked = data.include_sub !== false;
             // Default: include_other = false
             document.getElementById('setting-include-other').checked = data.include_other === true;
-            
+
             // UI Preferences
             // Default: toast_notifications = true
             document.getElementById('setting-toast-notifications').checked = data.toast_notifications !== false;
             // Default: toast_sound = false
             document.getElementById('setting-toast-sound').checked = data.toast_sound === true;
-            
+
             // File Processing
             // Default: file_stability_hours = 24
             document.getElementById('setting-file-stability-hours').value = data.file_stability_hours !== undefined ? data.file_stability_hours : 24;
-            
+
             // Advanced
             // Default: demo_mode = false
             document.getElementById('setting-demo-mode').checked = data.demo_mode === true;
@@ -374,7 +374,7 @@ function saveAllSettings() {
         file_stability_hours: parseInt(document.getElementById('setting-file-stability-hours').value),
         demo_mode: document.getElementById('setting-demo-mode').checked,
     };
-    
+
     // Validation
     if (settings.repeat_after_minutes < 1 || settings.repeat_after_minutes > 1440) {
         showToast('error', 'Validation Error', 'Check interval must be between 1 and 1440 minutes');
@@ -388,16 +388,16 @@ function saveAllSettings() {
         showToast('error', 'Validation Error', 'File stability hours must be between 1 and 168 (7 days)');
         return;
     }
-    
+
     // Save each setting
-    const promises = Object.entries(settings).map(([key, value]) => 
+    const promises = Object.entries(settings).map(([key, value]) =>
         fetch(`/api/settings/${key}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value })
         })
     );
-    
+
     Promise.all(promises)
         .then(() => {
             showToast('success', 'Settings Saved', 'All settings have been saved successfully', true);
@@ -433,15 +433,15 @@ function resetSettings() {
             file_stability_hours: 24,
             demo_mode: false,
         };
-        
-        const promises = Object.entries(defaults).map(([key, value]) => 
+
+        const promises = Object.entries(defaults).map(([key, value]) =>
             fetch(`/api/settings/${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value })
             })
         );
-        
+
         Promise.all(promises)
             .then(() => {
                 loadSettings(); // Reload to show defaults
@@ -460,7 +460,7 @@ let currentTheme = 'dark';
 function toggleTheme() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     applyTheme(newTheme);
-    
+
     // Save to server
     fetch('/api/theme', {
         method: 'POST',
@@ -473,7 +473,7 @@ function applyTheme(theme) {
     currentTheme = theme;
     const body = document.body;
     const icon = document.getElementById('theme-icon');
-    
+
     if (theme === 'light') {
         body.classList.add('light-theme');
         icon.textContent = '☀️';
@@ -481,7 +481,7 @@ function applyTheme(theme) {
         body.classList.remove('light-theme');
         icon.textContent = '🌙';
     }
-    
+
     localStorage.setItem('theme', theme);
 }
 
@@ -492,7 +492,7 @@ function loadThemePreference() {
     if (savedTheme) {
         applyTheme(savedTheme);
     }
-    
+
     // Then fetch from server
     fetch('/api/theme')
         .then(r => r.json())
@@ -522,13 +522,13 @@ function updateStatus() {
                 // Compare by JSON string for simplicity
                 return JSON.stringify(a) === JSON.stringify(b);
             }
-            
+
             // Helper function to check if objects are equal (for system health)
             function objectsEqual(a, b) {
                 if (!a || !b) return a === b;
                 return JSON.stringify(a) === JSON.stringify(b);
             }
-            
+
             // Stats - only update if changed (updateValue already does this)
             updateValue('processed', data.processed_count || 0);
             updateValue('failed', data.failed_count || 0);
@@ -537,7 +537,7 @@ function updateStatus() {
             updateValue('extracted', data.extracted_count || 0);
             updateValue('copied', data.copied_count || 0);
             updateValue('moved', data.moved_count || 0);
-            
+
             // Notifications
             if (previousStatus.processed_count !== undefined) {
                 if (data.processed_count > previousStatus.processed_count) {
@@ -547,17 +547,17 @@ function updateStatus() {
                     showToast('error', 'Error', `${data.failed_count - previousStatus.failed_count} archive(s) failed`);
                 }
             }
-            
+
             // Status - only update if changed
             const isRunning = data.is_running || false;
             const isPaused = data.is_paused || false;
             const prevIsRunning = previousStatus.is_running || false;
             const prevIsPaused = previousStatus.is_paused || false;
-            
+
             if (isRunning !== prevIsRunning || isPaused !== prevIsPaused) {
                 const statusDot = document.getElementById('status-dot');
                 const statusText = document.getElementById('status-text');
-                
+
                 if (isPaused) {
                     statusDot.classList.remove('running');
                     statusText.textContent = 'Paused';
@@ -569,48 +569,48 @@ function updateStatus() {
                     statusText.textContent = 'Idle';
                 }
             }
-            
+
             // Countdown Progressbar - only update if changed
             const isIdle = !isRunning && !isPaused;
             const hasNextRun = data.seconds_until_next_run !== null && data.seconds_until_next_run >= 0;
             const hasRepeatMode = data.repeat_mode && data.repeat_interval_minutes > 0;
-            
+
             const prevSecondsUntilNextRun = previousStatus.seconds_until_next_run;
             const prevRepeatMode = previousStatus.repeat_mode;
             const prevRepeatInterval = previousStatus.repeat_interval_minutes;
-            
-            const countdownChanged = 
+
+            const countdownChanged =
                 data.seconds_until_next_run !== prevSecondsUntilNextRun ||
                 data.repeat_mode !== prevRepeatMode ||
                 data.repeat_interval_minutes !== prevRepeatInterval ||
                 isRunning !== prevIsRunning ||
                 isPaused !== prevIsPaused;
-            
+
             if (countdownChanged) {
                 const countdownContainer = document.getElementById('countdown-container');
                 const countdownFill = document.getElementById('countdown-fill');
                 const countdownTime = document.getElementById('countdown-time');
                 const headerStatusBasic = document.querySelector('.header-status-basic');
-                
+
                 if (isIdle && (hasNextRun || hasRepeatMode)) {
                     countdownContainer.style.display = 'flex';
                     // Hide header-status-basic when progressbar is shown
                     if (headerStatusBasic) {
                         headerStatusBasic.style.display = 'none';
                     }
-                    
+
                     const totalSeconds = (data.repeat_interval_minutes || 30) * 60;
                     const remainingSeconds = data.seconds_until_next_run !== null ? data.seconds_until_next_run : totalSeconds;
                     const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
-                    
+
                     countdownFill.style.width = percentage + '%';
-                    
+
                     // Format time as "Idle (mm:ss)"
                     const minutes = Math.floor(remainingSeconds / 60);
                     const seconds = remainingSeconds % 60;
                     const timeString = `Idle (${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')})`;
                     countdownTime.textContent = timeString;
-                    
+
                     // Color gradient: 100% = red, 0% = green (inverse of percentage)
                     const redPercent = percentage;
                     const greenPercent = 100 - percentage;
@@ -637,11 +637,11 @@ function updateStatus() {
                     }
                 }
             }
-            
+
             // Current operation - only update if changed
             const release = data.current_release;
             const prevRelease = previousStatus.current_release;
-            const releaseChanged = 
+            const releaseChanged =
                 !release !== !prevRelease ||
                 (release && prevRelease && (
                     release.release_name !== prevRelease.release_name ||
@@ -650,20 +650,20 @@ function updateStatus() {
                     release.message !== prevRelease.message ||
                     release.status !== prevRelease.status
                 ));
-            
+
             // Check if only progress changed (for live updates during extraction)
-            const progressChanged = release && prevRelease && 
+            const progressChanged = release && prevRelease &&
                 (release.archive_progress !== prevRelease.archive_progress);
-            
+
             if (releaseChanged || isRunning !== prevIsRunning) {
                 if (release && isRunning) {
                     document.getElementById('release-name').textContent = release.release_name || '-';
                     document.getElementById('archive-name').textContent = release.current_archive || '-';
                     document.getElementById('status-message').textContent = release.message || '-';
-                    
-                    const progress = release.archive_total > 0 
+
+                    const progress = release.archive_total > 0
                         ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
-                    
+
                     document.getElementById('progress-fill').style.width = progress + '%';
                     document.getElementById('progress-text').textContent = progress + '%';
                 } else {
@@ -675,23 +675,23 @@ function updateStatus() {
                 }
             } else if (progressChanged && release && isRunning) {
                 // Update only progress bar if only progress changed (for live updates)
-                const progress = release.archive_total > 0 
+                const progress = release.archive_total > 0
                     ? Math.round((release.archive_progress / release.archive_total) * 100) : 0;
-                
+
                 document.getElementById('progress-fill').style.width = progress + '%';
                 document.getElementById('progress-text').textContent = progress + '%';
             }
-            
+
             // Queue - only update if changed
             const queue = data.queue || [];
             const prevQueue = previousStatus.queue || [];
             const queueChanged = !arraysEqual(queue, prevQueue);
-            
+
             if (queueChanged) {
                 currentQueueData = queue; // Store for modal access
                 const queueList = document.getElementById('queue-list');
                 if (!queueList) return;
-                
+
                 if (queue.length === 0) {
                     queueList.innerHTML = '<div class="queue-empty">No items in queue</div>';
                 } else {
@@ -709,37 +709,37 @@ function updateStatus() {
                 // Still update currentQueueData for modal access
                 currentQueueData = queue;
             }
-            
+
             // System health - only update if changed
             const systemHealth = data.system_health;
             const prevSystemHealth = previousStatus.system_health;
             const healthChanged = !objectsEqual(systemHealth, prevSystemHealth);
-            
+
             if (healthChanged && systemHealth) {
                 renderSystemHealth(systemHealth);
             }
-            
+
             // Logs - only update if changed
             const logs = data.recent_logs || [];
             const prevLogs = previousStatus.recent_logs || [];
             const logsChanged = !arraysEqual(logs, prevLogs);
-            
+
             if (logsChanged) {
                 const logsContainer = document.getElementById('logs-container');
                 if (!logsContainer) return;
-                
+
                 const currentScroll = logsContainer.scrollTop;
                 const isBottom = logsContainer.scrollHeight - logsContainer.clientHeight <= currentScroll + 10;
-                
+
                 if (logs.length > 0) {
                     logsContainer.innerHTML = logs.slice().reverse().map(log => {
                         const time = new Date(log.timestamp).toLocaleTimeString('de-DE');
                         const level = (log.level || 'info').toLowerCase();
                         return `<div class="log-entry ${level}" data-level="${level}">[${time}] [${log.level}] ${log.message}</div>`;
                     }).join('');
-                    
+
                     filterLogs();
-                    
+
                     if (isBottom) {
                         logsContainer.scrollTop = logsContainer.scrollHeight;
                     }
@@ -747,16 +747,16 @@ function updateStatus() {
                     logsContainer.innerHTML = '';
                 }
             }
-            
+
             // History - only update if changed
             const history = data.history || [];
             const prevHistory = previousStatus.history || [];
             const historyChanged = !arraysEqual(history, prevHistory);
-            
+
             if (historyChanged) {
                 const historyTimeline = document.getElementById('history-timeline');
                 if (!historyTimeline) return;
-                
+
                 if (history.length === 0) {
                     historyTimeline.innerHTML = `
                         <div class="history-empty">
@@ -774,15 +774,15 @@ function updateStatus() {
                         const minutes = Math.floor((duration % 3600) / 60);
                         const seconds = Math.floor(duration % 60);
                         const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
-                        
+
                         const isSuccess = item.status === 'completed';
                         const markerClass = isSuccess ? 'success' : 'failed';
                         const borderColor = isSuccess ? '#10b981' : '#ef4444';
-                        
+
                         // Show attempt count if > 1 (NEW in v2.5.13)
                         const attemptCount = item.attempt_count || 1;
                         const attemptText = attemptCount > 1 ? ` (${attemptCount}x versucht)` : '';
-                        
+
                         return `
                             <div class="timeline-item">
                                 <div class="timeline-marker ${markerClass}"></div>
@@ -802,6 +802,13 @@ function updateStatus() {
                                             <span>${isSuccess ? '✓' : '✗'}</span> ${isSuccess ? 'Completed' : 'Failed'}
                                         </div>
                                     </div>
+                                    ${item.extracted_files && item.extracted_files.length > 0 ? `
+                                    <div class="timeline-success" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                                        <div style="color: #10b981; font-weight: 600; margin-bottom: 5px;">✅ Completed:</div>
+                                        ${item.extracted_files.slice(0, 5).map(msg => `<div style="font-size: 0.85em; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">• ${msg}</div>`).join('')}
+                                        ${item.extracted_files.length > 5 ? `<div style="font-size: 0.8em; opacity: 0.6; margin-top: 2px;">+ ${item.extracted_files.length - 5} more items</div>` : ''}
+                                    </div>
+                                    ` : ''}
                                     ${item.error_messages && item.error_messages.length > 0 ? `
                                     <div class="timeline-errors">
                                         <div style="color: #ef4444; font-weight: 600; margin-bottom: 5px;">⚠️ Errors:</div>
@@ -814,7 +821,7 @@ function updateStatus() {
                     }).join('');
                 }
             }
-            
+
             // Last update time - only update if changed (every second is fine)
             if (data.last_update) {
                 const lastUpdateEl = document.getElementById('last-update');
@@ -825,38 +832,38 @@ function updateStatus() {
                     }
                 }
             }
-            
+
             // Next Run Countdown - only update if changed
-            const nextRunChanged = 
+            const nextRunChanged =
                 data.repeat_mode !== prevRepeatMode ||
                 data.seconds_until_next_run !== prevSecondsUntilNextRun ||
                 data.next_run_time !== previousStatus.next_run_time ||
                 isRunning !== prevIsRunning;
-            
+
             if (nextRunChanged) {
                 const nextRunCard = document.getElementById('next-run-card');
                 if (nextRunCard) {
                     if (data.repeat_mode && data.seconds_until_next_run !== null && !isRunning) {
                         const seconds = data.seconds_until_next_run;
-                        
+
                         if (seconds > 0) {
                             nextRunCard.style.display = 'block';
-                            
+
                             const hours = Math.floor(seconds / 3600);
                             const minutes = Math.floor((seconds % 3600) / 60);
                             const secs = seconds % 60;
-                            
-                            const timeStr = hours > 0 
+
+                            const timeStr = hours > 0
                                 ? `${hours}h ${minutes}m ${secs}s`
                                 : minutes > 0
                                     ? `${minutes}m ${secs}s`
                                     : `${secs}s`;
-                            
+
                             const countdownEl = document.getElementById('next-run-countdown');
                             if (countdownEl && countdownEl.textContent !== timeStr) {
                                 countdownEl.textContent = timeStr;
                             }
-                            
+
                             if (data.next_run_time) {
                                 const nextRunDate = new Date(data.next_run_time);
                                 const nextRunTextEl = document.getElementById('next-run-text');
@@ -867,7 +874,7 @@ function updateStatus() {
                                     }
                                 }
                             }
-                            
+
                             if (countdownEl) {
                                 if (seconds < 60) {
                                     countdownEl.classList.add('pulse');
@@ -891,7 +898,7 @@ function updateStatus() {
                     }
                 }
             }
-            
+
             // Store current status for next comparison
             previousStatus = data;
         })
@@ -918,12 +925,12 @@ function renderSystemHealth(systemHealth) {
     updateDisk('downloads', h.disk_downloads_used_gb, h.disk_downloads_free_gb, h.disk_downloads_percent);
     updateDisk('extracted', h.disk_extracted_used_gb, h.disk_extracted_free_gb, h.disk_extracted_percent);
     updateDisk('finished', h.disk_finished_used_gb, h.disk_finished_free_gb, h.disk_finished_percent);
-    
+
     const sevenZipEl = document.getElementById('seven-zip-version');
     if (sevenZipEl && sevenZipEl.textContent !== (h.seven_zip_version || 'Unknown')) {
         sevenZipEl.textContent = h.seven_zip_version || 'Unknown';
     }
-    
+
     const cpuEl = document.getElementById('cpu-usage');
     if (cpuEl) {
         const cpuText = (h.cpu_percent || 0).toFixed(1) + '%';
@@ -931,7 +938,7 @@ function renderSystemHealth(systemHealth) {
             cpuEl.textContent = cpuText;
         }
     }
-    
+
     const memEl = document.getElementById('memory-usage');
     if (memEl) {
         const memText = (h.memory_percent || 0).toFixed(1) + '%';
@@ -946,28 +953,28 @@ function updateDisk(name, used, free, percent) {
     const freeEl = document.getElementById(`disk-${name}-free`);
     const percentEl = document.getElementById(`disk-${name}-percent`);
     const fillEl = document.getElementById(`disk-${name}-fill`);
-    
+
     if (usedEl) {
         const usedText = `${used.toFixed(1)} GB used`;
         if (usedEl.textContent !== usedText) {
             usedEl.textContent = usedText;
         }
     }
-    
+
     if (freeEl) {
         const freeText = `${free.toFixed(1)} GB free`;
         if (freeEl.textContent !== freeText) {
             freeEl.textContent = freeText;
         }
     }
-    
+
     if (percentEl) {
         const percentText = `${percent.toFixed(1)}%`;
         if (percentEl.textContent !== percentText) {
             percentEl.textContent = percentText;
         }
     }
-    
+
     if (fillEl) {
         const percentStr = `${percent}%`;
         if (fillEl.style.width !== percentStr) {
@@ -979,7 +986,7 @@ function updateDisk(name, used, free, percent) {
 
 // Initial load and auto-refresh
 // Smart refresh: Updates only when data changes (conditional rendering)
-(function() {
+(function () {
     let statusInterval = null;
     function startStatusUpdates() {
         if (statusInterval) {

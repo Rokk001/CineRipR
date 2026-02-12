@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 
 from ..extraction.archive_constants import TV_TAG_RE, SUPPORTED_ARCHIVE_SUFFIXES
@@ -57,6 +57,7 @@ class ProcessResult:
     processed: int
     failed: list[Path]
     unsupported: list[Path]
+    success_messages: list[str] = field(default_factory=list)
 
 
 def iter_download_subdirs(download_root: Path) -> list[Path]:
@@ -424,6 +425,7 @@ def process_downloads(
     processed = 0
     failed: list[Path] = []
     unsupported: list[Path] = []
+    success_messages: list[str] = []
 
     for download_root in paths.download_roots:
         release_dirs = iter_download_subdirs(download_root)
@@ -898,6 +900,9 @@ def process_downloads(
 
                         # Count extraction as done
                         extractions_done += 1
+                        success_messages.append(
+                            f"Extracted {group.primary.name} -> {target_dir.name}"
+                        )
 
                         # Track extracted files (count parts as extracted files)
                         if status_callback:
@@ -1139,6 +1144,7 @@ def process_downloads(
 
                 files_moved = 0
                 for group, _release_name, source_dir in archive_groups_to_move:
+                    success_messages.append(f"Moving {group.primary.name} -> finished")
                     # Mirror the release directory under finished: <finished>/<ReleaseRoot>/<sub_rel>
                     try:
                         rel_parts = source_dir.relative_to(download_root).parts
@@ -1294,7 +1300,12 @@ def process_downloads(
                 else:
                     tracker.update_queue_item(release_dir.name, "completed")
 
-    return ProcessResult(processed=processed, failed=failed, unsupported=unsupported)
+    return ProcessResult(
+        processed=processed,
+        failed=failed,
+        unsupported=unsupported,
+        success_messages=success_messages,
+    )
 
 
 __all__ = [

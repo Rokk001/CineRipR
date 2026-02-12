@@ -130,34 +130,81 @@ def get_rar_volume_count(
         return None, f"Failed to read RAR volume count: {exc}"
 
 
+def test_archive_integrity(
+    archive: Path, *, seven_zip_path: Path | None
+) -> tuple[bool, str | None]:
+    """Test archive integrity using 7-Zip without extracting.
+
+    Runs ``7z t <archive>`` to detect CRC errors, data errors, missing
+    volumes and header corruption *before* a costly extraction attempt.
+
+    Returns:
+        Tuple of (is_ok, error_message)
+    """
+    command = resolve_seven_zip_command(seven_zip_path)
+    if command is None:
+        return False, "7-Zip executable not found"
+
+    try:
+        result = subprocess.run(
+            [command, "t", str(archive), "-y"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=600,  # 10 min for very large archives
+        )
+
+        output = (result.stdout or "") + (result.stderr or "")
+
+        # Patterns that indicate corruption / incompleteness
+        _ERROR_PATTERNS = [
+            (r"CRC Failed\s*:\s*(.+)", "CRC Failed"),
+            (r"Data Error\s*:\s*(.+)", "Data Error"),
+            (r"Headers Error", "Headers Error"),
+            (r"Missing volume\s*:\s*(.+)", "Missing volume"),
+        ]
+
+        for pattern, label in _ERROR_PATTERNS:
+            m = re.search(pattern, output, re.IGNORECASE)
+            if m:
+                detail = m.group(1).strip() if m.lastindex else ""
+                msg = f"{label}: {detail}" if detail else label
+                return False, msg
+
+        if result.returncode != 0:
+            return False, f"7-Zip test failed (exit code {result.returncode})"
+
+        return True, None
+
+    except subprocess.TimeoutExpired:
+        return False, "7-Zip integrity test timed out"
+    except Exception as exc:
+        return False, f"Integrity test error: {exc}"
+
+
 def can_extract_archive(
     archive: Path, *, seven_zip_path: Path | None
 ) -> tuple[bool, str | None]:
     """Check if an archive can be extracted and validate its integrity.
+
+    For RAR/DCTMP archives a full ``7z t`` integrity test is performed
+    to catch CRC / data / header errors before the actual extraction.
 
     Returns:
         Tuple of (can_extract, error_message)
     """
     format_name = detect_archive_format(archive)
 
-    if format_name == "rar":
+    if format_name in ("rar", "dctmp"):
         command = resolve_seven_zip_command(seven_zip_path)
         if command is None:
             return (
                 False,
                 "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.",
             )
-        return True, None
-
-    if format_name == "dctmp":
-        # DCTMP files are temporary archive files that should be handled by 7-Zip
-        command = resolve_seven_zip_command(seven_zip_path)
-        if command is None:
-            return (
-                False,
-                "7-Zip executable not found. Configure [tools].seven_zip or install 7-Zip.",
-            )
-        return True, None
+        # Run integrity test before allowing extraction
+        return test_archive_integrity(archive, seven_zip_path=seven_zip_path)
 
     if format_name == "zip":
         try:
@@ -488,7 +535,7 @@ __all__ = [
     "detect_archive_format",
     "resolve_seven_zip_command",
     "get_rar_volume_count",
+    "test_archive_integrity",
     "can_extract_archive",
     "extract_archive",
-
 ]

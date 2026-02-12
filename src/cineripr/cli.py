@@ -571,7 +571,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     processed_archives=result.processed,
                     failed_archives=len(result.failed),
                     duration_seconds=duration,
-                    extracted_files=[],
+                    extracted_files=result.success_messages,
                     error_messages=[
                         str(f) for f in result.failed[:10]
                     ],  # First 10 errors
