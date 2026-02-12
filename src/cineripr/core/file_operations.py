@@ -16,18 +16,6 @@ if TYPE_CHECKING:
     from ..web.settings_db import SettingsDB
 
 
-def _set_file_permissions(path: Path) -> None:
-    """Set file permissions to 777.
-
-    Args:
-        path: File or directory path to set permissions for
-    """
-    try:
-        # Set permissions to 777 (read/write/execute for all)
-        path.chmod(0o777)
-    except (OSError, ImportError):
-        pass
-
 
 def _is_unc_path(path: Path) -> bool:
     """Check if path is a Windows UNC path.
@@ -94,7 +82,7 @@ def _safe_move_with_retry(src: Path, dst: Path, logger: logging.Logger = None) -
     # Strategy 2: Copy + delete (for read-only filesystems)
     try:
         shutil.copy2(str(src), str(dst))
-        _set_file_permissions(dst)
+
 
         # Try to delete original
         try:
@@ -125,7 +113,7 @@ def _safe_move_with_retry(src: Path, dst: Path, logger: logging.Logger = None) -
             normalized_dst.parent.mkdir(parents=True, exist_ok=True)
 
             shutil.move(str(normalized_src), str(normalized_dst))
-            _set_file_permissions(normalized_dst)
+
             return True
         except OSError as e:
             if logger:
@@ -429,8 +417,7 @@ def copy_non_archives_to_extracted(current_dir: Path, target_dir: Path) -> None:
                     # Copy and overwrite existing files (do not remove source)
                     dest_path = target_dir / entry.name
                     shutil.copy2(str(entry), str(dest_path))
-                    # Fix permissions for copied files (important for Docker environments)
-                    _set_file_permissions(dest_path)
+
                 except OSError as e:
                     _logger = logging.getLogger(__name__)
                     _logger.error("Error copying %s: %s", entry, e)
@@ -468,8 +455,7 @@ def move_archive_group(
         # Use safe move with retry strategies for Docker/UNC paths
         if _safe_move_with_retry(src, destination, logger):
             moved_path = destination
-            # Set proper permissions for moved files
-            _set_file_permissions(moved_path)
+
         else:
             # Move failed completely, skip this file
             if logger is not None:
@@ -522,9 +508,7 @@ def move_remaining_to_finished(
             for fname in files:
                 src_file = root_path / fname
                 dest = ensure_unique_destination(dest_dir / fname)
-                if _safe_move_with_retry(src_file, dest):
-                    _set_file_permissions(dest)
-                else:
+                if not _safe_move_with_retry(src_file, dest):
                     _logger = logging.getLogger(__name__)
                     _logger.error("Failed to move %s to %s", src_file, dest)
     except OSError:
@@ -564,9 +548,7 @@ def move_extracted_to_finished(
             for fname in files:
                 src_file = root_path / fname
                 dest = ensure_unique_destination(dest_dir / fname)
-                if _safe_move_with_retry(src_file, dest):
-                    _set_file_permissions(dest)
-                else:
+                if not _safe_move_with_retry(src_file, dest):
                     _logger = logging.getLogger(__name__)
                     _logger.error("Failed to move %s to %s", src_file, dest)
     except OSError:
@@ -698,8 +680,7 @@ def move_related_episode_artifacts(
                         dest_dir = finished_root / release_root_name / sub_rel
                         dest_dir.mkdir(parents=True, exist_ok=True)
                         dest = ensure_unique_destination(dest_dir / fname)
-                        if _safe_move_with_retry(src_file, dest):
-                            _set_file_permissions(dest)
+                        _safe_move_with_retry(src_file, dest)
                     except ValueError:
                         continue
         except OSError:

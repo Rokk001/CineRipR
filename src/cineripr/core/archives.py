@@ -1205,12 +1205,7 @@ def process_downloads(
                                     else:
                                         raise move_error
 
-                                # Set proper permissions for moved files
-                                try:
-                                    # Set permissions to 777 (read/write/execute for all)
-                                    destination.chmod(0o777)
-                                except (OSError, ImportError):
-                                    pass
+
                                 files_moved += 1
                                 move_tracker.advance(
                                     _logger,
