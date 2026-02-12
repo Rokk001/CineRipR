@@ -241,7 +241,16 @@
         <!-- History Tab -->
         <div class="tab-content" id="tab-history">
             <div class="card">
-                <h2>📅 Processing History</h2>
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin-bottom: 0;">📅 Processing History</h2>
+                    <div class="history-filter">
+                        <select id="history-filter-status" class="form-select" style="padding: 8px 12px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1);">
+                            <option value="all">All Statuses</option>
+                            <option value="completed">Completed</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="timeline" id="history-timeline">
                     <div class="history-empty">
                         <div class="history-empty-icon">🕐</div>

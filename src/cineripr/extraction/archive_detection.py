@@ -110,6 +110,10 @@ def compute_archive_group_key(archive: Path) -> tuple[str, int]:
         - part_index: Order index for this part (-1 for single-part archives)
     """
     lower_name = archive.name.lower()
+    
+    # Strip .dctmp extension if present to group with main archive
+    if lower_name.endswith(".dctmp"):
+        lower_name = lower_name[:-6]  # remove .dctmp
 
     # Multi-part pattern: file.part01.rar (CHECK THIS FIRST!)
     part_match = PART_VOLUME_RE.match(lower_name)
@@ -191,6 +195,11 @@ def validate_archive_group(
         - is_valid: True if group can be extracted
         - error_message: Description of problem if invalid, None if valid
     """
+    # Check for .dctmp files in the group - this indicates incomplete download
+    for member in group.members:
+        if member.name.lower().endswith(".dctmp"):
+            return False, f"part {member.name} is still downloading (.dctmp)"
+
     orders = group.order_map
     positives = sorted(order for order in orders.values() if order >= 0)
 

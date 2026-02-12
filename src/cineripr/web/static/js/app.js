@@ -1,3 +1,4 @@
+
 // Create particles
 function createParticles() {
     const container = document.getElementById('particles');
@@ -146,6 +147,130 @@ function filterLogs() {
 let previousStatus = {};
 let currentQueueData = [];
 let healthRefreshInProgress = false;
+
+// History Filtering Globals
+let historyFilter = 'all';
+let currentHistoryData = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const filterSelect = document.getElementById('history-filter-status');
+    if (filterSelect) {
+        filterSelect.addEventListener('change', (e) => {
+            historyFilter = e.target.value;
+            renderHistory();
+        });
+    }
+
+    // Add click handlers to stat cards for navigation
+    // We need to wait for stats to be rendered/availble? They are static in HTML.
+    setupStatCardNavigation();
+});
+
+function setupStatCardNavigation() {
+    const mapStatToFilter = {
+        'processed': 'completed',
+        'extracted': 'completed',
+        'failed': 'failed',
+        'unsupported': 'failed'
+    };
+
+    document.querySelectorAll('.stat-card').forEach(card => {
+        const label = card.querySelector('.stat-label').textContent.toLowerCase();
+
+        // Determine filter based on label content
+        let filterVal = 'all';
+        if (label.includes('processed') || label.includes('extracted')) filterVal = 'completed';
+        else if (label.includes('failed') || label.includes('unsupported')) filterVal = 'failed';
+        else return; // Don't add click for others if not mapped
+
+        card.style.cursor = 'pointer';
+        card.setAttribute('title', 'View in History');
+
+        card.addEventListener('click', () => {
+            // Set filter
+            historyFilter = filterVal;
+            const select = document.getElementById('history-filter-status');
+            if (select) select.value = filterVal;
+
+            // Render immediately if we have data
+            renderHistory();
+
+            // Switch tab
+            switchTab('history');
+        });
+    });
+}
+
+function renderHistory() {
+    const historyTimeline = document.getElementById('history-timeline');
+    if (!historyTimeline) return;
+
+    const history = currentHistoryData || [];
+
+    // Filter items
+    const filteredHistory = history.filter(item => {
+        if (historyFilter === 'all') return true;
+        return item.status === historyFilter;
+    });
+
+    if (filteredHistory.length === 0) {
+        if (history.length === 0) {
+            historyTimeline.innerHTML = `
+                <div class="history-empty">
+                    <div class="history-empty-icon">🕐</div>
+                    <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
+                    <div>Processed releases will appear here</div>
+                </div>
+            `;
+        } else {
+            historyTimeline.innerHTML = `
+                <div class="history-empty">
+                    <div class="history-empty-icon">🔍</div>
+                    <div style="font-size: 1.2em; margin-bottom: 10px;">No matching items</div>
+                    <div>Try selecting a different filter</div>
+                </div>
+            `;
+        }
+    } else {
+        historyTimeline.innerHTML = filteredHistory.map(item => {
+            const endTime = new Date(item.timestamp);
+            const timeStr = endTime.toLocaleString('en-US');
+            const duration = item.duration_seconds || 0;
+            const hours = Math.floor(duration / 3600);
+            const minutes = Math.floor((duration % 3600) / 60);
+            const seconds = Math.floor(duration % 60);
+            const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
+
+            const isSuccess = item.status === 'completed';
+            const markerClass = isSuccess ? 'success' : 'failed';
+            const borderColor = isSuccess ? '#10b981' : '#ef4444';
+
+            const attemptCount = item.attempt_count || 1;
+            const attemptText = attemptCount > 1 ? ` (${attemptCount}x versucht)` : '';
+
+            return `
+                <div class="timeline-item">
+                    <div class="timeline-marker ${markerClass}"></div>
+                    <div class="timeline-content" style="--timeline-color: ${borderColor}">
+                        <div class="timeline-header">
+                            <div class="timeline-title">${item.release_name}${attemptText}</div>
+                            <div class="timeline-time">${timeStr}</div>
+                        </div>
+                        <div class="timeline-meta">
+                            <div class="timeline-meta-item">
+                                <span>⏱</span> ${durationStr}
+                            </div>
+                            <div class="timeline-meta-item">
+                                <span>📦</span> Processed: ${item.processed_archives || 0} | Failed: ${item.failed_archives || 0}
+                            </div>
+                        </div>
+                        ${item.error_message ? `<div class="timeline-error">${item.error_message}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
 
 // Modal functions
 function openReleaseModal(index) {
@@ -754,72 +879,8 @@ function updateStatus() {
             const historyChanged = !arraysEqual(history, prevHistory);
 
             if (historyChanged) {
-                const historyTimeline = document.getElementById('history-timeline');
-                if (!historyTimeline) return;
-
-                if (history.length === 0) {
-                    historyTimeline.innerHTML = `
-                        <div class="history-empty">
-                            <div class="history-empty-icon">🕐</div>
-                            <div style="font-size: 1.2em; margin-bottom: 10px;">No history yet</div>
-                            <div>Processed releases will appear here</div>
-                        </div>
-                    `;
-                } else {
-                    historyTimeline.innerHTML = history.map(item => {
-                        const endTime = new Date(item.timestamp);
-                        const timeStr = endTime.toLocaleString('en-US');
-                        const duration = item.duration_seconds || 0;
-                        const hours = Math.floor(duration / 3600);
-                        const minutes = Math.floor((duration % 3600) / 60);
-                        const seconds = Math.floor(duration % 60);
-                        const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
-
-                        const isSuccess = item.status === 'completed';
-                        const markerClass = isSuccess ? 'success' : 'failed';
-                        const borderColor = isSuccess ? '#10b981' : '#ef4444';
-
-                        // Show attempt count if > 1 (NEW in v2.5.13)
-                        const attemptCount = item.attempt_count || 1;
-                        const attemptText = attemptCount > 1 ? ` (${attemptCount}x versucht)` : '';
-
-                        return `
-                            <div class="timeline-item">
-                                <div class="timeline-marker ${markerClass}"></div>
-                                <div class="timeline-content" style="--timeline-color: ${borderColor}">
-                                    <div class="timeline-header">
-                                        <div class="timeline-title">${item.release_name}${attemptText}</div>
-                                        <div class="timeline-time">${timeStr}</div>
-                                    </div>
-                                    <div class="timeline-meta">
-                                        <div class="timeline-meta-item">
-                                            <span>⏱</span> ${durationStr}
-                                        </div>
-                                        <div class="timeline-meta-item">
-                                            <span>📦</span> Processed: ${item.processed_archives || 0} | Failed: ${item.failed_archives || 0}
-                                        </div>
-                                        <div class="timeline-meta-item">
-                                            <span>${isSuccess ? '✓' : '✗'}</span> ${isSuccess ? 'Completed' : 'Failed'}
-                                        </div>
-                                    </div>
-                                    ${item.extracted_files && item.extracted_files.length > 0 ? `
-                                    <div class="timeline-success" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
-                                        <div style="color: #10b981; font-weight: 600; margin-bottom: 5px;">✅ Completed:</div>
-                                        ${item.extracted_files.slice(0, 5).map(msg => `<div style="font-size: 0.85em; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">• ${msg}</div>`).join('')}
-                                        ${item.extracted_files.length > 5 ? `<div style="font-size: 0.8em; opacity: 0.6; margin-top: 2px;">+ ${item.extracted_files.length - 5} more items</div>` : ''}
-                                    </div>
-                                    ` : ''}
-                                    ${item.error_messages && item.error_messages.length > 0 ? `
-                                    <div class="timeline-errors">
-                                        <div style="color: #ef4444; font-weight: 600; margin-bottom: 5px;">⚠️ Errors:</div>
-                                        ${item.error_messages.slice(0, 3).map(err => `<div style="font-size: 0.85em; opacity: 0.8;">• ${err}</div>`).join('')}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
+                currentHistoryData = history;
+                renderHistory();
             }
 
             // Last update time - only update if changed (every second is fine)
