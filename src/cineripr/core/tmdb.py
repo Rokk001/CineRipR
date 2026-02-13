@@ -232,7 +232,7 @@ class TMDbClient:
         Args:
             episode_data: Dictionary containing TMDB episode details.
             show_name: Name of the TV show (since episode data might not have it).
-            output_path: Path where the .info file should be saved.
+            output_path: Path where the .nfo file should be saved.
 
         Returns:
             True if successful, False otherwise.

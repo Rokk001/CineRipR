@@ -668,6 +668,11 @@ def process_downloads(
                                 files_to_move.append((current_dir, release_name))
                         except OSError:
                             pass
+                            # Process metadata and NFO for copied files
+                            target_dir = _process_metadata_and_nfo(target_dir, tmdb_api_token, tracker, success_messages)
+
+                        except OSError:
+                            pass
                     _logger.debug("No supported archives found in %s", current_dir)
                     continue
 
