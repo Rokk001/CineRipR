@@ -661,8 +661,10 @@ volumes:
 ### 🎯 Implementierte Features
 
 #### 1. 🎥 TMDB Integration
-- **Automatische .info-Erstellung**: Nach dem Extrahieren und Verschieben von Filmen wird auf TMDB gesucht.
-- **Metadaten-Download**: Titel, Jahr, Plot, Bewertung, Cast & Crew werden in eine Kodi/Emby-kompatible `.info` Datei geschrieben.
+- **Automatische .info-Erstellung**: Nach dem Extrahieren und Verschieben von Filmen **und TV-Serien** wird auf TMDB gesucht.
+- **Metadaten-Download**: 
+    - **Movies**: Titel, Jahr, Plot, Bewertung, Cast & Crew -> `movie.info`
+    - **TV Episodes**: Episodentitel, Plot, Air Date, Rating, Guest Stars -> `Dateiname.info`
 - **Graceful Failure**: Wenn kein API-Token gesetzt ist oder der Film nicht gefunden wird, läuft der Prozess normal weiter.
 
 #### 2. 🔒 Secure Configuration

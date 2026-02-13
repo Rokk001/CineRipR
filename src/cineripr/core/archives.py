@@ -972,10 +972,16 @@ def process_downloads(
                                     )
                                     is_tv_show = False  # Directory name parsing assumes movie
                                 else:
-                                    _logger.debug(
-                                        "Could not parse metadata from directory name '%s', skipping rename",
-                                        target_dir.name,
-                                    )
+                                    # Fallback 2: Check if it looks like a TV Show using path_utils
+                                    from .path_utils import looks_like_tv_show
+                                    if looks_like_tv_show(target_dir):
+                                        _logger.info("Detected TV Show structure for '%s'", target_dir.name)
+                                        is_tv_show = True
+                                    else:
+                                        _logger.debug(
+                                            "Could not parse metadata from directory name '%s', skipping rename",
+                                            target_dir.name,
+                                        )
 
                             # Rename folder and files if we have metadata
                             if metadata and metadata.title:
@@ -1059,6 +1065,46 @@ def process_downloads(
                                             
                                     except Exception as tmdb_exc:
                                         _logger.error("TMDB integration failed for '%s': %s", metadata.title, tmdb_exc)
+                                
+                                # TMDB Integration for TV Shows
+                                elif is_tv_show and tmdb_api_token:
+                                    try:
+                                        from .tmdb import TMDbClient
+                                        from .path_utils import parse_tv_show_info
+                                        
+                                        # Iterate over files in the target directory to find video files and process them
+                                        files_to_check = [f for f in target_dir.iterdir() if f.is_file() and f.suffix.lower() in (".mkv", ".mp4", ".avi")]
+                                        
+                                        tmdb_client = TMDbClient(tmdb_api_token)
+
+                                        for video_file in files_to_check:
+                                            # Parse info from filename
+                                            tv_info = parse_tv_show_info(video_file.name)
+                                            if tv_info:
+                                                show_name, season_num, episode_num = tv_info
+                                                _logger.info("Checking TMDB for TV Show '%s' S%02dE%02d...", show_name, season_num, episode_num)
+                                                
+                                                # Search for Show ID
+                                                show_id = tmdb_client.search_tv_show(show_name)
+                                                if show_id:
+                                                    # Get Episode Details
+                                                    ep_details = tmdb_client.get_episode_details(show_id, season_num, episode_num)
+                                                    if ep_details:
+                                                        # Create INFO
+                                                        info_path = video_file.with_suffix(".info")
+                                                        if tmdb_client.create_episode_nfo(ep_details, show_name, info_path):
+                                                             _logger.info("Successfully created Episode INFO for %s", video_file.name)
+                                                             success_messages.append(f"Downloaded INFO for {video_file.name}")
+                                                    else:
+                                                        _logger.warning("Episode not found on TMDB: %s S%02dE%02d", show_name, season_num, episode_num)
+                                                else:
+                                                    _logger.warning("TV Show '%s' not found on TMDB", show_name)
+                                            else:
+                                                _logger.debug("Could not parse Season/Episode from %s", video_file.name)
+
+                                    except Exception as tv_exc:
+                                        _logger.error("TMDB TV integration failed: %s", tv_exc)
+                                
                                 elif not tmdb_api_token and not is_tv_show:
                                     _logger.debug("TMDB API token not set, skipping NFO generation")
 

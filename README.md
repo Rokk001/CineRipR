@@ -48,7 +48,7 @@ Downloaded media often comes as:
 | **🗜️ Multi-Part Archives**        | Full support for RAR5, split ZIPs, and multi-volume archives                          |
 | **📺 Smart TV Show Organization** | Automatic detection and organization into `ShowName/Season XX/`                       |
 | **🎬 Movie Organization**         | Proper naming and structure for movie collections                                     |
-| **🎥 TMDB Integration**           | Auto-fetch metadata and `.info` creation for movies (requires API Token)              |
+| **🎥 TMDB Integration**           | Auto-fetch metadata and `.info` creation for movies **and TV episodes** (requires API Token) |
 | **✅ File Completeness Check**    | Verifies files are fully downloaded before processing (configurable stability period) |
 | **🔄 Real-Time Progress**         | Live progress bars with color-coded status                                            |
 | **🐳 Docker-Ready**               | Production-tested Docker image with official 7-Zip binary                             |
@@ -226,28 +226,56 @@ volumes:
 
 ### TOML Configuration (Optional)
 
-If you prefer TOML files, create `cineripr.toml`:
+If you prefer TOML files, create `cineripr.toml`. Here is a complete reference of all available options:
 
 ```toml
 [paths]
+# Directory to scan for archives (can be multiple)
 download_roots = ["/data/downloads"]
+
+# Directory where extracted content will be placed
 extracted_root = "/data/extracted"
+
+# Directory where original archives are moved after successful extraction
 finished_root = "/data/finished"
 
+# Optional: Final destinations for Movies and TV Shows
+# If set, recognized content is moved here after extraction/renaming.
+# movie_root = "/data/movies"
+# tvshow_root = "/data/tvshows"
+
 [options]
+# Number of days to keep files in 'finished_root' before deletion
 finished_retention_days = 15
+
+# Enable automatic deletion of old files in 'finished_root'
 enable_delete = false
+
+# Demo mode: Dry-run only, no files are modified/deleted
 demo_mode = false
 
 [subfolders]
+# Process 'Sample' directories?
 include_sample = false
+
+# Process 'Subs' directories?
 include_sub = true
+
+# Process other subdirectories?
 include_other = false
+
+[tools]
+# Path to 7-Zip executable (auto-detected usually)
+# seven_zip = "/usr/bin/7z"
+
+[tmdb]
+# TMDB API Token for metadata fetching (Movies & TV)
+# api_token = "your_read_access_token_here"
 ```
 
-### TMDB Integration (Movie Metadata)
+### TMDB Integration (Movie & TV Metadata)
 
-To enable automatic `.info` (metadata) downloading for movies, add your TMDB API Token to your **Docker Compose** configuration.
+To enable automatic `.info` (metadata) downloading for movies **and TV episodes**, add your TMDB API Token to your **Docker Compose** configuration.
 
 **1. Docker Compose (Recommended)**
 Add the `CINERIPR_TMDB_API_TOKEN` environment variable to your service definition. Here is a complete example:
@@ -278,7 +306,9 @@ services:
 ```
 
 **2. Local Development (Optional)**
-Only for local testing without Docker. Create `cineripr.local.toml` (gitignored):
+Only for local testing without Docker. You can add the token to your `cineripr.toml` (see above) or create a secure local override:
+1. Create `cineripr.local.toml` (this file is gitignored).
+2. Add your token:
 ```toml
 [tmdb]
 api_token = "your_token"

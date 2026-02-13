@@ -175,3 +175,118 @@ class TMDbClient:
                         return release['certification']
                         
         return ""
+
+    def search_tv_show(self, query: str) -> int | None:
+        """Search for a TV show by title.
+
+        Args:
+            query: TV show title to search for.
+
+        Returns:
+            TMDB ID of the first match, or None if not found.
+        """
+        url = f"{TMDB_BASE_URL}/search/tv"
+        params = {"query": query, "language": "de-DE", "include_adult": "true"}
+
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            results = data.get("results", [])
+            
+            if results:
+                return results[0]["id"]
+            
+            _logger.debug("No TMDB results found for TV show '%s'", query)
+            return None
+            
+        except requests.RequestException as e:
+            _logger.error("TMDB TV search failed for '%s': %s", query, e)
+            return None
+
+    def get_episode_details(self, tv_id: int, season: int, episode: int) -> Dict[str, Any] | None:
+        """Fetch details for a specific TV show episode.
+
+        Args:
+            tv_id: The TMDB TV show ID.
+            season: Season number.
+            episode: Episode number.
+
+        Returns:
+            Dictionary with episode details, or None if request fails.
+        """
+        url = f"{TMDB_BASE_URL}/tv/{tv_id}/season/{season}/episode/{episode}"
+        params = {"language": "de-DE"}
+
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            _logger.error("Failed to get TMDB episode details for ID %s S%sE%s: %s", tv_id, season, episode, e)
+            return None
+
+    def create_episode_nfo(self, episode_data: Dict[str, Any], show_name: str, output_path: Path) -> bool:
+        """Create a Kodi/Emby compatible NFO file for an episode.
+
+        Args:
+            episode_data: Dictionary containing TMDB episode details.
+            show_name: Name of the TV show (since episode data might not have it).
+            output_path: Path where the .info file should be saved.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        try:
+            root = ET.Element("episodedetails")
+            
+            # Helper to add simple text elements
+            def add_elem(parent, tag, text):
+                if text:
+                    elem = ET.SubElement(parent, tag)
+                    elem.text = str(text)
+
+            add_elem(root, "title", episode_data.get("name"))
+            add_elem(root, "showtitle", show_name)
+            
+            rating = episode_data.get("vote_average")
+            if rating:
+                add_elem(root, "rating", str(rating))
+                add_elem(root, "userrating", str(rating))
+            
+            add_elem(root, "season", str(episode_data.get("season_number")))
+            add_elem(root, "episode", str(episode_data.get("episode_number")))
+            add_elem(root, "plot", episode_data.get("overview"))
+            add_elem(root, "aired", episode_data.get("air_date"))
+            add_elem(root, "runtime", str(episode_data.get("runtime")))
+            
+            # IDs
+            if episode_data.get("id"):
+                add_elem(root, "id", str(episode_data.get("id")))
+                add_elem(root, "tmdbid", str(episode_data.get("id")))
+                uniqueid = ET.SubElement(root, "uniqueid", type="tmdb", default="true")
+                uniqueid.text = str(episode_data.get("id"))
+
+            # Credits (Guest Stars / Crew)
+            for guest in episode_data.get("guest_stars", [])[:10]:
+                actor_elem = ET.SubElement(root, "actor")
+                add_elem(actor_elem, "name", guest.get("name"))
+                add_elem(actor_elem, "role", guest.get("character"))
+                if guest.get("profile_path"):
+                    add_elem(actor_elem, "thumb", f"https://image.tmdb.org/t/p/original{guest.get('profile_path')}")
+
+            # Save XML
+            tree = ET.ElementTree(root)
+            ET.indent(tree, space="  ", level=0)
+            
+            # Ensure output file has .info extension
+            if output_path.suffix.lower() != ".info":
+                output_path = output_path.with_suffix(".info")
+                
+            tree.write(output_path, encoding="utf-8", xml_declaration=True)
+            _logger.info("Created Episode INFO file at: %s", output_path)
+            return True
+
+        except Exception as e:
+            _logger.error("Failed to create Episode INFO file: %s", e)
+            return False

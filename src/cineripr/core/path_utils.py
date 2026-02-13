@@ -229,6 +229,37 @@ def get_category_prefix(directory: Path) -> Path:
     return Path(TV_CATEGORY) if looks_like_tv_show(directory) else Path(MOVIES_CATEGORY)
 
 
+def parse_tv_show_info(name: str) -> tuple[str, int, int] | None:
+    """Parse TV show name, season, and episode from a filename or directory name.
+
+    Args:
+        name: Filename or directory name (e.g., "Breaking.Bad.S01E01.mkv")
+
+    Returns:
+        Tuple of (Show Name, Season Number, Episode Number) or None if not found.
+    """
+    # 1. Look for SxxExx pattern
+    match = TV_TAG_RE.search(name)
+    if match:
+        tag = match.group(0).upper()
+        # Parse SxxExx
+        se_match = re.match(r"S(\d+)E(\d+)", tag)
+        if se_match:
+            season = int(se_match.group(1))
+            episode = int(se_match.group(2))
+            
+            # Extract Show Name: Everything before SxxExx
+            # e.g., "Breaking.Bad.S01E01" -> "Breaking Bad"
+            raw_name = name[:match.start()]
+            show_name = raw_name.replace(".", " ").replace("-", " ").strip()
+            
+            return show_name, season, episode
+            
+    # 2. Look for Episode only (E01) - less reliable, maybe skip for now for TMDB safety?
+    # Logic: if we can't find season, we can't query TMDB episode endpoint effectively.
+    
+    return None
+
 __all__ = [
     "is_season_directory",
     "extract_season_from_tag",
@@ -236,4 +267,5 @@ __all__ = [
     "normalize_special_subdir",
     "looks_like_tv_show",
     "get_category_prefix",
+    "parse_tv_show_info",
 ]
