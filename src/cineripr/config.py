@@ -94,6 +94,7 @@ class Settings:
     # New: endless repeat options
     repeat_forever: bool = False
     repeat_after_minutes: int = 0
+    tmdb_api_token: str | None = None
 
     @classmethod
     def from_mapping(
@@ -172,6 +173,20 @@ class Settings:
             options, "repeat_after_minutes", default=0, minimum=0
         )
 
+        # TMDB API Token
+        # Priority: Env Var > Config
+        import os
+        tmdb_api_token = os.environ.get("CINERIPR_TMDB_API_TOKEN")
+
+        if tmdb_api_token is None:
+            # Check 'tmdb' section first
+            tmdb_section = data.get("tmdb", {})
+            tmdb_api_token = tmdb_section.get("api_token")
+
+        if tmdb_api_token is None:
+             # Fallback to 'options' (legacy/flat structure support)
+            tmdb_api_token = options.get("tmdb_api_token")
+
         subfolders_data = data.get("subfolders")
         if subfolders_data is None:
             subfolder_policy = SubfolderPolicy()
@@ -214,6 +229,7 @@ class Settings:
             seven_zip_path=seven_zip_path,
             repeat_forever=repeat_forever,
             repeat_after_minutes=repeat_after_minutes,
+            tmdb_api_token=tmdb_api_token,
         )
 
 
@@ -250,9 +266,21 @@ def _read_bool(data: dict[str, Any], key: str, *, default: bool = False) -> bool
         f"Cannot interpret value '{value!r}' for '{key}' as boolean"
     )
 
+def _merge_dicts(base: dict, overlay: dict) -> dict:
+    """Recursively merge overlay dictionary into base dictionary."""
+    for key, value in overlay.items():
+        if isinstance(value, dict) and key in base and isinstance(base[key], dict):
+            _merge_dicts(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 def load_settings(config_file: Path | None) -> Settings:
-    """Load configuration from a TOML file."""
+    """Load configuration from a TOML file.
+
+    Supports loading an optional '.local.toml' file in the same directory
+    to override settings (e.g., for secrets).
+    """
 
     if config_file is None:
         raise ConfigurationError("No configuration file supplied")
@@ -263,6 +291,7 @@ def load_settings(config_file: Path | None) -> Settings:
     if tomllib is None:
         raise ConfigurationError("tomllib is not available on this Python version")
 
+    # Load main config
     with config_file.open("rb") as fh:
         data = tomllib.load(fh)
 
@@ -270,6 +299,23 @@ def load_settings(config_file: Path | None) -> Settings:
         raise ConfigurationError(
             "Configuration file must define a mapping at top level"
         )
+    
+    # Check for local override config (e.g., cineripr.local.toml)
+    # This allows users to keep secrets separate and gitignored
+    local_config_file = config_file.with_name(
+        config_file.stem + ".local" + config_file.suffix
+    )
+    if local_config_file.exists():
+        try:
+            with local_config_file.open("rb") as fh:
+                local_data = tomllib.load(fh)
+            if isinstance(local_data, dict):
+                # Merge local settings over main settings
+                _merge_dicts(data, local_data)
+        except Exception:
+             # If local config is broken, ignore it but maybe warn?
+             # For now we just silently ignore issues with the optional file
+             pass
 
     return Settings.from_mapping(data, base_path=config_file.parent)
 

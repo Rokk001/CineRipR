@@ -363,6 +363,7 @@ def process_downloads(
     debug: bool = False,
     status_callback: Callable[[str, str, str | None, int, int], None] | None = None,
     parallel_extractions: int = 1,
+    tmdb_api_token: str | None = None,
 ) -> ProcessResult:
     """Process all downloads: extract archives and organize files.
 
@@ -1028,11 +1029,39 @@ def process_downloads(
                                                 target_dir = (
                                                     paths.movie_root / target_dir.name
                                                 )
-                                        else:
                                             _logger.debug(
                                                 "Movie root not configured, skipping move for %s",
                                                 target_dir.name,
                                             )
+                                
+                                # TMDB Integration: Check for movie and download NFO
+                                if not is_tv_show and tmdb_api_token and metadata and metadata.title:
+                                    try:
+                                        from .tmdb import TMDbClient
+                                        
+                                        _logger.info("Checking TMDB for '%s' (%s)...", metadata.title, metadata.year or "unknown year")
+                                        tmdb_client = TMDbClient(tmdb_api_token)
+                                        tmdb_id = tmdb_client.search_movie(metadata.title, metadata.year)
+                                        
+                                        if tmdb_id:
+                                            _logger.info("Found movie on TMDB (ID: %s). Fetching details...", tmdb_id)
+                                            details = tmdb_client.get_movie_details(tmdb_id)
+                                            if details:
+                                                # Save NFO to the movie folder
+                                                nfo_path = target_dir / "movie.nfo"
+                                                if tmdb_client.create_nfo(details, nfo_path):
+                                                    _logger.info("Successfully created NFO file for '%s'", metadata.title)
+                                                    success_messages.append(f"Downloaded NFO for {metadata.title}")
+                                                else:
+                                                    _logger.warning("Failed to create NFO file for '%s'", metadata.title)
+                                        else:
+                                            _logger.info("Movie '%s' not found on TMDB.", metadata.title)
+                                            
+                                    except Exception as tmdb_exc:
+                                        _logger.error("TMDB integration failed for '%s': %s", metadata.title, tmdb_exc)
+                                elif not tmdb_api_token and not is_tv_show:
+                                    _logger.debug("TMDB API token not set, skipping NFO generation")
+
                         except Exception as rename_exc:
                             # Don't fail extraction if renaming/moving fails
                             _logger.warning(

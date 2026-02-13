@@ -653,3 +653,29 @@ volumes:
 - Debug-Logging in `webgui.py` Line 2591-2631
 - Debug-Logging in `status.py` Line 797-802
 - Logs sollten zeigen ob `set_next_run()` aufgerufen wird
+
+---
+
+## Session Notes - TMDB Integration (2025-02-13)
+
+### 🎯 Implementierte Features
+
+#### 1. 🎥 TMDB Integration
+- **Automatische NFO-Erstellung**: Nach dem Extrahieren und Verschieben von Filmen wird auf TMDB gesucht.
+- **Metadaten-Download**: Titel, Jahr, Plot, Bewertung, Cast & Crew werden in eine Kodi/Emby-kompatible `.nfo` Datei geschrieben.
+- **Graceful Failure**: Wenn kein API-Token gesetzt ist oder der Film nicht gefunden wird, läuft der Prozess normal weiter.
+
+#### 2. 🔒 Secure Configuration
+- **Environment Variables**: `CINERIPR_TMDB_API_TOKEN` wird unterstützt (für Docker).
+- **Local Config**: `cineripr.local.toml` (gitignored) überschreibt Einstellungen für lokale Entwicklung.
+- **Config-Ladereihenfolge**: Env Var > Local Config > Main Config > Default.
+
+### 🔧 Geänderte Module
+- **`src/cineripr/core/tmdb.py`**: Neues Modul für API-Interaktion.
+- **`src/cineripr/config.py`**: Erweiterte Ladelogik für Env-Vars und lokale Configs.
+- **`src/cineripr/core/archives.py`**: Integration des TMDB-Checks in den Workflow.
+- **`src/cineripr/cli.py`**: Durchreichen des API-Tokens.
+
+### 📝 Dokumentation
+- **README.md**: Features und Konfiguration aktualisiert.
+- **.gitignore**: `cineripr.local.toml` hinzugefügt.

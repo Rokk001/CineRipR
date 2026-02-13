@@ -21,6 +21,7 @@ dist/
 # Configuration
 # Ignore personal config, but keep the example
 emby_extractor.toml
+cineripr.local.toml
 
 # Testing
 .pytest_cache/

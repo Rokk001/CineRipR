@@ -534,6 +534,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 debug=args.debug,
                 status_callback=status_callback if args.webgui else None,
                 parallel_extractions=parallel_extractions,
+                tmdb_api_token=settings.tmdb_api_token,
             )
             tracker.update_counts(
                 processed=result.processed,
