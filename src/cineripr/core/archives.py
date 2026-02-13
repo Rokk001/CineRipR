@@ -1047,13 +1047,13 @@ def process_downloads(
                                             _logger.info("Found movie on TMDB (ID: %s). Fetching details...", tmdb_id)
                                             details = tmdb_client.get_movie_details(tmdb_id)
                                             if details:
-                                                # Save NFO to the movie folder
-                                                nfo_path = target_dir / "movie.nfo"
+                                                # Save INFO to the movie folder
+                                                nfo_path = target_dir / "movie.info"
                                                 if tmdb_client.create_nfo(details, nfo_path):
-                                                    _logger.info("Successfully created NFO file for '%s'", metadata.title)
-                                                    success_messages.append(f"Downloaded NFO for {metadata.title}")
+                                                    _logger.info("Successfully created INFO file for '%s'", metadata.title)
+                                                    success_messages.append(f"Downloaded INFO for {metadata.title}")
                                                 else:
-                                                    _logger.warning("Failed to create NFO file for '%s'", metadata.title)
+                                                    _logger.warning("Failed to create INFO file for '%s'", metadata.title)
                                         else:
                                             _logger.info("Movie '%s' not found on TMDB.", metadata.title)
                                             
