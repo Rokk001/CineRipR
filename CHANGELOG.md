@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.20] - 2026-02-13
+
+### 🎯 New Features
+
+- **Added "Scraped" Statistic:**
+    - New dashboard indicator for titles successfully scraped from TMDB.
+    - Tracks both movies and TV episodes.
+    - Persisted to database.
+
+### 🔧 Technical Changes
+
+- Database migration for `scraped_count`.
+- Backend logic updates in `status.py` and `archives.py`.
+- Frontend updates in `index.html` and `app.js`.
+
 ## [2.5.19] - 2025-01-02
 
 ### 🎬 Automatic Move to Final Destinations

@@ -1060,6 +1060,8 @@ def process_downloads(
                                                 if tmdb_client.create_nfo(details, nfo_path):
                                                     _logger.info("Successfully created NFO file for '%s'", metadata.title)
                                                     success_messages.append(f"Downloaded NFO for {metadata.title}")
+                                                    if tracker:
+                                                        tracker.increment_scraped(1)
                                                 else:
                                                     _logger.warning("Failed to create NFO file for '%s'", metadata.title)
                                         else:
@@ -1097,6 +1099,8 @@ def process_downloads(
                                                         if tmdb_client.create_episode_nfo(ep_details, show_name, info_path):
                                                              _logger.info("Successfully created Episode NFO for %s", video_file.name)
                                                              success_messages.append(f"Downloaded NFO for {video_file.name}")
+                                                             if tracker:
+                                                                 tracker.increment_scraped(1)
                                                     else:
                                                         _logger.warning("Episode not found on TMDB: %s S%02dE%02d", show_name, season_num, episode_num)
                                                 else:

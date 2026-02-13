@@ -68,6 +68,7 @@ class SettingsDB:
                 """)
                 # Statistics table
                 conn.execute("""
+                conn.execute("""
                     CREATE TABLE IF NOT EXISTS statistics (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         processed_count INTEGER DEFAULT 0,
@@ -75,6 +76,10 @@ class SettingsDB:
                         unsupported_count INTEGER DEFAULT 0,
                         deleted_count INTEGER DEFAULT 0,
                         cleanup_failed_count INTEGER DEFAULT 0,
+                        extracted_count INTEGER DEFAULT 0,
+                        copied_count INTEGER DEFAULT 0,
+                        moved_count INTEGER DEFAULT 0,
+                        scraped_count INTEGER DEFAULT 0,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
@@ -144,6 +149,22 @@ class SettingsDB:
                 except sqlite3.OperationalError:
                     # Column already exists, ignore
                     pass
+
+                # Migration: Add extracted_count, copied_count, moved_count if they don't exist (v2.5.17)
+                for col in ["extracted_count", "copied_count", "moved_count"]:
+                    try:
+                        conn.execute(f"ALTER TABLE statistics ADD COLUMN {col} INTEGER DEFAULT 0")
+                        conn.commit()
+                    except sqlite3.OperationalError:
+                        pass
+                
+                # Migration: Add scraped_count if it doesn't exist (v2.6.0)
+                try:
+                    conn.execute("ALTER TABLE statistics ADD COLUMN scraped_count INTEGER DEFAULT 0")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+
             finally:
                 conn.close()
 
@@ -246,14 +267,19 @@ class SettingsDB:
                 conn.execute("""
                     INSERT INTO statistics (
                         processed_count, failed_count, unsupported_count,
-                        deleted_count, cleanup_failed_count
-                    ) VALUES (?, ?, ?, ?, ?)
+                        deleted_count, cleanup_failed_count,
+                        extracted_count, copied_count, moved_count, scraped_count
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     stats.get("processed_count", 0),
                     stats.get("failed_count", 0),
                     stats.get("unsupported_count", 0),
                     stats.get("deleted_count", 0),
                     stats.get("cleanup_failed_count", 0),
+                    stats.get("extracted_count", 0),
+                    stats.get("copied_count", 0),
+                    stats.get("moved_count", 0),
+                    stats.get("scraped_count", 0),
                 ))
                 conn.commit()
             finally:
@@ -266,7 +292,8 @@ class SettingsDB:
             try:
                 cursor = conn.execute("""
                     SELECT processed_count, failed_count, unsupported_count,
-                           deleted_count, cleanup_failed_count
+                           deleted_count, cleanup_failed_count,
+                           extracted_count, copied_count, moved_count, scraped_count
                     FROM statistics
                     ORDER BY id DESC
                     LIMIT 1
@@ -279,6 +306,10 @@ class SettingsDB:
                         "unsupported_count": row[2],
                         "deleted_count": row[3],
                         "cleanup_failed_count": row[4],
+                        "extracted_count": row[5] if len(row) > 5 else 0,
+                        "copied_count": row[6] if len(row) > 6 else 0,
+                        "moved_count": row[7] if len(row) > 7 else 0,
+                        "scraped_count": row[8] if len(row) > 8 else 0,
                     }
                 return {
                     "processed_count": 0,
@@ -286,6 +317,10 @@ class SettingsDB:
                     "unsupported_count": 0,
                     "deleted_count": 0,
                     "cleanup_failed_count": 0,
+                    "extracted_count": 0,
+                    "copied_count": 0,
+                    "moved_count": 0,
+                    "scraped_count": 0,
                 }
             finally:
                 conn.close()

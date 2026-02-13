@@ -101,6 +101,7 @@ class GlobalStatus:
     extracted_count: int = 0
     copied_count: int = 0
     moved_count: int = 0
+    scraped_count: int = 0
     last_update: datetime = field(default_factory=datetime.now)
     current_release: ProcessingStatus | None = None
     recent_logs: list[dict[str, Any]] = field(default_factory=list)
@@ -142,6 +143,7 @@ class GlobalStatus:
             "extracted_count": self.extracted_count,
             "copied_count": self.copied_count,
             "moved_count": self.moved_count,
+            "scraped_count": self.scraped_count,
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "current_release": (
                 {
@@ -256,6 +258,7 @@ class StatusTracker:
             self._status.extracted_count = stats.get("extracted_count", 0)
             self._status.copied_count = stats.get("copied_count", 0)
             self._status.moved_count = stats.get("moved_count", 0)
+            self._status.scraped_count = stats.get("scraped_count", 0)
 
             # Load history
             history_data = db.load_history()
@@ -416,6 +419,7 @@ class StatusTracker:
         unsupported: int | None = None,
         deleted: int | None = None,
         cleanup_failed: int | None = None,
+        scraped: int | None = None,
     ) -> None:
         """Update processing counts."""
         with self._lock:
@@ -429,6 +433,8 @@ class StatusTracker:
                 self._status.deleted_count = deleted
             if cleanup_failed is not None:
                 self._status.cleanup_failed_count = cleanup_failed
+            if scraped is not None:
+                self._status.scraped_count = scraped
             self._status.last_update = datetime.now()
 
         # Save statistics to DB
@@ -446,6 +452,7 @@ class StatusTracker:
                     "extracted_count": self._status.extracted_count,
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
+                    "scraped_count": self._status.scraped_count,
                 }
             )
         except Exception as e:
@@ -474,6 +481,7 @@ class StatusTracker:
                     "extracted_count": self._status.extracted_count,
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
+                    "scraped_count": self._status.scraped_count,
                 }
             )
         except Exception as e:
@@ -502,6 +510,7 @@ class StatusTracker:
                     "extracted_count": self._status.extracted_count,
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
+                    "scraped_count": self._status.scraped_count,
                 }
             )
         except Exception as e:
@@ -530,6 +539,36 @@ class StatusTracker:
                     "extracted_count": self._status.extracted_count,
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
+                    "scraped_count": self._status.scraped_count,
+                }
+            )
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).debug(f"Failed to save statistics to DB: {e}")
+
+    def increment_scraped(self, count: int = 1) -> None:
+        """Increment scraped files count."""
+        with self._lock:
+            self._status.scraped_count += count
+            self._status.last_update = datetime.now()
+
+        # Save to DB
+        try:
+            from .settings_db import get_settings_db
+
+            db = get_settings_db()
+            db.save_statistics(
+                {
+                    "processed_count": self._status.processed_count,
+                    "failed_count": self._status.failed_count,
+                    "unsupported_count": self._status.unsupported_count,
+                    "deleted_count": self._status.deleted_count,
+                    "cleanup_failed_count": self._status.cleanup_failed_count,
+                    "extracted_count": self._status.extracted_count,
+                    "copied_count": self._status.copied_count,
+                    "moved_count": self._status.moved_count,
+                    "scraped_count": self._status.scraped_count,
                 }
             )
         except Exception as e:
@@ -556,6 +595,7 @@ class StatusTracker:
                 extracted_count=self._status.extracted_count,
                 copied_count=self._status.copied_count,
                 moved_count=self._status.moved_count,
+                scraped_count=self._status.scraped_count,
                 last_update=self._status.last_update,
                 current_release=(
                     ProcessingStatus(

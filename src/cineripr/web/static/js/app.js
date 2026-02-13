@@ -662,6 +662,7 @@ function updateStatus() {
             updateValue('extracted', data.extracted_count || 0);
             updateValue('copied', data.copied_count || 0);
             updateValue('moved', data.moved_count || 0);
+            updateValue('scraped', data.scraped_count || 0);
 
             // Notifications
             if (previousStatus.processed_count !== undefined) {
