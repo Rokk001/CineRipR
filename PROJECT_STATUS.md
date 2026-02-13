@@ -705,3 +705,19 @@ volumes:
 - **`src/cineripr/core/archives.py`**: `add_to_history()` Aufruf in die Loop integriert.
 - **`src/cineripr/cli.py`**: Redundanten History-Aufruf entfernt.
 - **`src/cineripr/web/static/css/style.css`**: CSS-Variablen-Fix für Dropdowns.
+
+---
+
+## Session Notes - UnboundLocalError Fix (2026-02-13)
+
+### 🐛 Problem
+- **UnboundLocalError**: `cannot access local variable 'extracted_ok' where it is not associated with a value`.
+- Occurred when `process_downloads` encountered a release directory that resulted in no extraction contexts (e.g. empty directory or only files that didn't trigger extraction), causing the loop where `extracted_ok` is set to be skipped.
+- The history logging at the end of the release processing attempted to access `extracted_ok`, causing the crash.
+
+### ✅ Solution
+- **Initialize Variable**: `extracted_ok` is now initialized to `False` *before* the context processing loop in `src/cineripr/core/archives.py`.
+- This ensures the variable is always defined, even if the loop is skipped.
+
+### 🔧 Geänderte Dateien
+- **`src/cineripr/core/archives.py`**: Initialization of `extracted_ok` added.

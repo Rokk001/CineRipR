@@ -536,6 +536,7 @@ def process_downloads(
             files_to_move: list[tuple[Path, Path]] = []
             release_failed = False
             is_main_context = False
+            extracted_ok = False # Initialize to prevent UnboundLocalError if loop is skipped
 
             # Track current context color (changes per episode/film)
             context_color = next_progress_color()
