@@ -48,7 +48,7 @@ Downloaded media often comes as:
 | **🗜️ Multi-Part Archives**        | Full support for RAR5, split ZIPs, and multi-volume archives                          |
 | **📺 Smart TV Show Organization** | Automatic detection and organization into `ShowName/Season XX/`                       |
 | **🎬 Movie Organization**         | Proper naming and structure for movie collections                                     |
-| **🎥 TMDB Integration**           | Auto-fetch metadata and `.info` creation for movies **and TV episodes** (requires API Token) |
+| **🎥 TMDB Integration**           | Auto-fetch metadata and NFO creation for movies **and TV episodes** (requires API Token) |
 | **✅ File Completeness Check**    | Verifies files are fully downloaded before processing (configurable stability period) |
 | **🔄 Real-Time Progress**         | Live progress bars with color-coded status                                            |
 | **🐳 Docker-Ready**               | Production-tested Docker image with official 7-Zip binary                             |
@@ -170,7 +170,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished"]
     
-    # Optional: TMDB Integration for Movie Metadata (.info)
+    # Optional: TMDB Integration for Movie Metadata (NFO)
     environment:
       - CINERIPR_TMDB_API_TOKEN=your_tmdb_read_access_token
 ```
@@ -275,7 +275,7 @@ include_other = false
 
 ### TMDB Integration (Movie & TV Metadata)
 
-To enable automatic `.info` (metadata) downloading for movies **and TV episodes**, add your TMDB API Token to your **Docker Compose** configuration.
+To enable automatic NFO (metadata) downloading for movies **and TV episodes**, add your TMDB API Token to your **Docker Compose** configuration.
 
 **1. Docker Compose (Recommended)**
 Add the `CINERIPR_TMDB_API_TOKEN` environment variable to your service definition. Here is a complete example:

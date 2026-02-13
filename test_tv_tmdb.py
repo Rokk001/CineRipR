@@ -56,7 +56,7 @@ def test_tv_integration():
     if details:
         print(f"SUCCESS: Found episode '{details.get('name')}' (Air Date: {details.get('air_date')})")
         
-        output_path = Path("Breaking.Bad.S01E01.info")
+        output_path = Path("Breaking.Bad.S01E01.nfo")
         print(f"Creating NFO at {output_path}...")
         if client.create_episode_nfo(details, show_name, output_path):
             if output_path.exists():

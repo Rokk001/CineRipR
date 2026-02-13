@@ -144,16 +144,16 @@ class TMDbClient:
             tree = ET.ElementTree(root)
             ET.indent(tree, space="  ", level=0)
             
-            # Ensure output file has .info extension
-            if output_path.suffix.lower() != ".info":
-                output_path = output_path.with_suffix(".info")
+            # Ensure output file has .nfo extension
+            if output_path.suffix.lower() != ".nfo":
+                output_path = output_path.with_suffix(".nfo")
                 
             tree.write(output_path, encoding="utf-8", xml_declaration=True)
-            _logger.info("Created INFO file at: %s", output_path)
+            _logger.info("Created NFO file at: %s", output_path)
             return True
 
         except Exception as e:
-            _logger.error("Failed to create INFO file: %s", e)
+            _logger.error("Failed to create NFO file: %s", e)
             return False
 
     def _get_certification(self, movie_data: Dict[str, Any]) -> str:
@@ -279,14 +279,14 @@ class TMDbClient:
             tree = ET.ElementTree(root)
             ET.indent(tree, space="  ", level=0)
             
-            # Ensure output file has .info extension
-            if output_path.suffix.lower() != ".info":
-                output_path = output_path.with_suffix(".info")
+            # Ensure output file has .nfo extension
+            if output_path.suffix.lower() != ".nfo":
+                output_path = output_path.with_suffix(".nfo")
                 
             tree.write(output_path, encoding="utf-8", xml_declaration=True)
-            _logger.info("Created Episode INFO file at: %s", output_path)
+            _logger.info("Created Episode NFO file at: %s", output_path)
             return True
 
         except Exception as e:
-            _logger.error("Failed to create Episode INFO file: %s", e)
+            _logger.error("Failed to create Episode NFO file: %s", e)
             return False

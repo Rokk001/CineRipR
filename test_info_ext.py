@@ -39,8 +39,8 @@ def test_info_extension():
         "imdb_id": "tt1234567"
     }
     
-    output_path = Path("test_movie.info")
-    print(f"Generating INFO file at {output_path}...")
+    output_path = Path("test_movie.nfo")
+    print(f"Generating NFO file at {output_path}...")
     
     if client.create_nfo(details, output_path):
         if output_path.exists():
@@ -48,8 +48,8 @@ def test_info_extension():
             output_path.unlink()
         else:
             print(f"ERROR: File not found at expected path {output_path}")
-            # Check if .nfo was created instead
-            wrong_path = output_path.with_suffix(".nfo")
+            # Check if .info was created instead (old behavior)
+            wrong_path = output_path.with_suffix(".info")
             if wrong_path.exists():
                 print(f"ERROR: File was created with wrong extension: {wrong_path}")
                 wrong_path.unlink()

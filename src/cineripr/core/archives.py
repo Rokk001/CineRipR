@@ -1053,13 +1053,13 @@ def process_downloads(
                                             _logger.info("Found movie on TMDB (ID: %s). Fetching details...", tmdb_id)
                                             details = tmdb_client.get_movie_details(tmdb_id)
                                             if details:
-                                                # Save INFO to the movie folder
-                                                nfo_path = target_dir / "movie.info"
+                                                # Save NFO to the movie folder
+                                                nfo_path = target_dir / "movie.nfo"
                                                 if tmdb_client.create_nfo(details, nfo_path):
-                                                    _logger.info("Successfully created INFO file for '%s'", metadata.title)
-                                                    success_messages.append(f"Downloaded INFO for {metadata.title}")
+                                                    _logger.info("Successfully created NFO file for '%s'", metadata.title)
+                                                    success_messages.append(f"Downloaded NFO for {metadata.title}")
                                                 else:
-                                                    _logger.warning("Failed to create INFO file for '%s'", metadata.title)
+                                                    _logger.warning("Failed to create NFO file for '%s'", metadata.title)
                                         else:
                                             _logger.info("Movie '%s' not found on TMDB.", metadata.title)
                                             
@@ -1090,11 +1090,11 @@ def process_downloads(
                                                     # Get Episode Details
                                                     ep_details = tmdb_client.get_episode_details(show_id, season_num, episode_num)
                                                     if ep_details:
-                                                        # Create INFO
-                                                        info_path = video_file.with_suffix(".info")
+                                                        # Create NFO
+                                                        info_path = video_file.with_suffix(".nfo")
                                                         if tmdb_client.create_episode_nfo(ep_details, show_name, info_path):
-                                                             _logger.info("Successfully created Episode INFO for %s", video_file.name)
-                                                             success_messages.append(f"Downloaded INFO for {video_file.name}")
+                                                             _logger.info("Successfully created Episode NFO for %s", video_file.name)
+                                                             success_messages.append(f"Downloaded NFO for {video_file.name}")
                                                     else:
                                                         _logger.warning("Episode not found on TMDB: %s S%02dE%02d", show_name, season_num, episode_num)
                                                 else:
