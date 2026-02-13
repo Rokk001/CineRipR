@@ -743,3 +743,22 @@ volumes:
 - **`src/cineripr/core/archives.py`**: Trigger increment on successful NFO generation.
 - **`src/cineripr/web/templates/index.html`**: Added UI card for the new statistic.
 - **`src/cineripr/web/static/js/app.js`**: Frontend logic to display the new count.
+
+---
+
+## Session Notes - SettingsDB Syntax Fix (2026-02-13)
+
+### 🐛 Problem
+- **SyntaxError**: `unterminated triple-quoted string literal` in `src/cineripr/web/settings_db.py`.
+- The error was detected at the end of the file or at random locations, but was caused by invisible characters or corrupted docstrings/SQL strings througout the file.
+- A duplicate `conn.execute("""` block in `_init_db` was also found and fixed.
+
+### ✅ Solution
+- **Removed all docstrings** from `settings_db.py` methods to eliminate potential invisible characters.
+- **Replaced all triple-quoted SQL strings** with standard strings (concatenated) to avoid parser confusion.
+- **Fixed duplicate code** in `_init_db`.
+- **Restored corrupted function body** for `load_history`.
+
+### 🔧 Geänderte Dateien
+- **`src/cineripr/web/settings_db.py`**: Massive cleanup of strings and docstrings.
+
