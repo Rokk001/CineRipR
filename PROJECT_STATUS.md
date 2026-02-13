@@ -660,6 +660,8 @@ volumes:
 
 ### 🎯 Implementierte Features
 
+### 🎯 Implementierte Features
+
 #### 1. 🎥 TMDB Integration
 - **Automatische NFO-Erstellung**: Nach dem Extrahieren und Verschieben von Filmen **und TV-Serien** wird auf TMDB gesucht.
 - **Metadaten-Download**: 
@@ -681,3 +683,25 @@ volumes:
 ### 📝 Dokumentation
 - **README.md**: Features und Konfiguration aktualisiert.
 - **.gitignore**: `cineripr.local.toml` hinzugefügt.
+
+---
+
+## Session Notes - History Display Fix (2025-02-13)
+
+### 🐛 Problem
+- **History View**: Zeigte nur fehlgeschlagene Items an.
+- **Unreadable Status**: Status-Dropdown im History-Tab war im Dark Mode unlesbar (weiße Schrift auf weißem Hintergrund).
+- **Missing Entries**: Erfolgreiche Releases und Details fehlten in der Historie.
+
+### ✅ Behobene Probleme
+1. **History Tracking Logic Refactor**:
+   - Die History-Logik wurde von `cli.py` (Batch-basiert) nach `archives.py` (Release-basiert) verschoben.
+   - **Ergebnis**: Jedes Release wird jetzt individuell als "Completed" oder "Failed" aufgezeichnet, anstatt dass der gesamte Batch als ein einziger "Processing Run" erscheint.
+2.  **CSS Fix**:
+    - Variable `--bg-secondary` in `style.css` definiert und auf `<select>`-Elemente angewendet.
+    - **Ergebnis**: Status-Filtering Dropdown ist jetzt in Dark- und Light-Mode gut lesbar.
+
+### 🔧 Geänderte Dateien
+- **`src/cineripr/core/archives.py`**: `add_to_history()` Aufruf in die Loop integriert.
+- **`src/cineripr/cli.py`**: Redundanten History-Aufruf entfernt.
+- **`src/cineripr/web/static/css/style.css`**: CSS-Variablen-Fix für Dropdowns.
