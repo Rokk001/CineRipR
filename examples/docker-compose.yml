@@ -37,7 +37,8 @@ services:
     
     # Entrypoint with proper umask
     entrypoint: ["/bin/sh", "-c"]
-    command: ["umask 000 && exec python -m cineripr.cli --config /config/cineripr.toml"]
+    # Run with CLI arguments (Recommended)
+    command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished --movie-root /data/movies --tvshow-root /data/tvshows"]
     
     # Volume mappings
     volumes:
@@ -49,9 +50,15 @@ services:
       
       # Finished directory (where original archives are moved after processing)
       - /path/to/finished:/data/finished
+
+      # Movies directory (Optional: Final destination after renaming)
+      - /path/to/movies:/data/movies
+
+      # TV Shows directory (Optional: Final destination after renaming)
+      - /path/to/tvshows:/data/tvshows
       
-      # Configuration file (read-only)
-      - /path/to/cineripr.toml:/config/cineripr.toml:ro
+      # Configuration directory (Database and Logs)
+      - /path/to/appdata/cineripr:/config
     
     # Logging configuration
     logging:
@@ -74,6 +81,9 @@ services:
       
       # Python buffering (recommended)
       - PYTHONUNBUFFERED=1
+
+      # TMDB API Token (optional, for movie NFO generation)
+      # - CINERIPR_TMDB_API_TOKEN=your_token_here
 
 # Networks (optional)
 networks:

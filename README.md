@@ -169,6 +169,10 @@ services:
     user: "99:100"  # Adjust to your system
     entrypoint: ["/bin/sh", "-c"]
     command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished"]
+    
+    # Optional: TMDB Integration for Movie NFOs
+    environment:
+      - CINERIPR_TMDB_API_TOKEN=your_tmdb_read_access_token
 ```
 
 ### Python (Development)
@@ -243,27 +247,42 @@ include_other = false
 
 ### TMDB Integration (Movie Metadata)
 
-To enable automatic NFO downloading for movies, you need a TMDB API Token (Read Access Token).
+To enable automatic NFO downloading for movies, add your TMDB API Token to your **Docker Compose** configuration.
 
-**Option 1: Environment Variable (Recommended for Docker)**
-Set `CINERIPR_TMDB_API_TOKEN` in your container environment.
+**1. Docker Compose (Recommended)**
+Add the `CINERIPR_TMDB_API_TOKEN` environment variable to your service definition. Here is a complete example:
 
-**Option 2: Local Config (Secure for Local Dev)**
-Create `cineripr.local.toml` (gitignored) next to your `cineripr.toml`:
-
-```toml
-[tmdb]
-api_token = "your_tmdb_read_access_token_here"
+```yaml
+version: "3.8"
+services:
+  cineripr:
+    image: ghcr.io/rokk001/cineripr:latest
+    container_name: cineripr
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    user: "99:100"
+    
+    # TMDB API Token
+    environment:
+      - CINERIPR_TMDB_API_TOKEN=your_tmdb_read_access_token
+      
+    volumes:
+      - /path/to/downloads:/data/downloads
+      - /path/to/extracted:/data/extracted
+      - /path/to/finished:/data/finished
+      - /path/to/movies:/data/movies  # Optional: Final destination for Movies
+      - /path/to/tvshows:/data/tvshows # Optional: Final destination for TV Shows
+      - /path/to/appdata/cineripr:/config
+    command: ["umask 000 && exec python -m cineripr.cli --download-root /data/downloads --extracted-root /data/extracted --finished-root /data/finished --movie-root /data/movies --tvshow-root /data/tvshows"]
 ```
 
-**Option 3: Main Config (Insecure)**
-You *can* put it in `cineripr.toml`, but be careful not to commit it!
+**2. Local Development (Optional)**
+Only for local testing without Docker. Create `cineripr.local.toml` (gitignored):
 ```toml
 [tmdb]
-api_token = "..."
+api_token = "your_token"
 ```
-
-**Note:** WebGUI settings will override TOML settings if configured.
 
 ### CLI Arguments
 

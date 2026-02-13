@@ -57,3 +57,7 @@ include_other = false
 seven_zip = "C:/Program Files/7-Zip/7z.exe"
 
 
+[tmdb]
+# API Token for The Movie Database (TMDB).
+# Required for downloading metadata/NFOs for movies.
+# api_token = "your_tmdb_read_access_token"
