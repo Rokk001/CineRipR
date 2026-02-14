@@ -1380,32 +1380,34 @@ def process_downloads(
                     pass
 
             # Update queue status after processing (if WebGUI is enabled)
-                else:
-                    tracker.update_queue_item(release_dir.name, "completed")
+            # Update queue status after processing (if WebGUI is enabled)
+            if tracker:
+                tracker.update_queue_item(release_dir.name, "completed")
 
-                # Add to history if WebGUI is enabled (MOVED here from cli.py in v2.6.0)
-                # Calculate duration (approximate, relative to this release processing)
-                # Note: precise duration per release is hard without a start time per release,
-                # but we can use the loop iteration time if needed. For now, use 0.0 or
-                # implement a timer start at the beginning of the loop.
-                duration = 0.0 # Placeholder, could be improved with a timer
-                
-                # Determine status for history
-                status = "failed" if release_failed else "completed"
-                
-                # Collect error messages from failed list (Path objects)
-                # We need to map paths back to error strings if possible, or just use path str
-                current_errors = []
-                if release_failed:
-                     # Check if specific errors were logged for this release in 'failed' list
-                     # This is a bit loose since 'failed' aggregates all failures, 
-                     # but we can filter by release path if needed.
-                     # For simplicity, if release_failed is True, we assume the failures in 'failed' 
-                     # that belong to this release are relevant.
-                     for f_path in failed:
-                         if str(release_dir) in str(f_path):
-                             current_errors.append(str(f_path))
+            # Add to history if WebGUI is enabled (MOVED here from cli.py in v2.6.0)
+            # Calculate duration (approximate, relative to this release processing)
+            # Note: precise duration per release is hard without a start time per release,
+            # but we can use the loop iteration time if needed. For now, use 0.0 or
+            # implement a timer start at the beginning of the loop.
+            duration = 0.0 # Placeholder, could be improved with a timer
+            
+            # Determine status for history
+            status = "failed" if release_failed else "completed"
+            
+            # Collect error messages from failed list (Path objects)
+            # We need to map paths back to error strings if possible, or just use path str
+            current_errors = []
+            if release_failed:
+                    # Check if specific errors were logged for this release in 'failed' list
+                    # This is a bit loose since 'failed' aggregates all failures, 
+                    # but we can filter by release path if needed.
+                    # For simplicity, if release_failed is True, we assume the failures in 'failed' 
+                    # that belong to this release are relevant.
+                    for f_path in failed:
+                        if str(release_dir) in str(f_path):
+                            current_errors.append(str(f_path))
 
+            if tracker:
                 tracker.add_to_history(
                     release_name=release_dir.name,
                     status=status,
