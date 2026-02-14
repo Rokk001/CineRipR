@@ -58,6 +58,7 @@ class ProcessResult:
     processed: int
     failed: list[Path]
     unsupported: list[Path]
+    skipped: list[Path] = field(default_factory=list)
     success_messages: list[str] = field(default_factory=list)
 
 
@@ -427,6 +428,7 @@ def process_downloads(
     processed = 0
     failed: list[Path] = []
     unsupported: list[Path] = []
+    skipped: list[Path] = []
     success_messages: list[str] = []
 
     for download_root in paths.download_roots:
@@ -737,13 +739,13 @@ def process_downloads(
                             group, check_completeness=True
                         )
                         if not complete:
-                            _logger.warning(
+                            _logger.info(
                                 "%s Skipping %s: %s",
                                 progress_before,
                                 group.primary,
                                 reason,
                             )
-                            failed.append(group.primary)
+                            skipped.append(group.primary)
                             continue
 
                         # For RAR archives, check if all volumes are present
@@ -761,14 +763,14 @@ def process_downloads(
                             if volume_count is not None and volume_count > 1:
                                 # Multi-volume RAR detected - verify all volumes are present
                                 if group.part_count < volume_count:
-                                    _logger.warning(
+                                    _logger.info(
                                         "%s Skipping %s: found %d volume(s) but archive requires %d volume(s) - download may still be in progress",
                                         progress_before,
                                         group.primary,
                                         group.part_count,
                                         volume_count,
                                     )
-                                    failed.append(group.primary)
+                                    skipped.append(group.primary)
                                     continue
                             elif volume_error:
                                 # If we can't read the volume count, rely on validate_archive_group
@@ -1419,6 +1421,7 @@ def process_downloads(
         processed=processed,
         failed=failed,
         unsupported=unsupported,
+        skipped=skipped,
         success_messages=success_messages,
     )
 

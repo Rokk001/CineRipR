@@ -762,3 +762,27 @@ volumes:
 ### 🔧 Geänderte Dateien
 - **`src/cineripr/web/settings_db.py`**: Massive cleanup of strings and docstrings.
 
+
+---
+
+## Session Notes - Skipped Archives (2026-02-14)
+
+### ?? Problem
+- **Log Noise**: Incomplete downloads (like \.dctmp\ files or missing RAR volumes) were being logged as 'Failed archives' (ERROR level), cluttering the logs and causing confusion.
+- **Incorrect Categorization**: These are temporary states, not actual processing failures.
+
+### ? Solution
+- **New 'Skipped' Category**: Introduced a new \skipped\ list in \ProcessResult\.
+- **Logic Update**:
+    - \.dctmp\ files are now explicitly identified and added to the \skipped\ list.
+    - Multi-volume RAR archives with missing parts are also added to \skipped\.
+- **Log Level**: These items are now logged at \INFO\ level as 'Skipped incomplete archives', removing them from the error logs.
+- **Statistic**: Added \skipped_count\ to database and status tracking.
+
+### ?? Ge�nderte Dateien
+- **\src/cineripr/core/archives.py\**: Updated validation logic and \ProcessResult\.
+- **\src/cineripr/cli.py\**: Updated logging to report skipped items.
+- **\src/cineripr/web/status.py\**: Added \skipped_count\ tracking.
+- **\src/cineripr/web/settings_db.py\**: DB schema update for \skipped_count\.
+- **\eproduce_skip.py\**: Created (and deleted) verification script.
+

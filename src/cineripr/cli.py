@@ -540,6 +540,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 processed=result.processed,
                 failed=len(result.failed),
                 unsupported=len(result.unsupported),
+                skipped=len(result.skipped),
             )
 
             # Add to history if WebGUI is enabled
@@ -613,6 +614,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     _LOGGER.info("Demo mode: all actions were simulated only.")
 
                 _log_path_summary(_LOGGER.error, "Failed archives", result.failed)
+                _log_path_summary(
+                    _LOGGER.info, "Skipped incomplete archives", result.skipped
+                )
                 _log_path_summary(
                     _LOGGER.warning, "Unsupported files", result.unsupported
                 )

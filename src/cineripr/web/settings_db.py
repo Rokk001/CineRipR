@@ -138,9 +138,18 @@ class SettingsDB:
                     except sqlite3.OperationalError:
                         pass
                 
+
+
                 # Migration: Add scraped_count if it doesn't exist (v2.6.0)
                 try:
                     conn.execute("ALTER TABLE statistics ADD COLUMN scraped_count INTEGER DEFAULT 0")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+
+                # Migration: Add skipped_count if it doesn't exist (v2.6.1)
+                try:
+                    conn.execute("ALTER TABLE statistics ADD COLUMN skipped_count INTEGER DEFAULT 0")
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
@@ -243,8 +252,8 @@ class SettingsDB:
                     "INSERT INTO statistics ("
                     "processed_count, failed_count, unsupported_count, "
                     "deleted_count, cleanup_failed_count, "
-                    "extracted_count, copied_count, moved_count, scraped_count) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "extracted_count, copied_count, moved_count, scraped_count, skipped_count) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                     stats.get("processed_count", 0),
                     stats.get("failed_count", 0),
@@ -255,6 +264,7 @@ class SettingsDB:
                     stats.get("copied_count", 0),
                     stats.get("moved_count", 0),
                     stats.get("scraped_count", 0),
+                    stats.get("skipped_count", 0),
                 ))
                 conn.commit()
             finally:
@@ -268,7 +278,7 @@ class SettingsDB:
                 cursor = conn.execute(
                     "SELECT processed_count, failed_count, unsupported_count, "
                     "deleted_count, cleanup_failed_count, "
-                    "extracted_count, copied_count, moved_count, scraped_count "
+                    "extracted_count, copied_count, moved_count, scraped_count, skipped_count "
                     "FROM statistics ORDER BY id DESC LIMIT 1"
                 )
                 row = cursor.fetchone()
@@ -283,6 +293,7 @@ class SettingsDB:
                         "copied_count": row[6] if len(row) > 6 else 0,
                         "moved_count": row[7] if len(row) > 7 else 0,
                         "scraped_count": row[8] if len(row) > 8 else 0,
+                        "skipped_count": row[9] if len(row) > 9 else 0,
                     }
                 return {
                     "processed_count": 0,
@@ -294,6 +305,7 @@ class SettingsDB:
                     "copied_count": 0,
                     "moved_count": 0,
                     "scraped_count": 0,
+                    "skipped_count": 0,
                 }
             finally:
                 conn.close()

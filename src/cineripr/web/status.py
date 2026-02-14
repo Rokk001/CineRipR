@@ -102,6 +102,7 @@ class GlobalStatus:
     copied_count: int = 0
     moved_count: int = 0
     scraped_count: int = 0
+    skipped_count: int = 0  # NEW: Track skipped incomplete archives
     last_update: datetime = field(default_factory=datetime.now)
     current_release: ProcessingStatus | None = None
     recent_logs: list[dict[str, Any]] = field(default_factory=list)
@@ -144,6 +145,7 @@ class GlobalStatus:
             "copied_count": self.copied_count,
             "moved_count": self.moved_count,
             "scraped_count": self.scraped_count,
+            "skipped_count": self.skipped_count,
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "current_release": (
                 {
@@ -218,7 +220,7 @@ class GlobalStatus:
                     "error_messages": h.error_messages,
                     "attempt_count": h.attempt_count,  # NEW in v2.5.13
                 }
-                for h in self.history[-50:]  # Last 50 releases
+                for h in reversed(self.history[-50:])  # Last 50 releases, newest first
             ],
             "theme_preference": self.theme_preference,
             # Next run tracking (NEW in v2.1.0)
@@ -259,6 +261,7 @@ class StatusTracker:
             self._status.copied_count = stats.get("copied_count", 0)
             self._status.moved_count = stats.get("moved_count", 0)
             self._status.scraped_count = stats.get("scraped_count", 0)
+            self._status.skipped_count = stats.get("skipped_count", 0)
 
             # Load history
             history_data = db.load_history()
@@ -420,6 +423,7 @@ class StatusTracker:
         deleted: int | None = None,
         cleanup_failed: int | None = None,
         scraped: int | None = None,
+        skipped: int | None = None,
     ) -> None:
         """Update processing counts."""
         with self._lock:
@@ -435,6 +439,8 @@ class StatusTracker:
                 self._status.cleanup_failed_count = cleanup_failed
             if scraped is not None:
                 self._status.scraped_count = scraped
+            if skipped is not None:
+                self._status.skipped_count = skipped
             self._status.last_update = datetime.now()
 
         # Save statistics to DB
@@ -482,6 +488,7 @@ class StatusTracker:
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
                     "scraped_count": self._status.scraped_count,
+                    "skipped_count": self._status.skipped_count,
                 }
             )
         except Exception as e:
@@ -511,6 +518,7 @@ class StatusTracker:
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
                     "scraped_count": self._status.scraped_count,
+                    "skipped_count": self._status.skipped_count,
                 }
             )
         except Exception as e:
@@ -540,6 +548,7 @@ class StatusTracker:
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
                     "scraped_count": self._status.scraped_count,
+                    "skipped_count": self._status.skipped_count,
                 }
             )
         except Exception as e:
@@ -569,6 +578,7 @@ class StatusTracker:
                     "copied_count": self._status.copied_count,
                     "moved_count": self._status.moved_count,
                     "scraped_count": self._status.scraped_count,
+                    "skipped_count": self._status.skipped_count,
                 }
             )
         except Exception as e:
@@ -596,6 +606,7 @@ class StatusTracker:
                 copied_count=self._status.copied_count,
                 moved_count=self._status.moved_count,
                 scraped_count=self._status.scraped_count,
+                skipped_count=self._status.skipped_count,
                 last_update=self._status.last_update,
                 current_release=(
                     ProcessingStatus(
