@@ -535,7 +535,7 @@ def process_downloads(
             extracted_dirs_to_move: list[tuple[Path, Path]] = (
                 []
             )  # (extracted_dir, relative_parent_name)
-            files_to_move: list[tuple[Path, Path]] = []
+            files_to_move: list[tuple[Path, list[Path]]] = []
             release_failed = False
             is_main_context = False
             extracted_ok = False # Initialize to prevent UnboundLocalError if loop is skipped
@@ -621,6 +621,9 @@ def process_downloads(
                             target_dir.mkdir(parents=True, exist_ok=True)
                             extracted_targets.append(target_dir)
 
+                            # Track which source files were actually successfully copied
+                            actually_copied: list[Path] = []
+
                             if files_to_copy:
                                 copy_tracker = ProgressTracker(
                                     len(files_to_copy),
@@ -640,6 +643,7 @@ def process_downloads(
                                     try:
                                         dest_path = target_dir / entry.name
                                         shutil.copy2(str(entry), str(dest_path))
+                                        actually_copied.append(entry)
                                         copy_tracker.advance(
                                             _logger,
                                             f"Copied {entry.name}",
@@ -656,25 +660,118 @@ def process_downloads(
 
                                 copy_tracker.complete(
                                     _logger,
-                                    f"Finished copying {len(files_to_copy)} file(s) from {current_dir.name}",
+                                    f"Finished copying {len(actually_copied)} file(s) from {current_dir.name}",
                                 )
 
-                            # Mark for moving to finished later (only if files were actually copied)
-                            if files_to_copy:
-                                # Use only the release name, not the full path structure
-                                release_name = (
-                                    relative_parent.parts[-1]
-                                    if relative_parent.parts
-                                    else "unknown"
-                                )
-                                files_to_move.append((current_dir, release_name))
-                        except OSError:
-                            pass
-                            # Process metadata and NFO for copied files
-                            target_dir = _process_metadata_and_nfo(target_dir, tmdb_api_token, tracker, success_messages)
+                            # Only mark individual files for moving to finished if they
+                            # were actually successfully copied to extracted.
+                            # Bug fix: previously the entire current_dir was queued and
+                            # move_remaining_to_finished would move ALL files — even those
+                            # not yet copied. Now we track per-file.
+                            if actually_copied:
+                                files_to_move.append((current_dir, actually_copied))
 
-                        except OSError:
-                            pass
+                                # TMDB scraping + move to final destination for movies
+                                # (mirrors the logic in the archive-extraction branch)
+                                _is_tv = looks_like_tv_show(current_dir) or looks_like_tv_show(release_dir)
+                                if not _is_tv:
+                                    # Try to parse metadata for movie scraping
+                                    try:
+                                        from .nfo_parser import (
+                                            find_nfo_file,
+                                            parse_nfo_file,
+                                            parse_directory_name,
+                                        )
+                                        from .naming import rename_movie_folder_and_files
+                                        from .file_mover import move_to_final_destination
+
+                                        nfo_file = find_nfo_file(target_dir)
+                                        metadata = None
+
+                                        if nfo_file:
+                                            metadata, _ = parse_nfo_file(nfo_file)
+                                            if not (metadata and metadata.title):
+                                                metadata = None
+
+                                        if not metadata or not metadata.title:
+                                            metadata = parse_directory_name(target_dir.name)
+
+                                        if metadata and metadata.title:
+                                            folder_pattern = "$T{ ($6)}{ ($Y)}"
+                                            file_pattern = "ST"
+
+                                            success_rename, new_target_dir = rename_movie_folder_and_files(
+                                                target_dir,
+                                                folder_pattern,
+                                                file_pattern,
+                                                metadata,
+                                                logger=_logger,
+                                            )
+                                            if success_rename:
+                                                target_dir = new_target_dir
+
+                                            # Move to final movies destination
+                                            if paths.movie_root:
+                                                move_success = move_to_final_destination(
+                                                    target_dir,
+                                                    paths.movie_root,
+                                                    overwrite=True,
+                                                    logger=_logger,
+                                                )
+                                                if move_success:
+                                                    target_dir = paths.movie_root / target_dir.name
+
+                                            # TMDB scraping for movie
+                                            if tmdb_api_token and metadata and metadata.title:
+                                                try:
+                                                    from .tmdb import TMDbClient
+
+                                                    _logger.info(
+                                                        "Checking TMDB for '%s' (%s)...",
+                                                        metadata.title,
+                                                        metadata.year or "unknown year",
+                                                    )
+                                                    tmdb_client = TMDbClient(tmdb_api_token)
+                                                    tmdb_id = tmdb_client.search_movie(metadata.title, metadata.year)
+
+                                                    if tmdb_id:
+                                                        details = tmdb_client.get_movie_details(tmdb_id)
+                                                        if details:
+                                                            nfo_path = target_dir / "movie.nfo"
+                                                            if tmdb_client.create_nfo(details, nfo_path):
+                                                                _logger.info(
+                                                                    "Successfully created NFO for '%s'",
+                                                                    metadata.title,
+                                                                )
+                                                                success_messages.append(
+                                                                    f"Downloaded NFO for {metadata.title}"
+                                                                )
+                                                                if tracker:
+                                                                    tracker.increment_scraped(1)
+                                                    else:
+                                                        _logger.info(
+                                                            "Movie '%s' not found on TMDB.",
+                                                            metadata.title,
+                                                        )
+                                                except Exception as tmdb_exc:
+                                                    _logger.error(
+                                                        "TMDB integration failed for '%s': %s",
+                                                        metadata.title,
+                                                        tmdb_exc,
+                                                    )
+                                    except Exception as movie_meta_exc:
+                                        _logger.warning(
+                                            "Failed to process metadata/NFO for pre-extracted movie %s: %s",
+                                            target_dir,
+                                            movie_meta_exc,
+                                        )
+
+                        except OSError as copy_err:
+                            _logger.error(
+                                "OS error while processing pre-extracted files in %s: %s",
+                                current_dir,
+                                copy_err,
+                            )
                     _logger.debug("No supported archives found in %s", current_dir)
                     continue
 
@@ -1356,21 +1453,54 @@ def process_downloads(
                     _remove_empty_subdirs(source_dir)
                     _remove_empty_tree(source_dir, stop=download_root)
 
-            # Move files that had no archives
+            # Move files that had no archives — only files that were actually copied to
+            # extracted are moved to finished. Bug fix: previously move_remaining_to_finished
+            # walked the whole source_dir and moved ALL files, including ones not yet copied.
             if files_to_move and not release_failed:
                 if not demo_mode:
-                    for source_dir, release_name in files_to_move:
+                    for source_dir, copied_file_list in files_to_move:
                         try:
-                            # Use move_remaining_to_finished for proper TV show organization
-                            move_remaining_to_finished(
-                                source_dir,
-                                finished_root=paths.finished_root,
-                                download_root=download_root,
+                            # Determine destination under finished/ mirroring the
+                            # downloads directory structure.
+                            try:
+                                rel_parts = source_dir.relative_to(download_root).parts
+                            except ValueError:
+                                rel_parts = (source_dir.name,)
+
+                            release_root_name = rel_parts[0] if rel_parts else source_dir.name
+                            release_root = download_root / release_root_name
+                            try:
+                                sub_rel = source_dir.relative_to(release_root)
+                            except ValueError:
+                                sub_rel = Path("")
+
+                            dest_dir = (
+                                paths.finished_root / release_root_name / sub_rel
                             )
+                            dest_dir.mkdir(parents=True, exist_ok=True)
+
+                            # Move ONLY the files that were successfully copied
+                            for src_file in copied_file_list:
+                                if not src_file.exists():
+                                    continue
+                                dest = ensure_unique_destination(dest_dir / src_file.name)
+                                try:
+                                    shutil.move(str(src_file), str(dest))
+                                    if status_callback:
+                                        from ..web.status import get_status_tracker
+                                        get_status_tracker().increment_moved(1)
+                                except OSError as move_err:
+                                    _logger.error(
+                                        "Failed to move %s to finished: %s",
+                                        src_file.name,
+                                        move_err,
+                                    )
+
                             _remove_empty_subdirs(source_dir)
                             _remove_empty_tree(source_dir, stop=download_root)
                         except OSError:
                             pass
+
 
             # Cleanup empty directories
             if not demo_mode:
